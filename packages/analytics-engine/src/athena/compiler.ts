@@ -46,7 +46,7 @@ export const DIMENSION_COLUMNS: Record<MeshDatasetId, Record<string, string>> = 
     contracted_date: 'contracted_at',
   },
   conversations: { conversation_status: 'status', conversation_channel: 'channel' },
-  crm_interactions: {},
+  crm_interactions: { crm_interaction_type: 'interaction_type', crm_outcome: 'outcome' },
   digital_journey: {},
   app_navigation: {
     app_screen: 'screen',
@@ -208,6 +208,62 @@ export const BASE_METRIC_SQL: Record<string, BaseMetricSql> = {
     time: 'responded_at',
     expression:
       'CAST(100 * (COUNT_IF(f.score >= 9) - COUNT_IF(f.score <= 6)) AS DOUBLE) / NULLIF(COUNT(*), 0)',
+  },
+  pix_volume: {
+    dataset: 'transactions',
+    time: 'occurred_at',
+    expression: 'SUM(f.amount)',
+    where: "f.transaction_type IN ('PIX_IN', 'PIX_OUT')",
+  },
+  boletos_issued: {
+    dataset: 'transactions',
+    time: 'occurred_at',
+    expression: 'COUNT(*)',
+    where: "f.transaction_type = 'BOLETO_ISSUED'",
+  },
+  transacting_companies: {
+    dataset: 'transactions',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.company_id)',
+  },
+  app_completions: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'COUNT(*)',
+    where: "f.action = 'COMPLETE'",
+  },
+  app_abandons: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'COUNT(*)',
+    where: "f.action = 'ABANDON'",
+  },
+  crm_interactions_total: {
+    dataset: 'crm_interactions',
+    time: 'occurred_at',
+    expression: 'COUNT(*)',
+  },
+  crm_contacted_companies: {
+    dataset: 'crm_interactions',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.company_id)',
+  },
+  conversations_total: { dataset: 'conversations', time: 'started_at', expression: 'COUNT(*)' },
+  conversations_resolved: {
+    dataset: 'conversations',
+    time: 'started_at',
+    expression: 'COUNT(*)',
+    where: "f.status = 'RESOLVED'",
+  },
+  digital_sessions: {
+    dataset: 'digital_journey',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.session_id)',
+  },
+  digital_active_companies: {
+    dataset: 'digital_journey',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.company_id)',
   },
   unresolved_conversations: {
     dataset: 'conversations',

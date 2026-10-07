@@ -11,8 +11,8 @@ import {
 } from './index';
 
 describe('@bfp/semantic-layer catalog', () => {
-  it('exports the 24 architecture metrics plus app, transactions and NPS (35)', () => {
-    expect(METRIC_CATALOG).toHaveLength(35);
+  it('exports the 24 architecture metrics plus usage, transactions, CRM, service and NPS (48)', () => {
+    expect(METRIC_CATALOG).toHaveLength(48);
     expect(METRIC_CATALOG[0]?.id).toBe('companies_total');
     expect(METRIC_CATALOG.map((metric) => metric.id)).toContain('activation_d30_rate');
     expect(METRIC_CATALOG.map((metric) => metric.id)).toContain('unresolved_conversations');
@@ -20,7 +20,7 @@ describe('@bfp/semantic-layer catalog', () => {
 
   it('keeps metric identifiers unique and required governance fields populated', () => {
     const ids = METRIC_CATALOG.map((metric) => metric.id);
-    expect(new Set(ids).size).toBe(35);
+    expect(new Set(ids).size).toBe(48);
 
     for (const metric of METRIC_CATALOG) {
       expect(metric.name.length).toBeGreaterThan(0);

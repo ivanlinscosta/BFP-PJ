@@ -279,7 +279,7 @@ describe('demo workspace and new routes', () => {
     ).toBe(403);
     const overview = await request(app).get('/api/admin/overview').set('Authorization', admin);
     expect(overview.body.users).toHaveLength(3);
-    expect(overview.body.semantic.metricCount).toBe(35);
+    expect(overview.body.semantic.metricCount).toBe(48);
 
     const flags = {
       aiCopilot: false,

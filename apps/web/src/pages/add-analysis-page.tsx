@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { SearchInput } from '@/components/ui/input';
 import { PageHeader } from '@/components/shell/page-header';
 import { ErrorState, LoadingRows } from '@/components/states/states';
+import type { CatalogMetric } from '@/features/catalog/api';
 import { useMetricCatalog } from '@/features/catalog/hooks';
 import { useMeshDatasets } from '@/features/mesh/api';
 import { useAnalysisStore } from '@/features/explorer/store';
@@ -45,11 +46,28 @@ export function AddAnalysisPage() {
     const normalized = normalizeText(query);
     const base = normalized
       ? all.filter((metric) =>
-          normalizeText(`${metric.shortName} ${metric.name}`).includes(normalized),
+          normalizeText(`${metric.shortName} ${metric.name} ${metric.category}`).includes(
+            normalized,
+          ),
         )
-      : all.filter((metric) => metric.featured);
+      : all;
     return [...base].sort((left, right) => (left.libraryOrder ?? 99) - (right.libraryOrder ?? 99));
   }, [metricsQuery.data, query]);
+  // Featured metrics first, then every governed metric grouped by business category.
+  const groups = useMemo(() => {
+    const featured = query ? [] : available.filter((metric) => metric.featured);
+    const rest = available.filter((metric) => !featured.includes(metric));
+    const byCategory = new Map<string, CatalogMetric[]>();
+    for (const metric of rest) {
+      byCategory.set(metric.category, [...(byCategory.get(metric.category) ?? []), metric]);
+    }
+    return [
+      ...(featured.length ? [{ title: 'Mais usadas', items: featured }] : []),
+      ...[...byCategory.entries()]
+        .sort(([left], [right]) => left.localeCompare(right, 'pt-BR'))
+        .map(([title, items]) => ({ title, items })),
+    ];
+  }, [available, query]);
   const selected = (metricsQuery.data ?? []).find(
     (metric) => metric.id === (selectedId ?? available[0]?.id),
   );
@@ -98,49 +116,56 @@ export function AddAnalysisPage() {
           ) : (
             <div
               aria-label="Métricas disponíveis"
-              className="mt-2 flex flex-col gap-1.5"
+              className="mt-2 flex max-h-[680px] flex-col gap-1.5 overflow-y-auto pr-1"
               role="radiogroup"
             >
-              {available.map((metric) => {
-                const checked = metric.id === selected?.id;
-                return (
-                  <label
-                    className={cn(
-                      'flex min-h-[57px] cursor-pointer items-center gap-3 rounded-[var(--radius-control)] border px-4 py-2 transition-colors',
-                      checked
-                        ? 'border-peach bg-cream'
-                        : 'border-line bg-card hover:border-line-strong',
-                    )}
-                    key={metric.id}
-                  >
-                    <input
-                      checked={checked}
-                      className="h-[18px] w-[18px] accent-[var(--color-brand-orange)]"
-                      name="metric"
-                      onChange={() => setSelectedId(metric.id)}
-                      type="radio"
-                    />
-                    <span className="flex flex-col items-start gap-1">
-                      <span className="flex items-center gap-2 text-sm text-ink">
-                        <ChartNoAxesColumn
-                          aria-hidden
-                          className="h-4 w-4 text-brand-orange"
-                          strokeWidth={2.5}
+              {groups.map((group) => (
+                <div className="flex flex-col gap-1.5" key={group.title}>
+                  <p className="mt-3 mb-0.5 text-[11px] font-semibold tracking-wide text-ink-soft uppercase">
+                    {group.title}
+                  </p>
+                  {group.items.map((metric) => {
+                    const checked = metric.id === selected?.id;
+                    return (
+                      <label
+                        className={cn(
+                          'flex min-h-[57px] cursor-pointer items-center gap-3 rounded-[var(--radius-control)] border px-4 py-2 transition-colors',
+                          checked
+                            ? 'border-peach bg-cream'
+                            : 'border-line bg-card hover:border-line-strong',
+                        )}
+                        key={metric.id}
+                      >
+                        <input
+                          checked={checked}
+                          className="h-[18px] w-[18px] accent-[var(--color-brand-orange)]"
+                          name="metric"
+                          onChange={() => setSelectedId(metric.id)}
+                          type="radio"
                         />
-                        <span className={checked ? 'font-semibold' : undefined}>
-                          {metric.shortName}
+                        <span className="flex flex-col items-start gap-1">
+                          <span className="flex items-center gap-2 text-sm text-ink">
+                            <ChartNoAxesColumn
+                              aria-hidden
+                              className="h-4 w-4 text-brand-orange"
+                              strokeWidth={2.5}
+                            />
+                            <span className={checked ? 'font-semibold' : undefined}>
+                              {metric.shortName}
+                            </span>
+                          </span>
+                          {metric.certificationStatus === 'CERTIFIED' ? (
+                            <CertificationBadge
+                              className="ml-6 h-[22px] text-[11px]"
+                              status="CERTIFIED"
+                            />
+                          ) : null}
                         </span>
-                      </span>
-                      {metric.certificationStatus === 'CERTIFIED' ? (
-                        <CertificationBadge
-                          className="ml-6 h-[22px] text-[11px]"
-                          status="CERTIFIED"
-                        />
-                      ) : null}
-                    </span>
-                  </label>
-                );
-              })}
+                      </label>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </Card>

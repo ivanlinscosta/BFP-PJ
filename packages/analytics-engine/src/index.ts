@@ -1089,10 +1089,20 @@ function computeNonRatioMetricValue(
     case 'app_errors':
     case 'transactions_count':
     case 'nps_responses':
+    case 'boletos_issued':
+    case 'app_completions':
+    case 'app_abandons':
+    case 'crm_interactions_total':
+    case 'conversations_total':
+    case 'conversations_resolved':
       return documents.length;
     case 'app_sessions':
-    case 'app_active_companies': {
-      const field = metric.definition.id === 'app_sessions' ? 'sessionId' : 'companyId';
+    case 'digital_sessions':
+    case 'app_active_companies':
+    case 'transacting_companies':
+    case 'crm_contacted_companies':
+    case 'digital_active_companies': {
+      const field = metric.definition.id.endsWith('_sessions') ? 'sessionId' : 'companyId';
       return new Set(
         documents
           .map((document) => getDocumentValue(document, field))
@@ -1108,6 +1118,7 @@ function computeNonRatioMetricValue(
         : values.reduce((sum, value) => sum + value, 0) / values.length;
     }
     case 'transaction_volume':
+    case 'pix_volume':
       return documents.reduce(
         (total, document) => total + (toNumber(getDocumentValue(document, 'amount')) ?? 0),
         0,
