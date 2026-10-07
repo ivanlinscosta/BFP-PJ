@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@bfp/*": ["packages/*/src/index.ts"],
+      "@api/*": ["apps/api/src/*"]
+    }
+  },
+  "include": ["./**/*.ts"]
+}

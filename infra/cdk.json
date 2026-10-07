@@ -1,0 +1,12 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "context": {
+    "env": "dev",
+    "region": "sa-east-1",
+    "bedrockModelId": "",
+    "githubRepository": "",
+    "lakeFormationAdmins": "",
+    "datazoneDomainId": "",
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}

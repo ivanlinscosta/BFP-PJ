@@ -1,0 +1,59 @@
+{
+  "name": "bfp-pj",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "infra"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev -w web",
+    "dev:api": "npm run dev -w api",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p scripts/seed/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
+    "lint": "eslint . && prettier --check .",
+    "test": "vitest run && vitest run --config scripts/seed/vitest.config.ts",
+    "build": "npm run build --workspaces --if-present",
+    "format": "prettier --write .",
+    "seed": "tsx scripts/seed/generate.ts",
+    "seed:validate": "tsx scripts/seed/validate.ts",
+    "seed:aws": "tsx scripts/seed/aws.ts",
+    "seed:lake": "tsx scripts/seed/lake.ts",
+    "seed:workspace": "tsx scripts/seed/workspace.ts",
+    "cdk:synth": "npm run build -w api && npm run build -w web && npm run synth -w infra",
+    "cdk:deploy": "npm run build -w api && npm run build -w web && npm run deploy -w infra",
+    "cognito:users": "tsx scripts/cognito-users.ts",
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test e2e/visual.spec.ts",
+    "fullstory:export": "tsx scripts/fullstory-export.ts"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-athena": "^3.1147.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1147.0",
+    "@aws-sdk/client-glue": "^3.1147.0",
+    "@aws-sdk/client-s3": "^3.1147.0",
+    "@aws-sdk/client-secrets-manager": "^3.1147.0",
+    "@aws-sdk/client-ssm": "^3.1147.0",
+    "@eslint/js": "^9.39.1",
+    "@faker-js/faker": "^10.6.0",
+    "@playwright/test": "^1.63.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^26.6.4",
+    "concurrently": "^9.2.4",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "globals": "^17.0.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "recharts": "^3.10.1"
+  }
+}

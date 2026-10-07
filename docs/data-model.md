@@ -1,0 +1,42 @@
+# Modelo de dados
+
+## Dados sintéticos (LGPD)
+
+Todo o dataset é gerado por `scripts/seed/generator.ts` (semente fixa = determinístico). Não há CPF,
+CNPJ, telefone, e-mail ou conta bancária reais: CNPJs são mascarados (`10.000.123/0001-**`) e
+exibidos com máscara adicional na UI; nomes vêm do faker em pt-BR.
+
+Volumes padrão: ~3.000 empresas que avançam no funil + ~16.000 leads que não convertem
+(calibração por canal), 12 meses de eventos, 40 campanhas, 9.000 sócios, 8.000 produtos
+contratados, 60.000 touchpoints de mídia, 50.000 eventos de funil, 12.000 interações de CRM,
+8.000 conversas e 80.000 eventos digitais.
+
+Padrões de negócio garantidos por `scripts/seed/coherence.ts` (testados):
+
+- Conversão lead → conta entre 5% e 20% por canal — Google Search ~14,8%, Organic ~13,6%,
+  Referral ~12,1%, Meta ~9,7%, LinkedIn ~8,4%.
+- Google Search: boa conversão e CAC intermediário; Meta: alto volume e conversão menor;
+  LinkedIn: CAC alto e empresas maiores; Organic: CAC muito baixo.
+- Empresas médias contratam mais produtos; onboarding ≤ 3 dias aumenta a ativação D30; mais de
+  uma conversa não resolvida reduz a ativação.
+- ~1,2% dos touchpoints chegam sem empresa correspondente (sincronização tardia) para que a
+  governança mostre qualidade realista.
+- A empresa-vitrine **Atlas Tecnologia Ltda.** (SP, Média, Google Search) sustenta o roteiro do
+  Cliente 360.
+
+## Estado da aplicação (DynamoDB `objects`)
+
+Chave `PK = USER#<userId>`, `SK = <type>#<id>`; `GSI1` por id; `GSI2 = SHARED#<type>` para
+objetos compartilhados.
+
+| type             | Conteúdo                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `analysis`       | `AnalysisSpec` + `metadata` (owner, time, `visibility` PRIVATE/TEAM/READ_ONLY, descrição) |
+| `dashboard`      | nome, descrição, cards (referência a `analysisId` + layout/ordem), compartilhamento       |
+| `favorite`       | favoritos por usuário (`dashboard:<id>`)                                                  |
+| `audience`       | `filterGroups` (E/OU aninhado), tamanho estimado, status, último destino                  |
+| `activationJob`  | destino CRM/MEDIA, status QUEUED → PROCESSING → COMPLETED, registros                      |
+| `aiConversation` | turnos da Inteligência PJ e o `AnalysisSpec` resultante                                   |
+| `preference`     | feature flags (usuário de sistema)                                                        |
+
+Cards de dashboard referenciam análises salvas — a definição da consulta não é duplicada.

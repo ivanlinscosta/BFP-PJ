@@ -1,0 +1,11 @@
+dist
+node_modules
+package-lock.json
+coverage
+data
+docs/architecture.md
+.playwright-mcp
+infra/cdk.out
+playwright-report
+test-results
+artifacts

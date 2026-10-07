@@ -1,0 +1,20 @@
+{
+  "name": "@bfp/analytics-engine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/lib-dynamodb": "^3.1147.0",
+    "@bfp/domain": "*",
+    "@bfp/semantic-layer": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "npm run typecheck"
+  }
+}

@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+
+/*
+ * BFP-PJ design tokens — extracted from the approved reference screens (1440 × 1024).
+ * Components must use these tokens (e.g. bg-brand-orange, text-brand-navy, border-line)
+ * instead of raw hex values.
+ */
+@theme {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Brand */
+  --color-brand-navy: #002663;
+  --color-brand-navy-strong: #001a47;
+  --color-brand-navy-soft: #1e4076;
+  --color-brand-logo: #030066;
+  --color-brand-orange: #ff6200;
+  --color-brand-orange-hover: #e65800;
+
+  /* Surfaces */
+  --color-page: #f7f7f7;
+  --color-card: #ffffff;
+  --color-muted: #f5f5f5;
+  --color-tint: #f1f5fa;
+  --color-segment: #eef0f3;
+  --color-cream: #fff3eb;
+  --color-peach: #ffd4b3;
+  --color-peach-soft: #fff0e6;
+
+  /* Lines */
+  --color-line: #e3e6ea;
+  --color-line-strong: #cfd4da;
+
+  /* Text */
+  --color-ink: #1f2329;
+  --color-ink-soft: #5f6670;
+  --color-ink-faint: #888c93;
+
+  /* Feedback */
+  --color-success: #23634a;
+  --color-success-soft: #eff7f2;
+  --color-success-line: #cfe6d9;
+  --color-warning: #9a5b00;
+  --color-warning-soft: #fff6e5;
+  --color-danger: #b42318;
+  --color-danger-soft: #fef3f2;
+
+  /* Shape */
+  --radius-card: 8px;
+  --radius-control: 6px;
+
+  /* Layout */
+  --spacing-sidebar: 224px;
+  --spacing-topbar: 72px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-brand-orange);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
