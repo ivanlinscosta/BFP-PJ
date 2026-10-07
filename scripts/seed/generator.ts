@@ -1,5 +1,8 @@
 import { Faker, base, pt_BR } from '@faker-js/faker';
 import type {
+  AppNavigationEvent,
+  NpsResponse,
+  Transaction,
   AcquisitionChannel,
   Account,
   AccountStatus,
@@ -53,6 +56,14 @@ import {
   PROSPECT_SIZE_FACTORS,
   REFERENCE_DATE,
   SEGMENTS,
+  APP_ACTION_WEIGHTS,
+  APP_SCREEN_SECONDS,
+  APP_SCREEN_WEIGHTS,
+  APP_VERSIONS,
+  NPS_TOUCHPOINT_WEIGHTS,
+  TRANSACTION_CHANNEL_WEIGHTS,
+  TRANSACTION_TICKET,
+  TRANSACTION_TYPE_WEIGHTS,
 } from './constants';
 import { createKeyedRandom, mulberry32 } from './prng';
 
@@ -74,6 +85,9 @@ export interface GenerationCounts {
   crmInteractions: number;
   conversations: number;
   digitalEvents: number;
+  appNavigationEvents: number;
+  transactions: number;
+  npsResponses: number;
   qualityStatuses: number;
   auditLogs: number;
 }
@@ -187,6 +201,9 @@ export function resolveGenerationCounts(scale = 1): GenerationCounts {
     crmInteractions: scaledCount(BASE_COUNTS.crmInteractions, 96),
     conversations: scaledCount(BASE_COUNTS.conversations, 72),
     digitalEvents: scaledCount(BASE_COUNTS.digitalEvents, 720),
+    appNavigationEvents: scaledCount(BASE_COUNTS.appNavigationEvents, 900),
+    transactions: scaledCount(BASE_COUNTS.transactions, 450),
+    npsResponses: scaledCount(BASE_COUNTS.npsResponses, 60),
     qualityStatuses: 0,
     auditLogs: 0,
   };
@@ -242,6 +259,9 @@ export function generateDatasetBundle(options: GenerationOptions = {}): DatasetB
   );
   const funnelEvents = sortById(generateFunnelEvents(companyPlans, seed));
   const digitalEvents = sortById(generateDigitalEvents(companyPlans, companyProducts, seed));
+  const appNavigationEvents = generateAppNavigation(companyPlans, counts.appNavigationEvents, seed);
+  const transactions = generateTransactions(companyPlans, counts.transactions, seed);
+  const npsResponses = generateNpsResponses(companyPlans, conversations, counts.npsResponses, seed);
   const prospects = generateProspectLeads({
     coreCompanies,
     seed,
@@ -266,6 +286,9 @@ export function generateDatasetBundle(options: GenerationOptions = {}): DatasetB
     crmInteractions,
     conversations,
     digitalEvents,
+    appNavigationEvents,
+    transactions,
+    npsResponses,
     qualityStatuses: [],
     auditLogs: [],
   };
@@ -1096,6 +1119,185 @@ function generateDigitalEvents(
   }
 
   return events;
+}
+
+/** Companies with an open account, weighted by how intensely they use the bank. */
+function allocateActiveUsage(companyPlans: CompanyPlan[], total: number, maximum: number) {
+  return allocateIntegerCounts({
+    items: companyPlans,
+    total,
+    getId: (plan) => plan.company.id,
+    getMinimum: (plan) => (plan.accountOpenedAt ? 1 : 0),
+    getMaximum: (plan) => (plan.accountOpenedAt ? maximum : 0),
+    getWeight: (plan) =>
+      plan.accountOpenedAt
+        ? 1 +
+          SIZE_WEIGHT_MAP[plan.company.companySize] * 2 +
+          (plan.activationDate ? 6 : 0) +
+          plan.revenueWeight * 2 -
+          (plan.churnedAt ? 3 : 0)
+        : 0,
+  });
+}
+
+/** Moment after the account is open when a company uses the bank, bounded by the history. */
+function usageDate(plan: CompanyPlan, rand: () => number) {
+  const start = plan.activationDate ?? plan.accountOpenedAt ?? plan.leadDate;
+  const end =
+    plan.churnedAt && plan.churnedAt < plan.referenceDate ? plan.churnedAt : plan.referenceDate;
+  return clampDate(randomDateBetween(rand, start, end > start ? end : start), HISTORY_START, end);
+}
+
+/** Itaú Empresas app telemetry: screen views, clicks, completions, abandons and errors. */
+function generateAppNavigation(
+  companyPlans: CompanyPlan[],
+  total: number,
+  seed: number,
+): AppNavigationEvent[] {
+  const counts = allocateActiveUsage(companyPlans, total, 120);
+  const events: AppNavigationEvent[] = [];
+  let runningIndex = 1;
+
+  for (const plan of companyPlans) {
+    const count = counts.get(plan.company.id) ?? 0;
+    if (count === 0) continue;
+
+    const rand = createKeyedRandom(seed, `app:${plan.company.id}`);
+    const platform = rand() < 0.57 ? 'ANDROID' : 'IOS';
+    let sessionIndex = 0;
+    let sessionStart = usageDate(plan, rand);
+
+    for (let index = 0; index < count; index += 1) {
+      // A session groups 3-8 consecutive screens a few seconds apart.
+      if (index % (3 + (sessionIndex % 6)) === 0) {
+        sessionIndex += 1;
+        sessionStart = usageDate(plan, rand);
+      }
+      const screen = pickWeighted(
+        APP_SCREEN_WEIGHTS.map(([value, weight]) => ({ value, weight })),
+        rand,
+      );
+      const action = pickWeighted(
+        APP_ACTION_WEIGHTS.map(([value, weight]) => ({ value, weight })),
+        rand,
+      );
+      const durationSeconds = Math.max(
+        2,
+        Math.round(APP_SCREEN_SECONDS[screen] * (0.4 + rand() * 1.4)),
+      );
+      events.push({
+        id: `app-${String(runningIndex).padStart(7, '0')}`,
+        companyId: plan.company.id,
+        sessionId: `${plan.company.id}-app-${String(sessionIndex).padStart(4, '0')}`,
+        screen,
+        action,
+        platform,
+        appVersion: APP_VERSIONS[Math.floor(rand() * APP_VERSIONS.length)] ?? APP_VERSIONS[0],
+        durationSeconds,
+        occurredAt: toIso(
+          clampDate(
+            new Date(sessionStart.getTime() + (index % 8) * 40_000),
+            HISTORY_START,
+            plan.referenceDate,
+          ),
+        ),
+      });
+      runningIndex += 1;
+    }
+  }
+
+  return events;
+}
+
+/** Pix, boletos, TED and card transactions (amounts only; no counterpart data). */
+function generateTransactions(
+  companyPlans: CompanyPlan[],
+  total: number,
+  seed: number,
+): Transaction[] {
+  const counts = allocateActiveUsage(companyPlans, total, 80);
+  const transactions: Transaction[] = [];
+  let runningIndex = 1;
+
+  for (const plan of companyPlans) {
+    const count = counts.get(plan.company.id) ?? 0;
+    if (count === 0) continue;
+
+    const rand = createKeyedRandom(seed, `transactions:${plan.company.id}`);
+    for (let index = 0; index < count; index += 1) {
+      const transactionType = pickWeighted(
+        TRANSACTION_TYPE_WEIGHTS.map(([value, weight]) => ({ value, weight })),
+        rand,
+      );
+      // Log-normal-ish ticket: most values near the median, a long tail of large payments.
+      const spread = Math.exp((rand() - 0.5) * 2.2);
+      transactions.push({
+        id: `trx-${String(runningIndex).padStart(7, '0')}`,
+        companyId: plan.company.id,
+        transactionType,
+        channel: pickWeighted(
+          TRANSACTION_CHANNEL_WEIGHTS.map(([value, weight]) => ({ value, weight })),
+          rand,
+        ),
+        amount: roundNumber(
+          TRANSACTION_TICKET[transactionType] * (0.6 + plan.revenueWeight * 0.5) * spread,
+          2,
+        ),
+        occurredAt: toIso(usageDate(plan, rand)),
+      });
+      runningIndex += 1;
+    }
+  }
+
+  return transactions;
+}
+
+/**
+ * NPS answers (0-10, no free text). Fast onboarding and resolved service raise the score;
+ * unresolved conversations lower it, so detractors correlate with service problems.
+ */
+function generateNpsResponses(
+  companyPlans: CompanyPlan[],
+  conversations: Conversation[],
+  total: number,
+  seed: number,
+): NpsResponse[] {
+  const unresolved = new Map<string, number>();
+  for (const conversation of conversations) {
+    if (conversation.status !== 'RESOLVED') {
+      unresolved.set(conversation.companyId, (unresolved.get(conversation.companyId) ?? 0) + 1);
+    }
+  }
+  const counts = allocateActiveUsage(companyPlans, total, 4);
+  const responses: NpsResponse[] = [];
+  let runningIndex = 1;
+
+  for (const plan of companyPlans) {
+    const count = counts.get(plan.company.id) ?? 0;
+    if (count === 0) continue;
+
+    const rand = createKeyedRandom(seed, `nps:${plan.company.id}`);
+    const base =
+      8.5 +
+      (plan.fastOnboarding ? 0.9 : -0.3) +
+      (plan.activationDate ? 0.5 : -0.6) -
+      Math.min(3, (unresolved.get(plan.company.id) ?? 0) * 1.1);
+    for (let index = 0; index < count; index += 1) {
+      responses.push({
+        id: `nps-${String(runningIndex).padStart(6, '0')}`,
+        companyId: plan.company.id,
+        touchpoint: pickWeighted(
+          NPS_TOUCHPOINT_WEIGHTS.map(([value, weight]) => ({ value, weight })),
+          rand,
+        ),
+        score: Math.round(clamp(base + (rand() - 0.5) * 4, 0, 10)),
+        respondedAt: toIso(usageDate(plan, rand)),
+      });
+      runningIndex += 1;
+    }
+  }
+
+  return responses;
 }
 
 function buildCompanyChannels(total: number, seed: number) {

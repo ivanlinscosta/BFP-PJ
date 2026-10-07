@@ -164,7 +164,7 @@ describe('mesh and integrations routes', () => {
     expect(status.body).toMatchObject({
       atlan: 'not_configured',
       fullstory: 'not_configured',
-      mesh: { datasets: 6 },
+      mesh: { datasets: 9 },
     });
 
     const business = await request(app)

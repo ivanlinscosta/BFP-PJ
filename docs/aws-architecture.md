@@ -54,7 +54,7 @@ flowchart TB
 
 | Stack                        | Recursos                                                                                                                                                                                                                                                                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bfp-pj-<env>-data`          | KMS (rotação), bucket do data lake (BLOCK_ALL, SSL, lifecycle de resultados), **6 databases Glue (um por domínio do mesh)**, Lake Formation (admins, registro do bucket, LF-tags `bfp_domain`/`bfp_classification` associadas aos bancos), workgroups Athena da API e de ETL, DynamoDB `dataset` e `objects` (PITR, KMS), segredos Atlan/FullStory, parâmetro `data-loaded-at`                          |
+| `bfp-pj-<env>-data`          | KMS (rotação), bucket do data lake (BLOCK_ALL, SSL, lifecycle de resultados), **9 databases Glue (um por domínio do mesh)**, Lake Formation (admins, registro do bucket, LF-tags `bfp_domain`/`bfp_classification` associadas aos bancos), workgroups Athena da API e de ETL, DynamoDB `dataset` e `objects` (PITR, KMS), segredos Atlan/FullStory, parâmetro `data-loaded-at`                          |
 | `bfp-pj-<env>-auth`          | User pool (sem self sign-up, e-mail, `custom:team`), grupos, app client sem secret                                                                                                                                                                                                                                                                                                                      |
 | `bfp-pj-<env>-ai`            | Parâmetro SSM com o model id do Bedrock (`NOT_CONFIGURED` = provedor local)                                                                                                                                                                                                                                                                                                                             |
 | `bfp-pj-<env>-api`           | Lambda + HTTP API, rotas públicas só para `POST /api/auth/login` e `GET /api/health`, IAM mínimo (tabelas, prefixos do bucket, workgroup, Glue dos bancos do mesh, `lakeformation:GetDataAccess`, segredos, SSM, Bedrock, `ListUsersInGroup`) e grants Lake Formation por LF-tag (`DESCRIBE` nos bancos, `SELECT`/`DESCRIBE` nas tabelas). O model id é lido do SSM no deploy (sem export entre stacks) |
@@ -83,6 +83,9 @@ Produtos de dados (tabelas gold), todos com chave `company_id`:
 | `bfp_pj_<env>_service`      | `conversations`     | Atendimento PJ                 |
 | `bfp_pj_<env>_relationship` | `crm_interactions`  | Relacionamento PJ              |
 | `bfp_pj_<env>_digital`      | `digital_journey`   | Canais Digitais PJ (FullStory) |
+| `bfp_pj_<env>_app`          | `app_navigation`    | Canais Digitais PJ (app)       |
+| `bfp_pj_<env>_payments`     | `transactions`      | Pagamentos PJ                  |
+| `bfp_pj_<env>_experience`   | `nps_responses`     | Experiência do Cliente PJ      |
 
 Detalhes de governança, seleção de bases e integrações em
 [data-mesh-and-integrations.md](data-mesh-and-integrations.md).

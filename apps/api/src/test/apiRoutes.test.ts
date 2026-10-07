@@ -270,6 +270,9 @@ function createFixtureBundle(): DatasetBundle {
         value: 1,
       },
     ],
+    appNavigationEvents: [],
+    transactions: [],
+    npsResponses: [],
     qualityStatuses: [
       {
         id: 'quality-001',

@@ -40,10 +40,10 @@ Firebase abandonado — não há nenhuma dependência Firebase no código).
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Frontend    | React 19, TypeScript, Vite, Tailwind v4 (tokens em `apps/web/src/app/styles.css`), TanStack Query, Zustand, Recharts           |
 | API         | Express empacotado para Lambda (`apps/api`), Zod, RBAC, logs estruturados                                                      |
-| Semântica   | `packages/semantic-layer` — 24 métricas, 21 dimensões, 7 produtos de dados, glossário, linhagem                                |
+| Semântica   | `packages/semantic-layer` — 35 métricas, 30 dimensões, 10 produtos de dados, glossário, linhagem                               |
 | Motor       | `packages/analytics-engine` — engine local/DynamoDB, **AthenaQueryCompiler**, Insight Engine, Audience Engine                  |
 | IA          | Inteligência PJ: provedor determinístico local ou **Amazon Bedrock** (Converse + ferramentas governadas)                       |
-| Data mesh   | 6 produtos de dados (Glue + Lake Formation, DataZone opcional); o usuário escolhe as bases e o motor faz JOIN por `company_id` |
+| Data mesh   | 9 produtos de dados (Glue + Lake Formation, DataZone opcional); o usuário escolhe as bases e o motor faz JOIN por `company_id` |
 | Integrações | **Atlan** (certificação, owners, glossário) e **FullStory** (sessões e eventos da jornada digital)                             |
 | Infra       | **AWS CDK** (`infra/`): Data, Auth, AI, Api, Web, Observability (+ GitHub OIDC opcional)                                       |
 

@@ -34,6 +34,9 @@ const ENTITY_TYPE_TO_BUNDLE_KEY = {
   crmInteraction: 'crmInteractions',
   conversation: 'conversations',
   digitalEvent: 'digitalEvents',
+  appNavigation: 'appNavigationEvents',
+  transaction: 'transactions',
+  npsResponse: 'npsResponses',
   qualityStatus: 'qualityStatuses',
   auditLog: 'auditLogs',
 } as const satisfies Record<DatasetEntityType, keyof DatasetBundle>;
@@ -50,6 +53,9 @@ const DEFAULT_ENTITY_FIELDS = {
   crmInteraction: ['id', 'companyId'],
   conversation: ['id', 'companyId'],
   digitalEvent: ['id', 'companyId', 'productId'],
+  appNavigation: ['id', 'companyId'],
+  transaction: ['id', 'companyId'],
+  npsResponse: ['id', 'companyId'],
   qualityStatus: ['id', 'companyId'],
   auditLog: ['id', 'companyId'],
 } as const satisfies Record<DatasetEntityType, readonly string[]>;
@@ -74,6 +80,9 @@ const TIMESTAMP_FIELDS_BY_ENTITY_TYPE = {
   crmInteraction: ['occurredAt'],
   conversation: ['startedAt', 'resolvedAt'],
   digitalEvent: ['occurredAt'],
+  appNavigation: ['occurredAt'],
+  transaction: ['occurredAt'],
+  npsResponse: ['respondedAt'],
   qualityStatus: ['checkedAt'],
   auditLog: ['timestamp'],
 } as const satisfies Record<DatasetEntityType, readonly string[]>;
@@ -1076,7 +1085,45 @@ function computeNonRatioMetricValue(
       return values.reduce((sum, value) => sum + value, 0) / values.length;
     }
     case 'unresolved_conversations':
+    case 'app_interactions':
+    case 'app_errors':
+    case 'transactions_count':
+    case 'nps_responses':
       return documents.length;
+    case 'app_sessions':
+    case 'app_active_companies': {
+      const field = metric.definition.id === 'app_sessions' ? 'sessionId' : 'companyId';
+      return new Set(
+        documents
+          .map((document) => getDocumentValue(document, field))
+          .filter((value): value is string => typeof value === 'string'),
+      ).size;
+    }
+    case 'app_avg_screen_time': {
+      const values = documents
+        .map((document) => toNumber(getDocumentValue(document, 'durationSeconds')))
+        .filter((value): value is number => value !== null);
+      return values.length === 0
+        ? null
+        : values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
+    case 'transaction_volume':
+      return documents.reduce(
+        (total, document) => total + (toNumber(getDocumentValue(document, 'amount')) ?? 0),
+        0,
+      );
+    case 'nps': {
+      // Net Promoter Score: % promoters (9-10) minus % detractors (0-6).
+      const scores = documents
+        .map((document) => toNumber(getDocumentValue(document, 'score')))
+        .filter((value): value is number => value !== null);
+      if (scores.length === 0) {
+        return null;
+      }
+      const promoters = scores.filter((score) => score >= 9).length;
+      const detractors = scores.filter((score) => score <= 6).length;
+      return (100 * (promoters - detractors)) / scores.length;
+    }
     default:
       return null;
   }

@@ -25,7 +25,7 @@ describe('AppShell', () => {
     ]) {
       expect(within(nav).getByText(label)).toBeInTheDocument();
     }
-    expect(screen.getAllByText('Administração').length).toBeGreaterThan(0);
+    expect(within(nav).queryByText('Administração')).not.toBeInTheDocument();
     expect(screen.getByText('BFP - PJ')).toBeInTheDocument();
     expect(screen.getByText('Mariana Souza')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Buscar análises, empresas e dados')).toBeInTheDocument();

@@ -19,7 +19,7 @@ Perfil: **Mariana Souza · Growth PJ** (`analyst@example.local`).
    playground abre com a dimensão aplicada.
 7. **Teste arquitetural** — pergunte "Compare CAC e ativação D30 por canal, porte e estado nos
    últimos 120 dias": é só um novo `AnalysisSpec`.
-8. **Catálogo** — aba _Bases de dados_: os 6 produtos do mesh lidos do Glue, com status de Atlan,
+8. **Catálogo** — aba _Bases de dados_: os 9 produtos do mesh lidos do Glue, com status de Atlan,
    DataZone e FullStory. Em seguida, _Conversão de abertura_: definição, fórmula, confiança, dimensões compatíveis e
    linhagem _CRM + Mídia + Abertura de contas → Acquisition Gold → métrica → uso_. _Usar na análise_.
 9. **Cliente PJ 360** — busque _Atlas Tecnologia_: resumo, jornada cronológica (marcos digitais do
@@ -28,4 +28,4 @@ Perfil: **Mariana Souza · Growth PJ** (`analyst@example.local`).
 10. **Audiência** — modelo _Oportunidade Capital de Giro — SP_: regras E/OU, prévia agregada,
     _Salvar_ e _Enviar para CRM_ (Na fila → Processando → Concluído, simulado).
 11. **Governança** — produtos de dados com owner, freshness × SLO e qualidade medida.
-12. **Administração** (entre como `admin@example.local`) — usuários, papéis, semântica e feature flags.
+12. **Administração** (entre como `admin@example.local`; acesso pelo menu do usuário no topo) — usuários, papéis, semântica e feature flags.

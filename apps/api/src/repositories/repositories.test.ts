@@ -161,6 +161,9 @@ const datasetBundle: DatasetBundle = {
       value: null,
     },
   ],
+  appNavigationEvents: [],
+  transactions: [],
+  npsResponses: [],
   qualityStatuses: [
     {
       id: 'quality-1',

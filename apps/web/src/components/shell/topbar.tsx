@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronDown, CircleHelp, LogOut, Sparkles } from 'lucide-react';
+import { Bell, ChevronDown, CircleHelp, LogOut, Sparkles, UserCog } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { formatRelative } from '@/lib/format';
@@ -134,6 +134,17 @@ export function Topbar() {
                 <br />
                 Perfil: {user ? ROLE_LABELS[user.role] : '—'}
               </p>
+              {user?.role === 'admin' ? (
+                <Link
+                  className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-ink hover:bg-muted"
+                  onClick={() => setMenuOpen(false)}
+                  role="menuitem"
+                  to="/admin"
+                >
+                  <UserCog aria-hidden className="h-4 w-4" />
+                  Administração
+                </Link>
+              ) : null}
               <button
                 className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-ink hover:bg-muted"
                 onClick={() => {

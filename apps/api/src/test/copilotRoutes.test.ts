@@ -184,6 +184,9 @@ function createFixtureBundle(): DatasetBundle {
     crmInteractions: [],
     conversations: [],
     digitalEvents: [],
+    appNavigationEvents: [],
+    transactions: [],
+    npsResponses: [],
     qualityStatuses: [],
     auditLogs: [],
   };

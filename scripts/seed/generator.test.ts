@@ -35,4 +35,30 @@ describe('seed generator', () => {
     expect(bundle.digitalEvents).toHaveLength(counts.digitalEvents);
     expect(assertions.every((assertion) => assertion.passed)).toBe(true);
   });
+
+  it('generates app navigation, transactions and NPS tied to companies with an open account', () => {
+    const scale = 0.05;
+    const bundle = generateDatasetBundle({ scale });
+    const counts = resolveGenerationCounts(scale);
+    const opened = new Map(
+      bundle.companies
+        .filter((company) => company.accountOpenedAt)
+        .map((company) => [company.id, company.accountOpenedAt ?? '']),
+    );
+
+    expect(bundle.appNavigationEvents).toHaveLength(counts.appNavigationEvents);
+    expect(bundle.transactions).toHaveLength(counts.transactions);
+    expect(bundle.npsResponses).toHaveLength(counts.npsResponses);
+
+    for (const item of [...bundle.appNavigationEvents, ...bundle.transactions]) {
+      expect(opened.has(item.companyId)).toBe(true);
+    }
+    expect(bundle.transactions.every((transaction) => transaction.amount > 0)).toBe(true);
+    expect(
+      bundle.npsResponses.every((response) => response.score >= 0 && response.score <= 10),
+    ).toBe(true);
+    expect(new Set(bundle.appNavigationEvents.map((event) => event.screen)).size).toBeGreaterThan(
+      5,
+    );
+  });
 });

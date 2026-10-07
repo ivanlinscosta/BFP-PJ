@@ -48,6 +48,18 @@ export const DIMENSION_COLUMNS: Record<MeshDatasetId, Record<string, string>> = 
   conversations: { conversation_status: 'status', conversation_channel: 'channel' },
   crm_interactions: {},
   digital_journey: {},
+  app_navigation: {
+    app_screen: 'screen',
+    app_action: 'action',
+    app_platform: 'platform',
+    app_event_date: 'occurred_at',
+  },
+  transactions: {
+    transaction_type: 'transaction_type',
+    transaction_channel: 'channel',
+    transaction_date: 'occurred_at',
+  },
+  nps_responses: { nps_touchpoint: 'touchpoint', nps_date: 'responded_at' },
 };
 
 /** Gold tables per mesh dataset (kept for documentation and the lake loader). */
@@ -65,6 +77,7 @@ const TIMESTAMP_COLUMNS = new Set([
   'contracted_at',
   'started_at',
   'created_at',
+  'responded_at',
 ]);
 
 interface BaseMetricSql {
@@ -164,6 +177,37 @@ export const BASE_METRIC_SQL: Record<string, BaseMetricSql> = {
     time: 'contracted_at',
     expression: 'SUM(f.monthly_revenue_proxy)',
     where: 'f.product_name IS NOT NULL',
+  },
+  app_interactions: { dataset: 'app_navigation', time: 'occurred_at', expression: 'COUNT(*)' },
+  app_sessions: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.session_id)',
+  },
+  app_active_companies: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.company_id)',
+  },
+  app_avg_screen_time: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'AVG(CAST(f.duration_seconds AS DOUBLE))',
+  },
+  app_errors: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'COUNT(*)',
+    where: "f.action = 'ERROR'",
+  },
+  transaction_volume: { dataset: 'transactions', time: 'occurred_at', expression: 'SUM(f.amount)' },
+  transactions_count: { dataset: 'transactions', time: 'occurred_at', expression: 'COUNT(*)' },
+  nps_responses: { dataset: 'nps_responses', time: 'responded_at', expression: 'COUNT(*)' },
+  nps: {
+    dataset: 'nps_responses',
+    time: 'responded_at',
+    expression:
+      'CAST(100 * (COUNT_IF(f.score >= 9) - COUNT_IF(f.score <= 6)) AS DOUBLE) / NULLIF(COUNT(*), 0)',
   },
   unresolved_conversations: {
     dataset: 'conversations',

@@ -63,22 +63,28 @@ aws bedrock-runtime converse --region sa-east-1 --model-id <id> \
 ```
 
 Na conta de dev, os perfis Claude 5.x retornam `AccessDenied`; o padrão em `infra/cdk.json` é
-`global.anthropic.claude-sonnet-4-6`. Sem modelo (`NOT_CONFIGURED`), a Inteligência PJ usa o
-provedor determinístico local. Falhas do Bedrock aparecem no log `ai_request_failed` com
-`errorName` e `errorMessage`.
+`global.anthropic.claude-sonnet-4-6`. Para modelos Anthropic, a AWS também exige que o formulário
+de caso de uso da Anthropic seja enviado uma vez por conta (Bedrock → Model catalog → modelo
+Anthropic → _Submit use case details_); sem isso o Bedrock responde `ResourceNotFoundException:
+Model use case details have not been submitted`. Esse envio aceita termos em nome da conta e deve
+ser feito por um responsável da conta.
+
+Sem modelo (`NOT_CONFIGURED`) ou com o Bedrock indisponível, a Inteligência PJ responde com o
+provedor determinístico local (mesmas ferramentas governadas) e registra `ai_provider_fallback`.
+Falhas do Bedrock aparecem no log `ai_request_failed` com `errorName` e `errorMessage`.
 
 ## Ambiente dev publicado
 
-| Item      | Valor                                                                  |
-| --------- | ---------------------------------------------------------------------- |
-| Conta     | `480595128032` · `sa-east-1`                                           |
-| Web       | https://dv90segk2omht.cloudfront.net                                   |
-| API       | https://99x83w7mdc.execute-api.sa-east-1.amazonaws.com                 |
-| User pool | `sa-east-1_YKZoKZ74A`                                                  |
-| Bucket    | `bfp-data-dev-480595128032`                                            |
-| Mesh      | `bfp_pj_dev_{customer360,media,products,service,relationship,digital}` |
-| Modelo    | `global.anthropic.claude-sonnet-4-6`                                   |
-| Usuários  | `analyst@`, `admin@`, `business@example.local`                         |
+| Item      | Valor                                                                                          |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| Conta     | `480595128032` · `sa-east-1`                                                                   |
+| Web       | https://dv90segk2omht.cloudfront.net                                                           |
+| API       | https://99x83w7mdc.execute-api.sa-east-1.amazonaws.com                                         |
+| User pool | `sa-east-1_YKZoKZ74A`                                                                          |
+| Bucket    | `bfp-data-dev-480595128032`                                                                    |
+| Mesh      | `bfp_pj_dev_{customer360,media,products,service,relationship,digital,app,payments,experience}` |
+| Modelo    | `global.anthropic.claude-sonnet-4-6`                                                           |
+| Usuários  | `analyst@`, `admin@`, `business@example.local`                                                 |
 
 ## Ambientes e pipeline
 

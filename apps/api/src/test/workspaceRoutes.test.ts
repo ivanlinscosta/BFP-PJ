@@ -265,7 +265,7 @@ describe('demo workspace and new routes', () => {
     const governance = await request(app)
       .get('/api/governance/data-products')
       .set('Authorization', auth);
-    expect(governance.body.items).toHaveLength(7);
+    expect(governance.body.items).toHaveLength(10);
     expect(governance.body.items[0].qualityRatio).toBeGreaterThan(0.9);
   });
 
@@ -279,7 +279,7 @@ describe('demo workspace and new routes', () => {
     ).toBe(403);
     const overview = await request(app).get('/api/admin/overview').set('Authorization', admin);
     expect(overview.body.users).toHaveLength(3);
-    expect(overview.body.semantic.metricCount).toBe(24);
+    expect(overview.body.semantic.metricCount).toBe(35);
 
     const flags = {
       aiCopilot: false,

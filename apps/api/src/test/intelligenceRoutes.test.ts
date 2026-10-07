@@ -1,5 +1,6 @@
 import request from 'supertest';
 import type { ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import type { AnalysisSpec } from '@bfp/domain';
 import { generateDatasetBundle } from '../../../../scripts/seed/generator';
 import { AuthService } from '@api/auth/authService';
 import { loadConfig } from '@api/common/config';
@@ -8,6 +9,7 @@ import { createApiContext } from '@api/http/context';
 import { createApp } from '@api/http/app';
 import { runBedrockProvider } from '@api/services/intelligence/bedrockProvider';
 import { buildUpdateOperations, parseIntent } from '@api/services/intelligence/nlu';
+import { runIntelligence } from '@api/services/intelligence/service';
 
 const bundle = generateDatasetBundle({ scale: 0.1 });
 const playgroundSpec = {
@@ -291,5 +293,47 @@ describe('Bedrock provider', () => {
 
     expect(result.answer).not.toContain('99,9%');
     expect(result.answer).toMatch(/melhor equilíbrio/);
+  });
+});
+
+describe('Inteligência PJ provider fallback', () => {
+  it('answers with the deterministic provider when Bedrock refuses the model', async () => {
+    const config = loadConfig({
+      NODE_ENV: 'test',
+      AUTH_MODE: 'dev',
+      JWT_SECRET: 'test-secret',
+      RATE_LIMIT_ENABLED: 'false',
+      AI_PROVIDER: 'bedrock',
+      BEDROCK_MODEL_ID: 'global.anthropic.claude-sonnet-4-6',
+    });
+    const context = createApiContext({
+      config,
+      logger,
+      authService: new AuthService(config),
+      datasetBundle: bundle,
+    });
+    const analysisSpec: AnalysisSpec = {
+      datasets: ['customer_360'],
+      metrics: [{ id: 'account_conversion_rate' }],
+      dimensions: [{ id: 'acquisition_channel' }],
+      filters: [],
+      dateRange: { type: 'LAST_N_DAYS', value: 365 },
+      visualization: { type: 'BAR' },
+    };
+    const refusal = Object.assign(new Error('Model use case details have not been submitted'), {
+      name: 'ResourceNotFoundException',
+    });
+
+    const response = await runIntelligence(
+      context,
+      { userId: 'usr-1', email: 'analyst@example.local', groups: ['analyst'], role: 'analyst' },
+      { prompt: 'Qual a conversão de abertura por canal?', analysisSpec },
+      'corr-1',
+      { bedrockClient: { send: () => Promise.reject(refusal) } },
+    );
+
+    expect(response.provider).toBe('local');
+    expect(response.model).toBe('deterministic-insights');
+    expect(response.message || response.answer).toBeTruthy();
   });
 });

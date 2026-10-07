@@ -102,6 +102,27 @@ export class InMemoryDatasetRepository implements DatasetRepository {
       (item) => item.occurredAt,
     );
     this.indexItems(
+      'appNavigation',
+      bundle.appNavigationEvents,
+      (item) => item.id,
+      (item) => item.companyId,
+      (item) => item.occurredAt,
+    );
+    this.indexItems(
+      'transaction',
+      bundle.transactions,
+      (item) => item.id,
+      (item) => item.companyId,
+      (item) => item.occurredAt,
+    );
+    this.indexItems(
+      'npsResponse',
+      bundle.npsResponses,
+      (item) => item.id,
+      (item) => item.companyId,
+      (item) => item.respondedAt,
+    );
+    this.indexItems(
       'qualityStatus',
       bundle.qualityStatuses,
       (item) => item.id,
@@ -186,6 +207,9 @@ export class InMemoryDatasetRepository implements DatasetRepository {
       case 'crmInteraction':
       case 'conversation':
       case 'digitalEvent':
+      case 'appNavigation':
+      case 'transaction':
+      case 'npsResponse':
         if ('companyId' in item && typeof item.companyId === 'string') {
           return item.companyId;
         }
@@ -216,7 +240,11 @@ export class InMemoryDatasetRepository implements DatasetRepository {
       case 'funnelEvent':
       case 'crmInteraction':
       case 'digitalEvent':
+      case 'appNavigation':
+      case 'transaction':
         return 'occurredAt' in item ? item.occurredAt : '';
+      case 'npsResponse':
+        return 'respondedAt' in item ? item.respondedAt : '';
       case 'conversation':
         return 'startedAt' in item ? item.startedAt : '';
       case 'qualityStatus':
@@ -268,6 +296,9 @@ export function createEmptyDatasetBundle(): DatasetBundle {
     crmInteractions: [],
     conversations: [],
     digitalEvents: [],
+    appNavigationEvents: [],
+    transactions: [],
+    npsResponses: [],
     qualityStatuses: [],
     auditLogs: [],
   };

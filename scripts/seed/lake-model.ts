@@ -109,6 +109,32 @@ export function buildLakeTables(bundle: DatasetBundle): LakeTable[] {
       occurred_at: interaction.occurredAt,
     })),
     digital_journey: bundle.digitalEvents.map(toFullStoryRow),
+    app_navigation: bundle.appNavigationEvents.map((event) => ({
+      event_id: event.id,
+      company_id: event.companyId,
+      session_id: event.sessionId,
+      screen: event.screen,
+      action: event.action,
+      platform: event.platform,
+      app_version: event.appVersion,
+      duration_seconds: event.durationSeconds,
+      occurred_at: event.occurredAt,
+    })),
+    transactions: bundle.transactions.map((transaction) => ({
+      transaction_id: transaction.id,
+      company_id: transaction.companyId,
+      transaction_type: transaction.transactionType,
+      channel: transaction.channel,
+      amount: transaction.amount,
+      occurred_at: transaction.occurredAt,
+    })),
+    nps_responses: bundle.npsResponses.map((response) => ({
+      response_id: response.id,
+      company_id: response.companyId,
+      touchpoint: response.touchpoint,
+      score: response.score,
+      responded_at: response.respondedAt,
+    })),
   };
 
   return MESH_DATASETS.map((dataset) => ({ dataset, rows: rowsById[dataset.id] }));

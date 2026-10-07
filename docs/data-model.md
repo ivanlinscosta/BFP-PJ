@@ -9,7 +9,20 @@ exibidos com máscara adicional na UI; nomes vêm do faker em pt-BR.
 Volumes padrão: ~3.000 empresas que avançam no funil + ~16.000 leads que não convertem
 (calibração por canal), 12 meses de eventos, 40 campanhas, 9.000 sócios, 8.000 produtos
 contratados, 60.000 touchpoints de mídia, 50.000 eventos de funil, 12.000 interações de CRM,
-8.000 conversas e 80.000 eventos digitais.
+8.000 conversas, 80.000 eventos digitais (formato FullStory), 90.000 interações no app Itaú
+Empresas, 45.000 transações e 5.000 respostas NPS.
+
+Tipos adicionados para análises de uso e relacionamento (todos ligados por `company_id` e só para
+empresas com conta aberta):
+
+| Entidade        | Campos                                                                                 | Produto de dados (mesh) |
+| --------------- | -------------------------------------------------------------------------------------- | ----------------------- |
+| `appNavigation` | sessão, tela (Início, Extrato, Pix, Boletos…), ação, plataforma, versão, tempo em tela | `app_navigation`        |
+| `transaction`   | tipo (Pix recebido/enviado, boleto emitido/pago, TED, cartão), canal, valor            | `transactions`          |
+| `npsResponse`   | momento (onboarding, app, atendimento, gerente) e nota 0–10, sem texto livre           | `nps_responses`         |
+
+Padrões: empresas maiores e ativadas usam mais o app e transacionam mais; o ticket segue o porte;
+o NPS sobe com onboarding rápido e cai com conversas não resolvidas.
 
 Padrões de negócio garantidos por `scripts/seed/coherence.ts` (testados):
 

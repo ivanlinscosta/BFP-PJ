@@ -234,6 +234,60 @@ export const DIGITAL_CHANNELS = ['WEB', 'MOBILE', 'API'] as const;
 /** Channels used by digital product events. */
 export type DigitalChannel = (typeof DIGITAL_CHANNELS)[number];
 
+/** Screens of the Itaú Empresas app tracked in the navigation telemetry. */
+export const APP_SCREENS = [
+  'HOME',
+  'EXTRATO',
+  'PIX',
+  'BOLETOS',
+  'CARTOES',
+  'INVESTIMENTOS',
+  'CREDITO',
+  'FOLHA_PAGAMENTO',
+  'MAQUININHA',
+  'PERFIL',
+] as const;
+
+/** Screens of the Itaú Empresas app tracked in the navigation telemetry. */
+export type AppScreen = (typeof APP_SCREENS)[number];
+
+/** Interaction recorded on an app screen. */
+export const APP_ACTIONS = ['VIEW', 'CLICK', 'COMPLETE', 'ABANDON', 'ERROR'] as const;
+
+/** Interaction recorded on an app screen. */
+export type AppAction = (typeof APP_ACTIONS)[number];
+
+/** Mobile platform of the Itaú Empresas app. */
+export const APP_PLATFORMS = ['IOS', 'ANDROID'] as const;
+
+/** Mobile platform of the Itaú Empresas app. */
+export type AppPlatform = (typeof APP_PLATFORMS)[number];
+
+/** Business transaction types moved by PJ customers. */
+export const TRANSACTION_TYPES = [
+  'PIX_IN',
+  'PIX_OUT',
+  'BOLETO_ISSUED',
+  'BOLETO_PAID',
+  'TED',
+  'CARD_PURCHASE',
+] as const;
+
+/** Business transaction types moved by PJ customers. */
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+
+/** Channel where a transaction was initiated. */
+export const TRANSACTION_CHANNELS = ['APP', 'INTERNET_BANKING', 'API', 'AGENCY'] as const;
+
+/** Channel where a transaction was initiated. */
+export type TransactionChannel = (typeof TRANSACTION_CHANNELS)[number];
+
+/** Moment of the relationship where an NPS survey is sent. */
+export const NPS_TOUCHPOINTS = ['ONBOARDING', 'APP', 'SERVICE', 'RELATIONSHIP_MANAGER'] as const;
+
+/** Moment of the relationship where an NPS survey is sent. */
+export type NpsTouchpoint = (typeof NPS_TOUCHPOINTS)[number];
+
 /** Dataset entity kinds stored in the dataset table. */
 export const DATASET_ENTITY_TYPES = [
   'company',
@@ -247,6 +301,9 @@ export const DATASET_ENTITY_TYPES = [
   'crmInteraction',
   'conversation',
   'digitalEvent',
+  'appNavigation',
+  'transaction',
+  'npsResponse',
   'qualityStatus',
   'auditLog',
 ] as const;
@@ -663,6 +720,38 @@ export interface DigitalEvent {
   value: number | null;
 }
 
+/** Navigation event of a company user inside the Itaú Empresas app (app telemetry). */
+export interface AppNavigationEvent {
+  id: string;
+  companyId: string;
+  sessionId: string;
+  screen: AppScreen;
+  action: AppAction;
+  platform: AppPlatform;
+  appVersion: string;
+  durationSeconds: number;
+  occurredAt: string;
+}
+
+/** Financial transaction moved by a company (aggregated amounts, no counterpart data). */
+export interface Transaction {
+  id: string;
+  companyId: string;
+  transactionType: TransactionType;
+  channel: TransactionChannel;
+  amount: number;
+  occurredAt: string;
+}
+
+/** NPS survey answer of a company (score only; no free text). */
+export interface NpsResponse {
+  id: string;
+  companyId: string;
+  touchpoint: NpsTouchpoint;
+  score: number;
+  respondedAt: string;
+}
+
 /** Single quality incident attached to a monitored scope. */
 export interface Incident {
   id: string;
@@ -715,6 +804,9 @@ export type DatasetEntity =
   | CRMInteraction
   | Conversation
   | DigitalEvent
+  | AppNavigationEvent
+  | Transaction
+  | NpsResponse
   | QualityStatus
   | AuditLogEntry;
 
@@ -1068,6 +1160,9 @@ export interface DatasetBundle {
   crmInteractions: CRMInteraction[];
   conversations: Conversation[];
   digitalEvents: DigitalEvent[];
+  appNavigationEvents: AppNavigationEvent[];
+  transactions: Transaction[];
+  npsResponses: NpsResponse[];
   qualityStatuses: QualityStatus[];
   auditLogs: AuditLogEntry[];
 }

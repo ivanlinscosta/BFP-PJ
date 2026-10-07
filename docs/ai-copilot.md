@@ -22,8 +22,11 @@ A Inteligência PJ é **outra interface para o mesmo `AnalysisSpec`** do playgro
 | `bedrock`     | Amazon Bedrock Converse com tool calling; `BEDROCK_MODEL_ID` vem de env/SSM (nunca hardcoded)                  |
 
 Em dev o modelo é `global.anthropic.claude-sonnet-4-6` (os perfis Claude 5.x não estão liberados
-na conta). Falhas do provedor retornam `503 ai_unavailable` e são registradas em
-`ai_request_failed` com `errorName`/`errorMessage`.
+na conta) e depende do formulário de caso de uso da Anthropic no Bedrock. Se o Bedrock falhar
+(acesso ao modelo, cota, região), a resposta vem do provedor determinístico local sobre as mesmas
+ferramentas governadas (`provider: "local"` na resposta, log `ai_provider_fallback`). A causa fica em
+`ai_request_failed` com `errorName`/`errorMessage`. `503 ai_unavailable` só ocorre se o provedor
+local também falhar.
 
 A IA também escolhe as bases do data mesh: toda spec que ela monta passa por `withRequiredDatasets`
 e as bases adicionadas aparecem como operações `ADD_DATASET`.

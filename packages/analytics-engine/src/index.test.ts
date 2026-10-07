@@ -282,6 +282,9 @@ function createFixtureBundle(): DatasetBundle {
       },
     ],
     digitalEvents: [],
+    appNavigationEvents: [],
+    transactions: [],
+    npsResponses: [],
     qualityStatuses: [],
     auditLogs: [],
   };

@@ -1,5 +1,5 @@
 import type { AnalysisSpec } from '@bfp/domain';
-import { requiredDatasets, validateAnalysisSpec } from '@bfp/semantic-layer';
+import { METRIC_CATALOG, requiredDatasets, validateAnalysisSpec } from '@bfp/semantic-layer';
 import {
   AthenaCompilationError,
   BASE_METRIC_SQL,
@@ -139,6 +139,14 @@ describe('compileAthenaQuery', () => {
       expect(required, metricId).toContain(sql.dataset);
       if (readsCompany) {
         expect(required, metricId).toContain('customer_360');
+      }
+    }
+  });
+
+  it('has governed SQL for every non-ratio metric of the semantic catalog', () => {
+    for (const metric of METRIC_CATALOG) {
+      if (metric.aggregation !== 'RATIO') {
+        expect(BASE_METRIC_SQL[metric.id], metric.id).toBeDefined();
       }
     }
   });

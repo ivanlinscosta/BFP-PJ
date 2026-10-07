@@ -37,6 +37,12 @@ export function flattenDatasetBundle(bundle: DatasetBundle): DatasetEntityRecord
     ...bundle.crmInteractions.map((entity) => ({ entityType: 'crmInteraction' as const, entity })),
     ...bundle.conversations.map((entity) => ({ entityType: 'conversation' as const, entity })),
     ...bundle.digitalEvents.map((entity) => ({ entityType: 'digitalEvent' as const, entity })),
+    ...bundle.appNavigationEvents.map((entity) => ({
+      entityType: 'appNavigation' as const,
+      entity,
+    })),
+    ...bundle.transactions.map((entity) => ({ entityType: 'transaction' as const, entity })),
+    ...bundle.npsResponses.map((entity) => ({ entityType: 'npsResponse' as const, entity })),
     ...bundle.qualityStatuses.map((entity) => ({ entityType: 'qualityStatus' as const, entity })),
     ...bundle.auditLogs.map((entity) => ({ entityType: 'auditLog' as const, entity })),
   ];
@@ -148,6 +154,9 @@ function getCompanyId(record: DatasetEntityRecord) {
     case 'crmInteraction':
     case 'conversation':
     case 'digitalEvent':
+    case 'appNavigation':
+    case 'transaction':
+    case 'npsResponse':
       return 'companyId' in entity ? entity.companyId : undefined;
     case 'qualityStatus':
     case 'auditLog':
@@ -173,7 +182,11 @@ function getTimestamp(record: DatasetEntityRecord) {
     case 'funnelEvent':
     case 'crmInteraction':
     case 'digitalEvent':
+    case 'appNavigation':
+    case 'transaction':
       return 'occurredAt' in entity ? entity.occurredAt : undefined;
+    case 'npsResponse':
+      return 'respondedAt' in entity ? entity.respondedAt : undefined;
     case 'conversation':
       return 'startedAt' in entity ? entity.startedAt : undefined;
     case 'qualityStatus':

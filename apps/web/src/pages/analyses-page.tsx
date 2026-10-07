@@ -220,7 +220,7 @@ export function AnalysesPage() {
             const description = describeAnalysisSpec(analysis, labels);
             return (
               <li key={analysis.id}>
-                <Card className="grid items-center gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_170px_auto]">
+                <Card className="grid items-center gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,230px)_auto]">
                   <div className="min-w-0">
                     <button
                       className="text-left text-base font-semibold text-brand-navy hover:underline"
@@ -249,15 +249,16 @@ export function AnalysesPage() {
                       {VIZ_LABELS[analysis.visualization.type] ?? analysis.visualization.type}
                     </dd>
                   </dl>
-                  <div className="text-[13px]">
-                    <p className="text-ink">
+                  <div className="min-w-0 text-[13px]">
+                    <p className="truncate text-ink">
                       {analysis.access === 'OWNER'
                         ? 'Você'
                         : (analysis.metadata?.ownerName ?? 'Outro owner')}{' '}
                       · {formatRelative(analysis.metadata?.updatedAt)}
                     </p>
                     <Badge
-                      className="mt-1"
+                      className="mt-1 max-w-full"
+                      title={sharingLabel(analysis.metadata?.visibility, analysis.metadata?.team)}
                       tone={
                         analysis.metadata?.visibility === 'PRIVATE' ||
                         !analysis.metadata?.visibility
@@ -265,10 +266,12 @@ export function AnalysesPage() {
                           : 'tint'
                       }
                     >
-                      {sharingLabel(analysis.metadata?.visibility, analysis.metadata?.team)}
+                      <span className="truncate">
+                        {sharingLabel(analysis.metadata?.visibility, analysis.metadata?.team)}
+                      </span>
                     </Badge>
                   </div>
-                  <div className="flex items-center justify-end gap-2">
+                  <div className="flex shrink-0 items-center justify-end gap-2">
                     <Button onClick={() => open(analysis)} size="sm">
                       Abrir
                     </Button>

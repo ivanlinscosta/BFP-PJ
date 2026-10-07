@@ -1,5 +1,10 @@
 import type {
   AcquisitionChannel,
+  AppAction,
+  AppScreen,
+  NpsTouchpoint,
+  TransactionChannel,
+  TransactionType,
   AcquisitionSource,
   AgeRange,
   AnnualRevenueRange,
@@ -33,6 +38,9 @@ export const BASE_COUNTS = {
   crmInteractions: 12000,
   conversations: 8000,
   digitalEvents: 80000,
+  appNavigationEvents: 90000,
+  transactions: 45000,
+  npsResponses: 5000,
   qualityStatuses: 0,
   auditLogs: 0,
 } as const;
@@ -576,6 +584,77 @@ export const DIGITAL_CHANNEL_WEIGHTS: readonly (readonly [DigitalChannel, number
   ['WEB', 58],
   ['MOBILE', 31],
   ['API', 11],
+];
+
+/** Screens of the Itaú Empresas app and how often companies visit them. */
+export const APP_SCREEN_WEIGHTS: readonly (readonly [AppScreen, number])[] = [
+  ['HOME', 26],
+  ['EXTRATO', 20],
+  ['PIX', 18],
+  ['BOLETOS', 11],
+  ['CARTOES', 7],
+  ['CREDITO', 5],
+  ['INVESTIMENTOS', 4],
+  ['FOLHA_PAGAMENTO', 4],
+  ['MAQUININHA', 3],
+  ['PERFIL', 2],
+];
+
+export const APP_ACTION_WEIGHTS: readonly (readonly [AppAction, number])[] = [
+  ['VIEW', 52],
+  ['CLICK', 27],
+  ['COMPLETE', 14],
+  ['ABANDON', 5],
+  ['ERROR', 2],
+];
+
+/** Typical time on screen (seconds) used to draw navigation durations. */
+export const APP_SCREEN_SECONDS: Record<AppScreen, number> = {
+  HOME: 18,
+  EXTRATO: 55,
+  PIX: 70,
+  BOLETOS: 85,
+  CARTOES: 40,
+  CREDITO: 95,
+  INVESTIMENTOS: 75,
+  FOLHA_PAGAMENTO: 120,
+  MAQUININHA: 45,
+  PERFIL: 30,
+};
+
+export const APP_VERSIONS = ['7.12.0', '7.13.1', '7.14.0', '7.15.2'] as const;
+
+export const TRANSACTION_TYPE_WEIGHTS: readonly (readonly [TransactionType, number])[] = [
+  ['PIX_IN', 34],
+  ['PIX_OUT', 27],
+  ['BOLETO_ISSUED', 12],
+  ['BOLETO_PAID', 13],
+  ['TED', 5],
+  ['CARD_PURCHASE', 9],
+];
+
+/** Median ticket (BRL) per transaction type, scaled by company revenue weight. */
+export const TRANSACTION_TICKET: Record<TransactionType, number> = {
+  PIX_IN: 1800,
+  PIX_OUT: 1400,
+  BOLETO_ISSUED: 3200,
+  BOLETO_PAID: 2600,
+  TED: 9500,
+  CARD_PURCHASE: 380,
+};
+
+export const TRANSACTION_CHANNEL_WEIGHTS: readonly (readonly [TransactionChannel, number])[] = [
+  ['APP', 58],
+  ['INTERNET_BANKING', 29],
+  ['API', 9],
+  ['AGENCY', 4],
+];
+
+export const NPS_TOUCHPOINT_WEIGHTS: readonly (readonly [NpsTouchpoint, number])[] = [
+  ['APP', 38],
+  ['ONBOARDING', 24],
+  ['SERVICE', 23],
+  ['RELATIONSHIP_MANAGER', 15],
 ];
 
 export const CAMPAIGN_OBJECTIVE_BY_CHANNEL: Record<CampaignChannel, readonly CampaignObjective[]> =

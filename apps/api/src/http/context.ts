@@ -22,7 +22,10 @@ import type { Logger } from '@api/common/logger';
 import { logger } from '@api/common/logger';
 import { DynamoDatasetRepository } from '@api/repositories/dynamoDatasetRepository';
 import { DynamoObjectRepository } from '@api/repositories/dynamoObjectRepository';
-import { InMemoryDatasetRepository } from '@api/repositories/inMemoryDatasetRepository';
+import {
+  InMemoryDatasetRepository,
+  createEmptyDatasetBundle,
+} from '@api/repositories/inMemoryDatasetRepository';
 import { InMemoryObjectRepository } from '@api/repositories/inMemoryObjectRepository';
 import type { DatasetRepository, ObjectRepository } from '@api/repositories/types';
 
@@ -80,7 +83,11 @@ function loadDevDatasetBundle(config: AppConfig, fallbackBundle?: DatasetBundle)
   }
 
   const contents = fs.readFileSync(datasetPath, 'utf8');
-  cachedProcessDatasetBundle = JSON.parse(contents) as DatasetBundle;
+  // Datasets generated before a new entity type existed simply lack that list: treat it as empty.
+  cachedProcessDatasetBundle = {
+    ...createEmptyDatasetBundle(),
+    ...(JSON.parse(contents) as Partial<DatasetBundle>),
+  };
   cachedProcessDatasetLoadedAt = fs.statSync(datasetPath).mtime.toISOString();
   return cachedProcessDatasetBundle;
 }

@@ -5,14 +5,17 @@
 Cada domínio de negócio publica um **produto de dados** em um banco Glue próprio
 `bfp_pj_<env>_<domínio>`. A chave de junção entre todos eles é `company_id`.
 
-| Base (id)           | Banco Glue / tabela                      | Domínio / owner    | Origem                         |
-| ------------------- | ---------------------------------------- | ------------------ | ------------------------------ |
-| `customer_360`      | `<prefix>_customer360.customer_360`      | Clientes PJ        | Cadastro, abertura, onboarding |
-| `media_touchpoints` | `<prefix>_media.media_touchpoints`       | Mídia PJ           | Google/Meta/LinkedIn Ads       |
-| `company_products`  | `<prefix>_products.company_products`     | Produtos PJ        | Sistemas de produto            |
-| `conversations`     | `<prefix>_service.conversations`         | Atendimento PJ     | WhatsApp, chat, telefone       |
-| `crm_interactions`  | `<prefix>_relationship.crm_interactions` | Relacionamento PJ  | CRM Empresas                   |
-| `digital_journey`   | `<prefix>_digital.digital_journey`       | Canais Digitais PJ | **FullStory**                  |
+| Base (id)           | Banco Glue / tabela                      | Domínio / owner    | Origem                          |
+| ------------------- | ---------------------------------------- | ------------------ | ------------------------------- |
+| `customer_360`      | `<prefix>_customer360.customer_360`      | Clientes PJ        | Cadastro, abertura, onboarding  |
+| `media_touchpoints` | `<prefix>_media.media_touchpoints`       | Mídia PJ           | Google/Meta/LinkedIn Ads        |
+| `company_products`  | `<prefix>_products.company_products`     | Produtos PJ        | Sistemas de produto             |
+| `conversations`     | `<prefix>_service.conversations`         | Atendimento PJ     | WhatsApp, chat, telefone        |
+| `crm_interactions`  | `<prefix>_relationship.crm_interactions` | Relacionamento PJ  | CRM Empresas                    |
+| `digital_journey`   | `<prefix>_digital.digital_journey`       | Canais Digitais PJ | **FullStory**                   |
+| `app_navigation`    | `<prefix>_app.app_navigation`            | Canais Digitais PJ | Telemetria do app Itaú Empresas |
+| `transactions`      | `<prefix>_payments.transactions`         | Pagamentos PJ      | Pix, boletos, TED, cartões      |
+| `nps_responses`     | `<prefix>_experience.nps_responses`      | Experiência PJ     | Pesquisas NPS (0–10, sem texto) |
 
 A definição fica em `packages/semantic-layer/src/mesh.ts`, que é a fonte única para o seed, o
 compilador, a API e a UI.
@@ -62,7 +65,7 @@ Configure o segredo `bfp-pj-<env>/atlan` no Secrets Manager:
 
 - **Leitura:** `POST /api/meta/search/indexsearch` procura as tabelas do mesh por nome. A UI
   mostra certificação, owners, descrição, termos e o link para o asset no Atlan.
-- **Escrita:** em Administração, o botão **"Publicar métricas governadas no Atlan"** chama
+- **Escrita:** em Administração (menu do usuário, perfil admin), o botão **"Publicar métricas governadas no Atlan"** chama
   `POST /api/integrations/atlan/sync`, que faz upsert de `AtlasGlossaryTerm` no glossário
   informado.
 

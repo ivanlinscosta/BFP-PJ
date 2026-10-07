@@ -57,8 +57,8 @@ export async function runIntelligence(
   const conversation = await loadConversation(context, auth, request.conversationId);
   const conversationId = conversation?.id ?? request.conversationId ?? randomUUID();
   const toolContext: ToolContext = { context, auth, correlationId, queries: [] };
-  const provider = context.config.aiProvider === 'bedrock' ? 'bedrock' : 'local';
-  const model = provider === 'bedrock' ? context.config.bedrockModelId : 'deterministic-insights';
+  let provider: 'bedrock' | 'local' = context.config.aiProvider === 'bedrock' ? 'bedrock' : 'local';
+  let model = provider === 'bedrock' ? context.config.bedrockModelId : 'deterministic-insights';
   const refusal = detectGuardrailRefusal(request.prompt);
 
   let result: ProviderResult;
@@ -119,11 +119,31 @@ export async function runIntelligence(
       if (error instanceof ApiError && error.statusCode < 500) {
         throw error;
       }
-      throw new ApiError(
-        503,
-        'ai_unavailable',
-        'A Inteligência PJ está indisponível no momento. Continue a análise no playground.',
-      );
+      if (provider !== 'bedrock') {
+        throw new ApiError(
+          503,
+          'ai_unavailable',
+          'A Inteligência PJ está indisponível no momento. Continue a análise no playground.',
+        );
+      }
+
+      // Bedrock unavailable (model access, quota, region): answer with the deterministic
+      // provider over the same governed tools instead of leaving the user without a reply.
+      context.logger.warn('ai_provider_fallback', {
+        correlationId,
+        userId: auth.userId,
+        operation: 'AI_REQUEST',
+        from: 'bedrock',
+        to: 'local',
+      });
+      toolContext.queries.splice(0);
+      provider = 'local';
+      model = 'deterministic-insights';
+      result = await runLocalProvider({
+        prompt: request.prompt,
+        analysisSpec: request.analysisSpec,
+        toolContext,
+      });
     }
   }
 

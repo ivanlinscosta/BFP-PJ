@@ -87,7 +87,7 @@ describe('CDK stacks', () => {
       TagKey: MESH_TAGS.domain,
       TagValues: Match.arrayWith(['customer360', 'media', 'digital']),
     });
-    templates.data.resourceCountIs('AWS::LakeFormation::TagAssociation', 6);
+    templates.data.resourceCountIs('AWS::LakeFormation::TagAssociation', 9);
     templates.data.resourceCountIs('AWS::SecretsManager::Secret', 2);
     templates.data.hasResourceProperties('AWS::Athena::WorkGroup', {
       Name: 'bfp-pj-dev-etl',
@@ -119,7 +119,7 @@ describe('CDK stacks', () => {
       },
       BucketEncryption: Match.objectLike({}),
     });
-    templates.data.resourceCountIs('AWS::Glue::Database', 6);
+    templates.data.resourceCountIs('AWS::Glue::Database', 9);
     templates.data.hasResourceProperties('AWS::Glue::Database', {
       DatabaseInput: Match.objectLike({ Name: 'bfp_pj_dev_digital' }),
     });

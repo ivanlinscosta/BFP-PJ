@@ -40,6 +40,9 @@ const REQUIRED_FIELDS: Partial<Record<DatasetEntityType, readonly string[]>> = {
   crmInteraction: ['id', 'companyId', 'interactionType', 'outcome', 'occurredAt'],
   conversation: ['id', 'companyId', 'channel', 'status', 'startedAt'],
   digitalEvent: ['id', 'companyId', 'eventType', 'channel', 'occurredAt'],
+  appNavigation: ['id', 'companyId', 'screen', 'action', 'platform', 'occurredAt'],
+  transaction: ['id', 'companyId', 'transactionType', 'channel', 'amount', 'occurredAt'],
+  npsResponse: ['id', 'companyId', 'touchpoint', 'score', 'respondedAt'],
 };
 
 function isFilled(value: unknown) {

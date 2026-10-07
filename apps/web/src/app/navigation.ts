@@ -6,7 +6,6 @@ import {
   Layers,
   ShieldCheck,
   Sparkles,
-  UserCog,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -27,8 +26,4 @@ export const PRIMARY_NAVIGATION: NavigationItem[] = [
   { path: '/clientes', label: 'Clientes PJ', icon: Building2 },
   { path: '/catalogo', label: 'Catálogo', icon: BookOpen },
   { path: '/governanca', label: 'Governança', icon: ShieldCheck },
-];
-
-export const SECONDARY_NAVIGATION: NavigationItem[] = [
-  { path: '/admin', label: 'Administração', icon: UserCog },
 ];
