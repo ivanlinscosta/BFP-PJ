@@ -15,6 +15,11 @@ function shouldUseDynamo(env: NodeJS.ProcessEnv) {
 }
 
 /** Creates the repository set for the current runtime without a DI framework. */
+/** Optional fields (e.g. a turn without action) are omitted instead of rejected by DynamoDB. */
+export const DOCUMENT_CLIENT_OPTIONS = {
+  marshallOptions: { removeUndefinedValues: true },
+} as const;
+
 export function createRepositories(options: RepositoryFactoryOptions = {}): RepositorySet {
   const env = options.env ?? process.env;
   const config = options.config ?? loadConfig(env);
@@ -29,8 +34,10 @@ export function createRepositories(options: RepositoryFactoryOptions = {}): Repo
   }
 
   const baseClient = new DynamoDBClient({ region: config.awsRegion });
-  const datasetClient = options.datasetClient ?? DynamoDBDocumentClient.from(baseClient);
-  const objectClient = options.objectClient ?? DynamoDBDocumentClient.from(baseClient);
+  const datasetClient =
+    options.datasetClient ?? DynamoDBDocumentClient.from(baseClient, DOCUMENT_CLIENT_OPTIONS);
+  const objectClient =
+    options.objectClient ?? DynamoDBDocumentClient.from(baseClient, DOCUMENT_CLIENT_OPTIONS);
 
   return {
     datasetRepository: new DynamoDatasetRepository(datasetClient, config.dynamoDatasetTable),

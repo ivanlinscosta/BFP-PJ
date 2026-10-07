@@ -1,3 +1,4 @@
+import { DOCUMENT_CLIENT_OPTIONS } from '@api/repositories/factory';
 import fs from 'node:fs';
 import path from 'node:path';
 import { AthenaClient } from '@aws-sdk/client-athena';
@@ -135,7 +136,7 @@ export function createApiContext(options: ApiContextOptions = {}): ApiContext {
     }
 
     const baseClient = new DynamoDBClient({ region: config.awsRegion });
-    documentClient = DynamoDBDocumentClient.from(baseClient);
+    documentClient = DynamoDBDocumentClient.from(baseClient, DOCUMENT_CLIENT_OPTIONS);
     return documentClient;
   };
 

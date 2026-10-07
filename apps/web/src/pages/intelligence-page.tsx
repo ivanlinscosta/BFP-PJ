@@ -135,7 +135,7 @@ export function IntelligencePage() {
         title="Inteligência PJ"
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <Card className="flex min-h-[calc(100vh-210px)] flex-col">
+        <Card className="flex h-[calc(100vh-210px)] min-h-[480px] flex-col overflow-hidden">
           <div className="border-b border-line px-4 pt-4 pb-4">
             <div className="flex items-start gap-2">
               <Sparkles aria-hidden className="mt-1 h-5 w-5 text-brand-orange" />
@@ -170,7 +170,7 @@ export function IntelligencePage() {
 
           <div
             aria-live="polite"
-            className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 py-4"
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4"
             ref={listRef}
           >
             {chat.entries.length === 0 ? (

@@ -55,6 +55,25 @@ describe('Inteligência PJ NLU', () => {
     expect(filtered.filters).toEqual([{ field: 'state', operator: 'EQ', value: 'SP' }]);
   });
 
+  it('understands the usage, payments, service and NPS metrics of the catalog', () => {
+    expect(parseIntent('Qual o NPS por porte da empresa?')).toMatchObject({
+      metrics: ['nps'],
+      dimensions: ['company_size'],
+    });
+    expect(parseIntent('Qual a taxa de erro no app por tela?')).toMatchObject({
+      metrics: ['app_error_rate'],
+      dimensions: ['app_screen'],
+    });
+    expect(parseIntent('Volume em Pix por segmento')).toMatchObject({
+      metrics: ['pix_volume'],
+      dimensions: ['segment'],
+    });
+    expect(parseIntent('Sessões digitais (FullStory) por região')).toMatchObject({
+      metrics: ['digital_sessions'],
+      dimensions: ['region'],
+    });
+  });
+
   it('turns "Agora separa por porte" into ADD_DIMENSION company_size', () => {
     const intent = parseIntent('Agora separa por porte.');
     expect(intent.kind).toBe('UPDATE');

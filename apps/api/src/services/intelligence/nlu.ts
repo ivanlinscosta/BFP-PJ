@@ -1,5 +1,10 @@
 import type { AnalysisSpec, DateRangeSpec, FilterCondition, VisualizationType } from '@bfp/domain';
-import { compatibility, getMetricDefinition, listDimensionDefinitions } from '@bfp/semantic-layer';
+import {
+  compatibility,
+  getMetricDefinition,
+  listDimensionDefinitions,
+  listMetricDefinitions,
+} from '@bfp/semantic-layer';
 import type { AnalysisOperation } from '@bfp/shared';
 import { normalizeSearchText } from '@api/http/textSearch';
 
@@ -10,7 +15,39 @@ interface LexiconEntry {
 }
 
 /** Governed metric vocabulary. Only ids that exist in the semantic catalog. */
-const METRIC_LEXICON: LexiconEntry[] = [
+const CURATED_METRIC_LEXICON: LexiconEntry[] = [
+  // Specific phrases of the usage, payments, service and NPS metrics come before the generic
+  // acquisition ones ("conversao", "investimento") so they win the match.
+  { id: 'nps', phrases: ['nps', 'net promoter score', 'satisfacao', 'recomendacao'] },
+  { id: 'nps_responses', phrases: ['respostas nps', 'respostas de nps'] },
+  { id: 'app_error_rate', phrases: ['taxa de erro no app', 'taxa de erro', 'erros no app'] },
+  {
+    id: 'app_completion_rate',
+    phrases: ['taxa de conclusao no app', 'conclusao no app', 'taxa de conclusao'],
+  },
+  { id: 'app_abandons', phrases: ['abandonos no app', 'abandono no app', 'abandonos'] },
+  { id: 'app_sessions', phrases: ['sessoes no app', 'sessoes do app'] },
+  { id: 'app_active_companies', phrases: ['ativas no app', 'empresas ativas no app'] },
+  { id: 'app_avg_screen_time', phrases: ['tempo por tela', 'tempo em tela', 'tempo no app'] },
+  { id: 'app_interactions', phrases: ['interacoes no app', 'uso do app', 'navegacao no app'] },
+  { id: 'pix_volume', phrases: ['volume em pix', 'volume de pix', 'pix'] },
+  { id: 'boletos_issued', phrases: ['boletos emitidos', 'boletos'] },
+  { id: 'average_ticket', phrases: ['ticket medio', 'ticket'] },
+  { id: 'transacting_companies', phrases: ['empresas transacionando'] },
+  {
+    id: 'transaction_volume',
+    phrases: ['volume transacionado', 'volume de transacoes', 'volume movimentado'],
+  },
+  { id: 'transactions_count', phrases: ['quantidade de transacoes', 'transacoes'] },
+  { id: 'conversation_resolution_rate', phrases: ['taxa de resolucao', 'resolucao'] },
+  { id: 'conversations_resolved', phrases: ['conversas resolvidas'] },
+  { id: 'unresolved_conversations', phrases: ['conversas nao resolvidas', 'nao resolvidas'] },
+  { id: 'conversations_total', phrases: ['conversas', 'atendimentos'] },
+  { id: 'crm_contacted_companies', phrases: ['empresas contatadas'] },
+  { id: 'crm_interactions_total', phrases: ['interacoes no crm', 'interacoes de crm', 'crm'] },
+  { id: 'digital_sessions', phrases: ['sessoes digitais', 'fullstory'] },
+  { id: 'digital_active_companies', phrases: ['ativas no digital'] },
+  { id: 'revenue_proxy', phrases: ['receita'] },
   { id: 'products_per_company', phrases: ['produtos por cliente', 'produtos por empresa'] },
   { id: 'new_companies', phrases: ['novos clientes', 'clientes novos'] },
   {
@@ -28,8 +65,31 @@ const METRIC_LEXICON: LexiconEntry[] = [
   { id: 'leads', phrases: ['leads'] },
 ];
 
+/**
+ * Curated phrases first, then every governed metric by its catalog name and short name, so a
+ * metric added to the semantic layer is understood without touching this file.
+ */
+const METRIC_LEXICON: LexiconEntry[] = [
+  ...CURATED_METRIC_LEXICON,
+  ...listMetricDefinitions().map((metric) => ({
+    id: metric.id,
+    phrases: [
+      ...new Set([normalizeSearchText(metric.name), normalizeSearchText(metric.shortName ?? '')]),
+    ].filter((phrase) => phrase.length > 2),
+  })),
+];
+
 /** Governed dimension vocabulary; "month" is resolved to a compatible date dimension. */
-const DIMENSION_LEXICON: LexiconEntry[] = [
+const CURATED_DIMENSION_LEXICON: LexiconEntry[] = [
+  { id: 'app_screen', phrases: ['telas', 'tela'] },
+  { id: 'app_platform', phrases: ['plataforma', 'ios', 'android', 'sistema operacional'] },
+  { id: 'app_action', phrases: ['acao no app', 'acoes'] },
+  { id: 'transaction_type', phrases: ['tipo de transacao', 'tipos de transacao'] },
+  { id: 'transaction_channel', phrases: ['canal da transacao'] },
+  { id: 'nps_touchpoint', phrases: ['momento da pesquisa', 'ponto de contato', 'momento'] },
+  { id: 'crm_outcome', phrases: ['resultado'] },
+  { id: 'crm_interaction_type', phrases: ['tipo de interacao'] },
+  { id: 'conversation_channel', phrases: ['canal da conversa', 'canal de atendimento'] },
   { id: 'acquisition_channel', phrases: ['canais', 'canal'] },
   { id: 'company_size', phrases: ['portes', 'porte', 'tamanho da empresa'] },
   { id: 'state', phrases: ['estados', 'estado', 'uf'] },
@@ -38,6 +98,17 @@ const DIMENSION_LEXICON: LexiconEntry[] = [
   { id: 'acquisition_campaign', phrases: ['campanhas', 'campanha'] },
   { id: 'product', phrases: ['produto'] },
   { id: 'month', phrases: ['mensal', 'meses', 'mes a mes', 'por mes', 'evolucao'] },
+];
+
+/** Curated dimension phrases first, then every governed dimension by its catalog label. */
+const DIMENSION_LEXICON: LexiconEntry[] = [
+  ...CURATED_DIMENSION_LEXICON,
+  ...listDimensionDefinitions().map((dimension) => ({
+    id: dimension.id,
+    phrases: [normalizeSearchText(dimension.label ?? dimension.name)].filter(
+      (phrase) => phrase.length > 2,
+    ),
+  })),
 ];
 
 const VALUE_LEXICON: Array<{ field: string; value: string; phrases: string[] }> = [
@@ -132,7 +203,8 @@ function findMentions(text: string, lexicon: LexiconEntry[]) {
 
   for (const entry of lexicon) {
     for (const phrase of entry.phrases) {
-      const pattern = new RegExp(`(^|[^a-z0-9])${phrase.trim()}([^a-z0-9]|$)`);
+      const escaped = phrase.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`);
       const match = pattern.exec(remaining);
       if (match) {
         found.push({ id: entry.id, index: match.index });
