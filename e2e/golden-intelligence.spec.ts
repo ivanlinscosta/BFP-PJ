@@ -39,3 +39,34 @@ test('Golden path 2: Inteligência PJ consulta dados e altera o AnalysisSpec', a
 
   expect(errors).toEqual([]);
 });
+
+test('Inteligência PJ: estudo completo, salvar análise e exportar PDF', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = trackConsoleErrors(page);
+  await login(page);
+  await page.goto('/inteligencia');
+  await page.evaluate(() => window.sessionStorage.removeItem('bfp-intelligence-chat'));
+  await page.reload();
+
+  await page.getByRole('button', { name: /Faça um estudo completo da jornada PJ/ }).click();
+  const study = page.getByRole('region', { name: 'Estudo completo da jornada PJ' });
+  await expect(study).toBeVisible({ timeout: 30_000 });
+  await expect(study.getByRole('heading', { name: 'Recomendações' })).toBeVisible();
+
+  // The first chapter becomes the active analysis and can be saved.
+  await page.getByRole('button', { name: 'Salvar análise' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Salvar análise' });
+  await dialog.getByRole('button', { name: 'Salvar análise' }).click();
+  await expect(dialog).toBeHidden();
+
+  const download = page.waitForEvent('download');
+  await page
+    .getByRole('complementary', { name: 'Contexto analítico' })
+    .getByRole('button', { name: 'Salvar PDF' })
+    .click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('estudo-completo-da-jornada-pj.pdf');
+  await file.saveAs('artifacts/estudo-completo-da-jornada-pj.pdf');
+
+  expect(errors).toEqual([]);
+});

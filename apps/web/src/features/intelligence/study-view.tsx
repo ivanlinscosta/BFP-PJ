@@ -1,8 +1,11 @@
-import { ExternalLink, Lightbulb } from 'lucide-react';
+import { ExternalLink, Lightbulb, Save } from 'lucide-react';
 import type { AnalysisSpec } from '@bfp/domain';
 import { Card } from '@/components/ui/card';
 import { ResultView } from '@/features/viz/result-view';
 import { formatMetricValue } from '@/lib/format';
+import { PDF_BLOCK_ATTRIBUTE, PDF_EXPAND_ATTRIBUTE, PDF_IGNORE_ATTRIBUTE } from '@/lib/pdf';
+
+const block = { [PDF_BLOCK_ATTRIBUTE]: '' };
 import type { IntelligenceStudy } from './api';
 
 /**
@@ -13,9 +16,11 @@ import type { IntelligenceStudy } from './api';
 export function StudyView({
   study,
   onOpen,
+  onSave,
 }: {
   study: IntelligenceStudy;
   onOpen(spec: AnalysisSpec): void;
+  onSave(spec: AnalysisSpec, name: string): void;
 }) {
   return (
     <section aria-label={study.title} className="mt-3 flex flex-col gap-3">
@@ -27,6 +32,7 @@ export function StudyView({
       </div>
 
       <ul
+        {...block}
         aria-label="Indicadores do estudo"
         className="m-0 grid list-none grid-cols-2 gap-2 p-0 md:grid-cols-4"
       >
@@ -44,7 +50,7 @@ export function StudyView({
       </ul>
 
       {study.sections.map((section, index) => (
-        <Card className="px-4 pt-4 pb-3" key={section.id}>
+        <Card {...block} className="px-4 pt-4 pb-3" key={section.id}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold tracking-wide text-brand-orange uppercase">
@@ -54,16 +60,26 @@ export function StudyView({
                 {section.title}
               </h4>
             </div>
-            <button
-              className="flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-navy hover:underline"
-              onClick={() => onOpen(section.spec)}
-              type="button"
-            >
-              Abrir no playground
-              <ExternalLink aria-hidden className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-3" {...{ [PDF_IGNORE_ATTRIBUTE]: '' }}>
+              <button
+                className="flex items-center gap-1 text-xs font-semibold text-brand-navy hover:underline"
+                onClick={() => onSave(section.spec, section.title)}
+                type="button"
+              >
+                <Save aria-hidden className="h-3.5 w-3.5" />
+                Salvar
+              </button>
+              <button
+                className="flex items-center gap-1 text-xs font-semibold text-brand-navy hover:underline"
+                onClick={() => onOpen(section.spec)}
+                type="button"
+              >
+                Abrir no playground
+                <ExternalLink aria-hidden className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
-          <div className="mt-3 max-h-[340px] overflow-auto">
+          <div className="mt-3 max-h-[340px] overflow-auto" {...{ [PDF_EXPAND_ATTRIBUTE]: '' }}>
             <ResultView
               result={section.result}
               showLegend
@@ -81,7 +97,7 @@ export function StudyView({
       ))}
 
       {study.recommendations.length > 0 ? (
-        <Card className="border-peach bg-cream px-4 py-4">
+        <Card {...block} className="border-peach bg-cream px-4 py-4">
           <h4 className="m-0 flex items-center gap-2 text-[15px] font-semibold text-brand-navy">
             <Lightbulb aria-hidden className="h-4 w-4 text-brand-orange" />
             Recomendações

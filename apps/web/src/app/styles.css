@@ -99,3 +99,9 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* PDF export: scrollable result areas are fully expanded while the report is captured. */
+[data-pdf-exporting] [data-pdf-expand] {
+  max-height: none !important;
+  overflow: visible !important;
+}

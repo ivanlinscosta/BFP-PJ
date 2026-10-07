@@ -1,5 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
-import { ArrowUp, Download, ExternalLink, LayoutGrid, Save, Share2, Sparkles } from 'lucide-react';
+import {
+  ArrowUp,
+  Download,
+  ExternalLink,
+  FileDown,
+  LayoutGrid,
+  Save,
+  Share2,
+  Sparkles,
+} from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { describeAnalysisSpec, describeFilter } from '@bfp/shared';
@@ -18,6 +27,8 @@ import { ThinkingIndicator } from '@/features/intelligence/thinking-indicator';
 import { downloadCsv } from '@/features/viz/csv';
 import { capitalize } from '@/lib/format';
 import { describeError } from '@/lib/errors';
+import { exportElementToPdf, PDF_IGNORE_ATTRIBUTE } from '@/lib/pdf';
+import type { AnalysisSpec } from '@bfp/domain';
 import { getCurrentUser } from '@/services/auth';
 import { useFeatureFlags } from '@/features/admin/hooks';
 
@@ -59,9 +70,14 @@ export function IntelligencePage() {
   const saved = useAnalysisStore((state) => state.saved);
   const applyOperations = useAnalysisStore((state) => state.applyOperations);
   const markSaved = useAnalysisStore((state) => state.markSaved);
+  const loadAnalysis = useAnalysisStore((state) => state.loadAnalysis);
+  // A study chapter can be saved on its own; otherwise the active analysis is saved.
+  const [saveTarget, setSaveTarget] = useState<{ spec: AnalysisSpec; name: string } | null>(null);
+  const [exporting, setExporting] = useState<number | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [chat, setChat] = useState(loadChat);
   const [prompt, setPrompt] = useState('');
-  const [dialog, setDialog] = useState<'save' | 'share' | null>(null);
+  const [dialog, setDialog] = useState<'share' | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const sequence = useRef(chat.entries.length);
   const result = useAnalysisResult(spec);
@@ -92,6 +108,10 @@ export function IntelligencePage() {
           entries.push({ id: ++sequence.current, role: 'assistant', text: reply.answer, reply });
         entries.push({ id: ++sequence.current, role: 'notice', text: reply.message, reply });
       } else {
+        // The answered analysis (or the first chapter of a study) becomes the active analysis,
+        // so it can be saved, shared, exported or continued in the playground.
+        const answered = reply.analysisSpec ?? reply.study?.sections[0]?.spec;
+        if (answered) loadAnalysis(answered);
         entries.push({
           id: ++sequence.current,
           role: 'assistant',
@@ -132,6 +152,27 @@ export function IntelligencePage() {
   }
 
   const lastReplyId = [...chat.entries].reverse().find((entry) => entry.reply)?.id;
+  const lastAnswerId = [...chat.entries]
+    .reverse()
+    .find((entry) => entry.role === 'assistant' && entry.reply)?.id;
+
+  async function exportEntry(entryId: number) {
+    const element = document.getElementById(`chat-entry-${entryId}`);
+    const entry = chat.entries.find((item) => item.id === entryId);
+    if (!element || !entry) return;
+    setExporting(entryId);
+    setExportError(null);
+    try {
+      await exportElementToPdf(element, {
+        title: entry.reply?.study?.title ?? description.title ?? 'Resposta da Inteligência PJ',
+        subtitle: entry.reply?.study?.period ?? capitalize(description.period),
+      });
+    } catch {
+      setExportError('Não foi possível gerar o PDF. Tente novamente.');
+    } finally {
+      setExporting(null);
+    }
+  }
 
   return (
     <div>
@@ -211,7 +252,7 @@ export function IntelligencePage() {
               }
               const isUser = entry.role === 'user';
               return (
-                <div key={entry.id}>
+                <div id={`chat-entry-${entry.id}`} key={entry.id}>
                   <div
                     className={
                       isUser
@@ -226,13 +267,27 @@ export function IntelligencePage() {
                     {entry.reply?.study && entry.role === 'assistant' ? (
                       <StudyView
                         onOpen={(sectionSpec) => {
-                          useAnalysisStore.getState().loadAnalysis(sectionSpec);
+                          loadAnalysis(sectionSpec);
                           navigate('/explorar');
                         }}
+                        onSave={(sectionSpec, name) => setSaveTarget({ spec: sectionSpec, name })}
                         study={entry.reply.study}
                       />
                     ) : null}
                   </div>
+                  {entry.reply && entry.role === 'assistant' ? (
+                    <div className="mt-2 flex justify-end" {...{ [PDF_IGNORE_ATTRIBUTE]: '' }}>
+                      <Button
+                        disabled={exporting !== null}
+                        onClick={() => void exportEntry(entry.id)}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <FileDown aria-hidden className="h-4 w-4" />
+                        {exporting === entry.id ? 'Gerando PDF…' : 'Salvar PDF'}
+                      </Button>
+                    </div>
+                  ) : null}
                   {entry.reply?.basis && entry.role === 'assistant' ? (
                     <div className="mt-3">
                       <p className="text-[11px] font-semibold text-brand-navy">Base da resposta</p>
@@ -242,7 +297,7 @@ export function IntelligencePage() {
                     </div>
                   ) : null}
                   {entry.id === lastReplyId && entry.reply && entry.reply.suggestions.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2" {...{ [PDF_IGNORE_ATTRIBUTE]: '' }}>
                       {entry.reply.suggestions.map((suggestion) => (
                         <ActionChip key={suggestion} onClick={() => send(suggestion)}>
                           {suggestion}
@@ -342,7 +397,7 @@ export function IntelligencePage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Button
               disabled={spec.metrics.length === 0}
-              onClick={() => setDialog('save')}
+              onClick={() => setSaveTarget({ spec, name: description.title })}
               size="sm"
               variant="primary"
             >
@@ -367,9 +422,22 @@ export function IntelligencePage() {
               size="sm"
             >
               <Download aria-hidden className="h-4 w-4" />
-              Exportar
+              Exportar CSV
+            </Button>
+            <Button
+              disabled={lastAnswerId === undefined || exporting !== null}
+              onClick={() => lastAnswerId !== undefined && void exportEntry(lastAnswerId)}
+              size="sm"
+            >
+              <FileDown aria-hidden className="h-4 w-4" />
+              {exporting !== null ? 'Gerando PDF…' : 'Salvar PDF'}
             </Button>
           </div>
+          {exportError ? (
+            <Notice className="mt-3" tone="error">
+              {exportError}
+            </Notice>
+          ) : null}
           <section className="mt-4 rounded-[var(--radius-card)] bg-tint px-3 py-3">
             <p className="text-[11px] font-semibold text-brand-navy">Contexto preservado</p>
             <p className="mt-1.5 text-xs text-ink-soft">
@@ -391,14 +459,16 @@ export function IntelligencePage() {
         </aside>
       </div>
 
-      {dialog === 'save' ? (
+      {saveTarget ? (
         <SaveAnalysisDialog
-          defaultName={description.title}
-          existing={saved}
-          onClose={() => setDialog(null)}
-          onSaved={(analysis) => markSaved({ id: analysis.id, name: analysis.name })}
+          defaultName={saveTarget.name}
+          existing={saveTarget.spec === spec ? saved : null}
+          onClose={() => setSaveTarget(null)}
+          onSaved={(analysis) => {
+            if (saveTarget.spec === spec) markSaved({ id: analysis.id, name: analysis.name });
+          }}
           open
-          spec={spec}
+          spec={saveTarget.spec}
         />
       ) : null}
       {dialog === 'share' ? (
