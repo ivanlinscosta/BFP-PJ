@@ -21,6 +21,13 @@ A Inteligência PJ é **outra interface para o mesmo `AnalysisSpec`** do playgro
 | `local`       | Determinístico: léxico governado → operações/spec → `runAnalyticsQuery` → narrativa a partir do Insight Engine |
 | `bedrock`     | Amazon Bedrock Converse com tool calling; `BEDROCK_MODEL_ID` vem de env/SSM (nunca hardcoded)                  |
 
+Em dev o modelo é `global.anthropic.claude-sonnet-4-6` (os perfis Claude 5.x não estão liberados
+na conta). Falhas do provedor retornam `503 ai_unavailable` e são registradas em
+`ai_request_failed` com `errorName`/`errorMessage`.
+
+A IA também escolhe as bases do data mesh: toda spec que ela monta passa por `withRequiredDatasets`
+e as bases adicionadas aparecem como operações `ADD_DATASET`.
+
 Ferramentas governadas: `getAvailableMetrics`, `getAvailableDimensions`, `getMetricDefinition`,
 `runAnalyticsQuery`, `getCustomer360`, `searchBusinessGlossary`, `createAudiencePreview`,
 `getQualityStatus`, `getLineage`. A IA não acessa Athena, tabelas ou SQL.

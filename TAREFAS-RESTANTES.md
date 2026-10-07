@@ -13,10 +13,12 @@ npm run synth -w infra -- -c env=dev                                  # CDK synt
 
 ## Pendências reais
 
-1. **Deploy na AWS não executado** — os stacks CDK sintetizam e têm testes de asserção, mas não
-   houve `cdk deploy` (requer conta/credenciais). Os caminhos Athena e Bedrock estão cobertos por
-   testes com clientes simulados; validar contra a conta real após o primeiro deploy
-   (ver `docs/deployment.md`).
+1. **Deploy executado em dev** (07/10/2026, conta 480595128032, `sa-east-1`, branch
+   `feature/bfp-v1`). Validado na conta: health, 401 sem token, consultas Athena com join
+   Mídia ⋈ Customer 360, grants Lake Formation da Lambda e modelo Bedrock respondendo. Correções
+   aplicadas no deploy: workgroup de ETL, timestamps UTC no Parquet, model id via SSM sem export,
+   query do Cliente 360 no DynamoDB e checagem de bases em todas as telas. Pendente: homol/prod e
+   validação ponta a ponta logada pelo time (ver `docs/deployment.md`).
 2. **Comparação com período anterior no Athena** — suportada no motor local; no Athena retorna
    aviso (`warnings`). Implementar com segunda execução do compilador usando a janela anterior.
 3. **Freshness na nuvem** — resolvido: `seed:lake` grava o horário no parâmetro SSM

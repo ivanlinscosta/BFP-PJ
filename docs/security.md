@@ -9,8 +9,13 @@
 - **Dados**: S3 com BLOCK_ALL, SSL obrigatório e KMS; DynamoDB com KMS e PITR; resultados do Athena
   cifrados e expirados em 7 dias; bronze sem CNPJ/nomes/texto livre.
 - **IAM mínimo**: a Lambda acessa só suas tabelas, prefixos `gold/*` e `analytics-results/*`, o
-  workgroup, o database Glue, Bedrock e `ListUsersInGroup`.
-- **Segredos**: nenhum segredo no repositório nem no frontend; model id no SSM; deploy via GitHub
+  workgroup, os databases Glue do mesh, os segredos de integração, o parâmetro de freshness,
+  Bedrock e `ListUsersInGroup`.
+- **Lake Formation**: permissões padrão `IAM_ALLOWED_PRINCIPALS` removidas; acesso às tabelas do
+  mesh só por grants baseados em LF-tag (`bfp_domain`). Administradores explícitos
+  (`-c lakeFormationAdmins`).
+- **Segredos**: nenhum segredo no repositório nem no frontend; credenciais Atlan/FullStory e senha
+  de demo no Secrets Manager (preenchidas por operadores); model id no SSM; deploy via GitHub
   OIDC (sem chaves estáticas). `JWT_SECRET` só existe em `AUTH_MODE=dev`.
 - **SQL**: o browser envia `AnalysisSpec`; o compilador usa whitelists e parâmetros.
 - **Erros**: envelope tipado; stack trace nunca é exposto em `NODE_ENV=production`; a UI só mostra

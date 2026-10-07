@@ -23,8 +23,11 @@ flowchart LR
   L --> SL[Semantic Layer<br/>validator]
   SL --> QC[Athena Query Compiler]
   QC --> ATH[Amazon Athena]
-  ATH --> GLUE[Glue Data Catalog]
+  ATH --> GLUE[Glue · um banco por domínio<br/>data mesh]
+  LF[Lake Formation<br/>LF-tags · grants] -.-> GLUE
   GLUE --> GOLD[(S3 Gold · Parquet)]
+  L --> ATLAN[Atlan<br/>catálogo oficial]
+  L --> FS[FullStory<br/>jornada digital]
   L --> BR[Amazon Bedrock<br/>Converse + tools]
   L --> CW[CloudWatch · X-Ray]
 ```
@@ -33,14 +36,16 @@ Detalhes em [docs/aws-architecture.md](docs/aws-architecture.md). O documento
 [docs/architecture.md](docs/architecture.md) é o discovery original (histórico; menciona o plano
 Firebase abandonado — não há nenhuma dependência Firebase no código).
 
-| Camada    | Implementação                                                                                                        |
-| --------- | -------------------------------------------------------------------------------------------------------------------- |
-| Frontend  | React 19, TypeScript, Vite, Tailwind v4 (tokens em `apps/web/src/app/styles.css`), TanStack Query, Zustand, Recharts |
-| API       | Express empacotado para Lambda (`apps/api`), Zod, RBAC, logs estruturados                                            |
-| Semântica | `packages/semantic-layer` — 24 métricas, 21 dimensões, 7 produtos de dados, glossário, linhagem                      |
-| Motor     | `packages/analytics-engine` — engine local/DynamoDB, **AthenaQueryCompiler**, Insight Engine, Audience Engine        |
-| IA        | Inteligência PJ: provedor determinístico local ou **Amazon Bedrock** (Converse + ferramentas governadas)             |
-| Infra     | **AWS CDK** (`infra/`): Data, Auth, AI, Api, Web, Observability (+ GitHub OIDC opcional)                             |
+| Camada      | Implementação                                                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Frontend    | React 19, TypeScript, Vite, Tailwind v4 (tokens em `apps/web/src/app/styles.css`), TanStack Query, Zustand, Recharts           |
+| API         | Express empacotado para Lambda (`apps/api`), Zod, RBAC, logs estruturados                                                      |
+| Semântica   | `packages/semantic-layer` — 24 métricas, 21 dimensões, 7 produtos de dados, glossário, linhagem                                |
+| Motor       | `packages/analytics-engine` — engine local/DynamoDB, **AthenaQueryCompiler**, Insight Engine, Audience Engine                  |
+| IA          | Inteligência PJ: provedor determinístico local ou **Amazon Bedrock** (Converse + ferramentas governadas)                       |
+| Data mesh   | 6 produtos de dados (Glue + Lake Formation, DataZone opcional); o usuário escolhe as bases e o motor faz JOIN por `company_id` |
+| Integrações | **Atlan** (certificação, owners, glossário) e **FullStory** (sessões e eventos da jornada digital)                             |
+| Infra       | **AWS CDK** (`infra/`): Data, Auth, AI, Api, Web, Observability (+ GitHub OIDC opcional)                                       |
 
 ## Pré-requisitos
 
@@ -86,7 +91,7 @@ Resumo (passo a passo em [docs/deployment.md](docs/deployment.md)):
 ```bash
 npx cdk bootstrap aws://<ACCOUNT_ID>/sa-east-1
 npm run build -w api && npm run build -w web
-npm run deploy -w infra -- -c env=dev -c bedrockModelId=<MODEL_OR_INFERENCE_PROFILE_ID> \
+npm run deploy -w infra -- -c env=dev -c bedrockModelId=<INFERENCE_PROFILE_LIBERADO_NA_CONTA> \
   -c lakeFormationAdmins=<ARN_DO_OPERADOR> [-c datazoneDomainId=<dzd_...>]
 # carga de dados e usuários (variáveis vêm dos outputs dos stacks)
 npm run seed:aws        # DATASET_TABLE, AWS_REGION
@@ -95,6 +100,9 @@ npm run fullstory:export # opcional: eventos reais do FullStory → produto digi
 npm run seed:workspace  # OBJECTS_TABLE, AWS_REGION
 npm run cognito:users   # COGNITO_USER_POOL_ID, DEMO_USER_PASSWORD, AWS_REGION
 ```
+
+Ambiente dev publicado: https://dv90segk2omht.cloudfront.net (detalhes, senha de demo e modelo do
+Bedrock em [docs/deployment.md](docs/deployment.md)).
 
 Ambientes independentes: `bfp-pj-dev`, `bfp-pj-homol`, `bfp-pj-prod`. Pipelines em
 `.github/workflows/` (CI em PR; deploy em push para `homol`/`prod` via GitHub OIDC).
