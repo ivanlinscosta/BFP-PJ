@@ -7,6 +7,7 @@ import {
   type AthenaClient,
 } from '@aws-sdk/client-athena';
 import {
+  AthenaCompilationError,
   buildResultColumns,
   compileAthenaQuery,
   recommendVisualization,
@@ -48,6 +49,21 @@ function sleep(ms: number) {
 export class AthenaAnalyticsQueryEngine {
   constructor(private readonly options: AthenaEngineOptions) {}
 
+  /** Compiles the governed SQL; a query the mesh cannot answer is a client error, not a 500. */
+  private compile(query: ValidatedAnalysisQuery, window: ReturnType<typeof resolveDateRange>) {
+    try {
+      return compileAthenaQuery(query, {
+        window,
+        resolveTable: (dataset) => this.resolveTable(dataset),
+      });
+    } catch (error) {
+      if (error instanceof AthenaCompilationError) {
+        throw new ApiError(422, 'analysis_not_supported', error.message);
+      }
+      throw error;
+    }
+  }
+
   async execute(query: ValidatedAnalysisQuery): Promise<AnalyticsExecutionResult> {
     const clock = this.options.clock ?? (() => new Date());
     const cacheKey = createHash('sha256')
@@ -60,10 +76,7 @@ export class AthenaAnalyticsQueryEngine {
 
     const startedAt = clock().getTime();
     const window = resolveDateRange(query.dateRange, { referenceDate: clock() });
-    const compiled = compileAthenaQuery(query, {
-      window,
-      resolveTable: (dataset) => this.resolveTable(dataset),
-    });
+    const compiled = this.compile(query, window);
     const started = await this.options.client.send(
       new StartQueryExecutionCommand({
         QueryString: compiled.sql,

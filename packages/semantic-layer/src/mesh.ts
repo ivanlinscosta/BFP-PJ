@@ -215,6 +215,12 @@ export function datasetForEntity(entityType: DatasetEntityType): MeshDatasetId |
   return DATASET_BY_ENTITY.get(entityType);
 }
 
+/**
+ * Base metrics whose governed definition also reads company attributes from Customer 360
+ * (e.g. excludes leads), so the engine joins `customer_360` even without a company dimension.
+ */
+const COMPANY_ATTRIBUTE_METRICS = new Set(['products_per_company']);
+
 /** Datasets a metric reads (ratios read both numerator and denominator datasets). */
 export function datasetsForMetric(metricId: string): MeshDatasetId[] {
   const metric = METRIC_DEFINITION_BY_ID.get(metricId);
@@ -232,7 +238,12 @@ export function datasetsForMetric(metricId: string): MeshDatasetId[] {
   }
 
   const dataset = datasetForEntity(metric.baseEntity);
-  return dataset ? [dataset] : [];
+  if (!dataset) {
+    return [];
+  }
+  return COMPANY_ATTRIBUTE_METRICS.has(metricId) && dataset !== 'customer_360'
+    ? [dataset, 'customer_360']
+    : [dataset];
 }
 
 /** Dataset that owns a dimension column. */

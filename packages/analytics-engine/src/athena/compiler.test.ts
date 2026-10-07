@@ -1,6 +1,11 @@
 import type { AnalysisSpec } from '@bfp/domain';
-import { validateAnalysisSpec } from '@bfp/semantic-layer';
-import { AthenaCompilationError, compileAthenaQuery, toParameterLiteral } from './compiler';
+import { requiredDatasets, validateAnalysisSpec } from '@bfp/semantic-layer';
+import {
+  AthenaCompilationError,
+  BASE_METRIC_SQL,
+  compileAthenaQuery,
+  toParameterLiteral,
+} from './compiler';
 
 function validated(spec: AnalysisSpec) {
   const validation = validateAnalysisSpec(spec);
@@ -121,5 +126,20 @@ describe('compileAthenaQuery', () => {
       compileAthenaQuery({ ...query, datasets: ['company_products'] }, { resolveTable, window }),
     ).toThrow('não foi selecionada');
     expect(toParameterLiteral("O'Reilly")).toBe("'O''Reilly'");
+  });
+
+  it('only reads datasets the semantic validator requires for every governed metric', () => {
+    for (const [metricId, sql] of Object.entries(BASE_METRIC_SQL)) {
+      const required = requiredDatasets({
+        metricIds: [metricId],
+        dimensionIds: [],
+        filterFields: [],
+      });
+      const readsCompany = sql.needsCompany || /\bc\./.test(`${sql.expression} ${sql.where ?? ''}`);
+      expect(required, metricId).toContain(sql.dataset);
+      if (readsCompany) {
+        expect(required, metricId).toContain('customer_360');
+      }
+    }
   });
 });
