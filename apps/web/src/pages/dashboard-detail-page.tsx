@@ -15,7 +15,7 @@ import {
   type DashboardCardSummary,
 } from '@/features/dashboards/api';
 import type { SavedAnalysis } from '@/features/explorer/api';
-import { useAnalysisResult } from '@/features/explorer/hooks';
+import { useAnalysisResult, useMissingDatasets } from '@/features/explorer/hooks';
 import { resolveVisualization } from '@/features/explorer/spec';
 import { useAnalysisStore } from '@/features/explorer/store';
 import { ResultView } from '@/features/viz/result-view';
@@ -38,6 +38,13 @@ function DashboardTile({
       enabled: Boolean(analysis),
     },
   );
+  const missingDatasets = useMissingDatasets(
+    analysis ?? { metrics: [], dimensions: [], filters: [], visualization: { type: 'AUTO' } },
+  );
+  const uncovered =
+    Boolean(analysis) &&
+    missingDatasets !== null &&
+    (missingDatasets.length > 0 || (analysis?.datasets ?? []).length === 0);
   const type = analysis ? resolveVisualization(analysis, dimensions.data ?? []) : 'TABLE';
 
   return (
@@ -70,6 +77,16 @@ function DashboardTile({
             className="py-8"
             description="A análise foi removida ou deixou de ser compartilhada."
             title="Análise indisponível"
+          />
+        ) : uncovered ? (
+          <EmptyState
+            className="py-8"
+            description={
+              missingDatasets && missingDatasets.length > 0
+                ? `Selecione a base ${missingDatasets.join(', ')} no Explorar e salve a análise novamente.`
+                : 'Abra no Explorar, selecione as bases do data mesh e salve a análise novamente.'
+            }
+            title="Bases de dados pendentes"
           />
         ) : result.isLoading ? (
           <div className="flex flex-col gap-3" role="status" aria-label="Carregando card">
