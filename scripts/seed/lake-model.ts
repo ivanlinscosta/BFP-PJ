@@ -132,7 +132,7 @@ export function goldCtas(prefix: string, bucket: string, table: LakeTable) {
   const database = domainDatabase(prefix, table.dataset);
   const select = table.dataset.columns.map((column) =>
     column.type === 'timestamp'
-      ? `from_iso8601_timestamp(${column.name}) AS ${column.name}`
+      ? `CAST(from_iso8601_timestamp(${column.name}) AT TIME ZONE 'UTC' AS timestamp) AS ${column.name}`
       : column.name,
   );
   return `CREATE TABLE ${database}.${table.dataset.table} WITH (format = 'PARQUET', parquet_compression = 'SNAPPY', external_location = 's3://${bucket}/gold/${table.dataset.glueDatabase}/${table.dataset.table}/') AS SELECT ${select.join(', ')} FROM ${database}.silver_${table.dataset.table}`;

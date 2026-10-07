@@ -34,6 +34,8 @@ export class DataStack extends Stack {
   readonly meshDatabasePrefix: string;
   readonly meshDatabases: string[];
   readonly workgroupName: string;
+  /** Workgroup used by the publishing jobs (CTAS needs its own external_location). */
+  readonly etlWorkgroupName: string;
   readonly datasetTable: dynamodb.Table;
   readonly objectsTable: dynamodb.Table;
   readonly dataKey: kms.Key;
@@ -63,7 +65,10 @@ export class DataStack extends Stack {
       versioned: config.retainData,
       removalPolicy,
       autoDeleteObjects: !config.retainData,
-      lifecycleRules: [{ prefix: 'analytics-results/', expiration: Duration.days(7) }],
+      lifecycleRules: [
+        { prefix: 'analytics-results/', expiration: Duration.days(7) },
+        { prefix: 'etl-results/', expiration: Duration.days(7) },
+      ],
     });
 
     // Lake Formation administrators: the CloudFormation execution role (to create tags and
@@ -155,6 +160,21 @@ export class DataStack extends Stack {
         engineVersion: { selectedEngineVersion: 'Athena engine version 3' },
         resultConfiguration: {
           outputLocation: `s3://${this.lakeBucket.bucketName}/analytics-results/`,
+          encryptionConfiguration: { encryptionOption: 'SSE_KMS', kmsKey: this.dataKey.keyArn },
+        },
+      },
+    });
+
+    this.etlWorkgroupName = `${config.prefix}-etl`;
+    new athena.CfnWorkGroup(this, 'EtlWorkgroup', {
+      name: this.etlWorkgroupName,
+      recursiveDeleteOption: !config.retainData,
+      workGroupConfiguration: {
+        enforceWorkGroupConfiguration: false,
+        publishCloudWatchMetricsEnabled: true,
+        engineVersion: { selectedEngineVersion: 'Athena engine version 3' },
+        resultConfiguration: {
+          outputLocation: `s3://${this.lakeBucket.bucketName}/etl-results/`,
           encryptionConfiguration: { encryptionOption: 'SSE_KMS', kmsKey: this.dataKey.keyArn },
         },
       },

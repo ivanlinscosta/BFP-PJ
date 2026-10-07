@@ -148,7 +148,7 @@ async function main() {
   const database = `${prefix}_${dataset.glueDatabase}`;
   const columns = dataset.columns.map((column) =>
     column.type === 'timestamp'
-      ? `from_iso8601_timestamp(${column.name}) AS ${column.name}`
+      ? `CAST(from_iso8601_timestamp(${column.name}) AT TIME ZONE 'UTC' AS timestamp) AS ${column.name}`
       : column.name,
   );
   await athena(client, `DROP TABLE IF EXISTS ${database}.${dataset.table}`, workgroup);

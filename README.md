@@ -90,7 +90,7 @@ npm run deploy -w infra -- -c env=dev -c bedrockModelId=<MODEL_OR_INFERENCE_PROF
   -c lakeFormationAdmins=<ARN_DO_OPERADOR> [-c datazoneDomainId=<dzd_...>]
 # carga de dados e usuários (variáveis vêm dos outputs dos stacks)
 npm run seed:aws        # DATASET_TABLE, AWS_REGION
-npm run seed:lake       # DATA_LAKE_BUCKET, MESH_DATABASE_PREFIX, ATHENA_WORKGROUP, DATA_LOADED_AT_PARAMETER, AWS_REGION
+npm run seed:lake       # DATA_LAKE_BUCKET, MESH_DATABASE_PREFIX, ATHENA_WORKGROUP=bfp-pj-<env>-etl, DATA_LOADED_AT_PARAMETER, AWS_REGION
 npm run fullstory:export # opcional: eventos reais do FullStory → produto digital_journey
 npm run seed:workspace  # OBJECTS_TABLE, AWS_REGION
 npm run cognito:users   # COGNITO_USER_POOL_ID, DEMO_USER_PASSWORD, AWS_REGION

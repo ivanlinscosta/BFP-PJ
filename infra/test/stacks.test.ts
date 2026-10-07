@@ -88,6 +88,10 @@ describe('CDK stacks', () => {
     });
     templates.data.resourceCountIs('AWS::LakeFormation::TagAssociation', 6);
     templates.data.resourceCountIs('AWS::SecretsManager::Secret', 2);
+    templates.data.hasResourceProperties('AWS::Athena::WorkGroup', {
+      Name: 'bfp-pj-dev-etl',
+      WorkGroupConfiguration: Match.objectLike({ EnforceWorkGroupConfiguration: false }),
+    });
     templates.api.hasResourceProperties('AWS::LakeFormation::PrincipalPermissions', {
       Permissions: ['SELECT', 'DESCRIBE'],
       Resource: { LFTagPolicy: Match.objectLike({ ResourceType: 'TABLE' }) },
