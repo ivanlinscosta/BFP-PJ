@@ -100,7 +100,6 @@ function ranked(result: GovernedQueryResult, metricId: string, dimensionId: stri
     .sort((left, right) => right.value - left.value);
 }
 
-
 /**
  * Runs one governed query exactly like the runAnalyticsQuery tool (mesh bases selected for the
  * spec, semantic validation, RBAC) and records it as evidence of the turn. Each call returns its
