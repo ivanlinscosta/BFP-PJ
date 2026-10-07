@@ -13,6 +13,8 @@ import { SaveAnalysisDialog, ShareDialog } from '@/features/explorer/components/
 import { useAnalysisResult } from '@/features/explorer/hooks';
 import { useAnalysisStore } from '@/features/explorer/store';
 import { askIntelligence, type IntelligenceReply } from '@/features/intelligence/api';
+import { StudyView } from '@/features/intelligence/study-view';
+import { ThinkingIndicator } from '@/features/intelligence/thinking-indicator';
 import { downloadCsv } from '@/features/viz/csv';
 import { capitalize } from '@/lib/format';
 import { describeError } from '@/lib/errors';
@@ -27,7 +29,10 @@ interface ChatEntry {
 }
 
 const STORAGE_KEY = 'bfp-intelligence-chat';
+const STUDY_STARTER =
+  'Faça um estudo completo da jornada PJ: aquisição, ativação, uso do app, transações e NPS.';
 const STARTERS = [
+  STUDY_STARTER,
   'Qual canal combina melhor conversão com menor CAC?',
   'Compare CAC e ativação D30 por canal, porte e estado nos últimos 120 dias.',
   'O que é ativação D30?',
@@ -218,6 +223,15 @@ export function IntelligencePage() {
                       {isUser ? (user?.name ?? 'Você') : 'Inteligência PJ'}
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-ink">{entry.text}</p>
+                    {entry.reply?.study && entry.role === 'assistant' ? (
+                      <StudyView
+                        onOpen={(sectionSpec) => {
+                          useAnalysisStore.getState().loadAnalysis(sectionSpec);
+                          navigate('/explorar');
+                        }}
+                        study={entry.reply.study}
+                      />
+                    ) : null}
                   </div>
                   {entry.reply?.basis && entry.role === 'assistant' ? (
                     <div className="mt-3">
@@ -250,9 +264,9 @@ export function IntelligencePage() {
               );
             })}
             {mutation.isPending ? (
-              <p className="text-[13px] text-ink-soft" role="status">
-                Consultando dados governados…
-              </p>
+              <ThinkingIndicator
+                study={/estudo|raio.?x|completo/i.test(mutation.variables ?? '')}
+              />
             ) : null}
           </div>
 

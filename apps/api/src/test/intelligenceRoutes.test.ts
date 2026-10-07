@@ -169,6 +169,38 @@ describe('POST /api/ai/chat', () => {
     ]);
   });
 
+  it('builds a complete study with KPIs, charts, tables and recommendations', async () => {
+    const { app } = createHarness();
+    const auth = await login(app);
+
+    const response = await request(app).post('/api/ai/chat').set('Authorization', auth).send({
+      prompt: 'Faça um estudo completo da jornada PJ',
+    });
+
+    expect(response.status).toBe(200);
+    const study = response.body.study;
+    expect(study.skipped).toEqual([]);
+    expect(study.kpis.length).toBeGreaterThanOrEqual(6);
+    expect(study.sections.map((section: { id: string }) => section.id)).toEqual([
+      'acquisition',
+      'trend',
+      'channel-size',
+      'activation',
+      'app-usage',
+      'app-quality',
+      'transactions',
+      'ticket',
+      'nps',
+      'service',
+    ]);
+    for (const section of study.sections) {
+      expect(section.result.rows.length).toBeGreaterThan(0);
+      expect(section.findings.length).toBeGreaterThan(0);
+    }
+    expect(study.recommendations.length).toBeGreaterThanOrEqual(4);
+    expect(response.body.explainability.tools).toEqual(['runAnalyticsQuery']);
+  });
+
   it('refuses PII requests before touching data', async () => {
     const { app } = createHarness();
     const auth = await login(app);

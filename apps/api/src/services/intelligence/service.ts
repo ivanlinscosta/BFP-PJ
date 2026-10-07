@@ -1,3 +1,4 @@
+import { buildStudy, isStudyRequest, studyAnswer } from '@api/services/intelligence/study';
 import { randomUUID } from 'node:crypto';
 import type { AnalysisSpec } from '@bfp/domain';
 import type { AuthenticatedUser } from '@api/auth/types';
@@ -84,6 +85,9 @@ export async function runIntelligence(
         },
       ),
     };
+  } else if (isStudyRequest(request.prompt)) {
+    // A complete study is a fixed, governed plan of queries; it does not depend on the LLM.
+    result = studyAnswer(await buildStudy(toolContext));
   } else {
     try {
       result =

@@ -1,8 +1,29 @@
 import type { AnalyticsInsight } from '@bfp/analytics-engine';
-import type { AnalysisSpec } from '@bfp/domain';
+import type { AnalysisSpec, ColumnFormat, VisualizationType } from '@bfp/domain';
 import type { AnalysisOperation } from '@bfp/shared';
+import type { AnalyticsResponse } from '@/features/explorer/api';
 import { apiRequest } from '@/services/apiClient';
 import { toQueryBody } from '@/features/explorer/spec';
+
+/** Complete study returned when the user asks for one (all numbers from governed queries). */
+export interface IntelligenceStudy {
+  title: string;
+  period: string;
+  summary: string;
+  queryCount: number;
+  kpis: Array<{ metricId: string; label: string; value: number | null; format?: ColumnFormat }>;
+  sections: Array<{
+    id: string;
+    title: string;
+    question: string;
+    visualization: VisualizationType;
+    spec: AnalysisSpec;
+    result: AnalyticsResponse;
+    findings: string[];
+  }>;
+  recommendations: string[];
+  skipped: string[];
+}
 
 export interface IntelligenceReply {
   conversationId: string;
@@ -16,6 +37,7 @@ export interface IntelligenceReply {
   basis?: { title: string; items: string[] };
   evidence?: AnalyticsInsight[];
   suggestions: string[];
+  study?: IntelligenceStudy;
   explainability: { tools: string[]; note: string; refusal?: string };
 }
 

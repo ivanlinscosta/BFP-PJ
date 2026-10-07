@@ -1,3 +1,4 @@
+import type { Study } from '@api/services/intelligence/study';
 import type { AnalyticsInsight } from '@bfp/analytics-engine';
 import type { AnalysisSpec } from '@bfp/domain';
 import type { AnalysisOperation } from '@bfp/shared';
@@ -15,6 +16,8 @@ export interface ProviderResult {
   basis?: { title: string; items: string[] };
   evidence?: AnalyticsInsight[];
   suggestions: string[];
+  /** Complete multi-chapter study, when the user asked for one. */
+  study?: Study;
 }
 
 /** One stored turn of an Inteligência PJ conversation. */
