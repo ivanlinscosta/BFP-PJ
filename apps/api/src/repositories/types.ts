@@ -64,5 +64,8 @@ export interface RepositoryFactoryOptions {
 
 /** Minimal subset of DynamoDBDocumentClient used by the repositories. */
 export interface DynamoDocumentClientLike {
-  send(command: object): Promise<{ Items?: Array<Record<string, unknown>> }>;
+  send(command: object): Promise<{
+    Items?: Array<Record<string, unknown>>;
+    LastEvaluatedKey?: Record<string, unknown>;
+  }>;
 }

@@ -13,7 +13,6 @@ function SidebarLink({ item }: { item: NavigationItem }) {
             isActive
               ? 'bg-cream font-semibold text-brand-navy'
               : 'text-ink-soft hover:bg-muted hover:text-ink',
-            item.emphasis && 'tracking-[0.01em] uppercase',
           )}
         >
           <Icon
@@ -37,8 +36,12 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-[var(--spacing-sidebar)] flex-col border-r border-line bg-card lg:flex">
       <div className="px-6 pt-11">
         <img alt="Itaú" className="h-[60px] w-[60px]" height={60} src="/itau-logo.png" width={60} />
-        <p className="mt-[38px] text-lg leading-none font-bold text-brand-navy">BFP - PJ</p>
-        <p className="mt-[22px] text-[11px] text-ink-soft">Business Friendly Platform</p>
+        <p className="mt-8 text-[28px] leading-none font-bold tracking-[-0.01em] text-brand-navy">
+          BFP - PJ
+        </p>
+        <p className="mt-3 text-[13px] whitespace-nowrap text-ink-soft">
+          Business Friendly Platform
+        </p>
       </div>
       <nav aria-label="Navegação principal" className="mt-6 flex flex-1 flex-col px-4">
         <ul className="m-0 flex list-none flex-col gap-1 p-0">

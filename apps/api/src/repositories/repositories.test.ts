@@ -262,6 +262,20 @@ describe('repositories', () => {
     expect(allById).toHaveLength(2);
   });
 
+  it('declares only the attribute names a company query uses (no date range)', async () => {
+    const client = createMockClient([{ document: datasetBundle.companies[0] }]);
+    const repository = new DynamoDatasetRepository(client, 'bfp-dev-dataset');
+
+    await repository.listByCompany('company-1');
+
+    const command = client.commands[0];
+    expect(command).toBeInstanceOf(QueryCommand);
+    if (command instanceof QueryCommand) {
+      expect(command.input.KeyConditionExpression).toBe('#gsi1pk = :gsi1pk');
+      expect(command.input.ExpressionAttributeNames).toEqual({ '#gsi1pk': 'GSI1PK' });
+    }
+  });
+
   it('builds QueryCommand shapes for dataset lookups in DynamoDB', async () => {
     const client = createMockClient([{ document: datasetBundle.companies[0] }]);
     const repository = new DynamoDatasetRepository(client, 'bfp-dev-dataset');

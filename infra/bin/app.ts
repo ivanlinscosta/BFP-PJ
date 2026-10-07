@@ -44,12 +44,13 @@ const api = new ApiStack(app, `${config.prefix}-api`, {
   meshDatabases: data.meshDatabases,
   domainTag: { key: MESH_TAGS.domain, values: data.domainTagValues },
   workgroupName: data.workgroupName,
-  modelParameter: ai.modelParameter,
+  modelParameterName: ai.modelParameterName,
   dataLoadedAtParameter: data.dataLoadedAtParameter,
   atlanSecret: data.atlanSecret,
   fullstorySecret: data.fullstorySecret,
   datazoneDomainId: String(app.node.tryGetContext('datazoneDomainId') ?? '') || undefined,
 });
+api.addDependency(ai);
 new WebStack(app, `${config.prefix}-web`, { env, config, api: api.api });
 new ObservabilityStack(app, `${config.prefix}-observability`, {
   env,

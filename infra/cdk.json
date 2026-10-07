@@ -3,7 +3,7 @@
   "context": {
     "env": "dev",
     "region": "sa-east-1",
-    "bedrockModelId": "",
+    "bedrockModelId": "global.anthropic.claude-sonnet-4-6",
     "githubRepository": "",
     "lakeFormationAdmins": "",
     "datazoneDomainId": "",

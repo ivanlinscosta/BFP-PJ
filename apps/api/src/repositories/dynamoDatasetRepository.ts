@@ -152,7 +152,6 @@ export class DynamoDatasetRepository implements DatasetRepository {
   ) {
     const expressionAttributeNames: Record<string, string> = {
       '#gsi1pk': 'GSI1PK',
-      '#gsi1sk': 'GSI1SK',
     };
     const expressionAttributeValues: Record<string, string | number> = {
       ':gsi1pk': `COMPANY#${companyId}`,
@@ -170,6 +169,10 @@ export class DynamoDatasetRepository implements DatasetRepository {
       keyConditionExpression += ' AND #gsi1sk <= :to';
       expressionAttributeValues[':to'] = `${options.to}~`;
     }
+    // DynamoDB rejects attribute names that the expressions do not use.
+    if (options.from || options.to) {
+      expressionAttributeNames['#gsi1sk'] = 'GSI1SK';
+    }
 
     let filterExpression: string | undefined;
     if (options.entityTypes && options.entityTypes.length > 0) {
@@ -179,18 +182,28 @@ export class DynamoDatasetRepository implements DatasetRepository {
       Object.assign(expressionAttributeValues, entityTypeFilter.ExpressionAttributeValues);
     }
 
-    const response = await this.client.send(
-      new QueryCommand({
-        TableName: this.tableName,
-        IndexName: DATASET_TABLE_INDEX,
-        KeyConditionExpression: keyConditionExpression,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-        FilterExpression: filterExpression,
-        Limit: options.limit,
-      }),
-    );
+    // A company partition can exceed one 1 MB page: follow LastEvaluatedKey up to the limit.
+    const items: Record<string, unknown>[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const response = await this.client.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: DATASET_TABLE_INDEX,
+          KeyConditionExpression: keyConditionExpression,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ExpressionAttributeValues: expressionAttributeValues,
+          FilterExpression: filterExpression,
+          Limit: options.limit,
+          ExclusiveStartKey: exclusiveStartKey,
+        }),
+      );
+      items.push(...(response.Items ?? []));
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey && (!options.limit || items.length < options.limit));
 
-    return (response.Items ?? []).map((item) => extractDocument<TEntity>(item));
+    return items
+      .slice(0, options.limit ?? items.length)
+      .map((item) => extractDocument<TEntity>(item));
   }
 }

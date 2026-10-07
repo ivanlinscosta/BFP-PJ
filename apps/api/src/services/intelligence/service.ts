@@ -113,6 +113,8 @@ export async function runIntelligence(
         provider,
         durationMs: Math.round(performance.now() - startedAt),
         status: 'error',
+        errorName: error instanceof Error ? error.name : 'unknown',
+        errorMessage: error instanceof Error ? error.message.slice(0, 300) : String(error),
       });
       if (error instanceof ApiError && error.statusCode < 500) {
         throw error;

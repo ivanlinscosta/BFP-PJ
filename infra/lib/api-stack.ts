@@ -12,7 +12,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import type * as s3 from 'aws-cdk-lib/aws-s3';
 import type * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import type * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import type { EnvironmentConfig } from './config';
 
@@ -30,7 +30,8 @@ export interface ApiStackProps extends StackProps {
   /** LF-tag key/values that identify the mesh domains (grants are tag based). */
   domainTag: { key: string; values: string[] };
   workgroupName: string;
-  modelParameter: ssm.StringParameter;
+  /** SSM parameter with the Bedrock model id (resolved at deploy time; changing it needs no export update). */
+  modelParameterName: string;
   dataLoadedAtParameter: ssm.StringParameter;
   atlanSecret: secretsmanager.Secret;
   fullstorySecret: secretsmanager.Secret;
@@ -83,7 +84,10 @@ export class ApiStack extends Stack {
         ATLAN_SECRET_ID: props.atlanSecret.secretName,
         FULLSTORY_SECRET_ID: props.fullstorySecret.secretName,
         ...(props.datazoneDomainId ? { DATAZONE_DOMAIN_ID: props.datazoneDomainId } : {}),
-        BEDROCK_MODEL_ID: props.modelParameter.stringValue,
+        BEDROCK_MODEL_ID: ssm.StringParameter.valueForStringParameter(
+          this,
+          props.modelParameterName,
+        ),
         SEED_DEMO_WORKSPACE: 'false',
         WEB_ORIGIN: 'https://localhost',
         NODE_OPTIONS: '--enable-source-maps',

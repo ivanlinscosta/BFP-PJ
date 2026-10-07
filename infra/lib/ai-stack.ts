@@ -12,12 +12,15 @@ export interface AiStackProps extends StackProps {
 /** Inteligência PJ configuration: the Bedrock model id lives in SSM Parameter Store. */
 export class AiStack extends Stack {
   readonly modelParameter: ssm.StringParameter;
+  /** Literal parameter name, so consumers resolve the value without a cross-stack export. */
+  readonly modelParameterName: string;
 
   constructor(scope: Construct, id: string, props: AiStackProps) {
     super(scope, id, props);
 
+    this.modelParameterName = `/${props.config.prefix}/bedrock-model-id`;
     this.modelParameter = new ssm.StringParameter(this, 'BedrockModelId', {
-      parameterName: `/${props.config.prefix}/bedrock-model-id`,
+      parameterName: this.modelParameterName,
       description:
         'Modelo Claude no Amazon Bedrock usado pela Inteligência PJ. Vazio = provedor determinístico local.',
       stringValue: props.bedrockModelId || 'NOT_CONFIGURED',

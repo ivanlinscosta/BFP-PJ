@@ -41,12 +41,13 @@ function synthesize(envName = 'dev') {
     meshDatabases: data.meshDatabases,
     domainTag: { key: MESH_TAGS.domain, values: data.domainTagValues },
     workgroupName: data.workgroupName,
-    modelParameter: ai.modelParameter,
+    modelParameterName: ai.modelParameterName,
     dataLoadedAtParameter: data.dataLoadedAtParameter,
     atlanSecret: data.atlanSecret,
     fullstorySecret: data.fullstorySecret,
     lambdaCodePath: fakeBundle('index.js'),
   });
+  api.addDependency(ai);
   const web = new WebStack(app, 'web', {
     env,
     config,
