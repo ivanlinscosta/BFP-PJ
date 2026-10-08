@@ -188,34 +188,59 @@ export function ShareDialog({
   );
 }
 
+/**
+ * Lists the dashboards the user can edit (or creates a new one) and adds the analysis as a card.
+ * An analysis that was never saved is saved first (private), so the user goes straight to the
+ * dashboard choice instead of a separate "save" step.
+ */
 export function AddToDashboardDialog({
   open,
   onClose,
   analysis,
+  spec,
+  defaultName = '',
+  onSaved,
 }: {
   open: boolean;
   onClose(): void;
   analysis: { id: string; name: string } | null;
+  /** Current analysis, saved automatically when `analysis` is null. */
+  spec?: AnalysisSpec;
+  defaultName?: string;
+  onSaved?(analysis: SavedAnalysis): void;
 }) {
   const queryClient = useQueryClient();
   const dashboards = useQuery({ queryKey: ['dashboards'], queryFn: listDashboards, enabled: open });
   const [newName, setNewName] = useState('');
+  const [analysisName, setAnalysisName] = useState(defaultName);
   const [done, setDone] = useState<{ id: string; name: string } | null>(null);
   const editable = (dashboards.data ?? []).filter((dashboard) => dashboard.access !== 'VIEW');
+  const needsSave = !analysis;
 
   const addMutation = useMutation({
     mutationFn: async (target: { id?: string }) => {
-      if (!analysis) throw new Error('missing analysis');
+      let card = analysis;
+      if (!card) {
+        if (!spec) throw new Error('missing analysis');
+        const saved = await saveAnalysis({
+          name: analysisName.trim() || defaultName || 'Análise sem título',
+          visibility: 'PRIVATE',
+          spec,
+        });
+        void queryClient.invalidateQueries({ queryKey: ['analyses'] });
+        onSaved?.(saved);
+        card = { id: saved.id, name: saved.name };
+      }
       if (target.id) {
         const dashboard = editable.find((item) => item.id === target.id)!;
         return updateDashboard(
           dashboard.id,
-          toDashboardInput(dashboard, appendCard(dashboard.cards, analysis)),
+          toDashboardInput(dashboard, appendCard(dashboard.cards, card)),
         );
       }
       return createDashboard({
         name: newName.trim(),
-        cards: appendCard([], analysis),
+        cards: appendCard([], card),
         visibility: 'PRIVATE',
       });
     },
@@ -227,7 +252,11 @@ export function AddToDashboardDialog({
 
   return (
     <Dialog
-      description={analysis ? `Adicione “${analysis.name}” como um card.` : undefined}
+      description={
+        analysis
+          ? `Escolha um dashboard para adicionar “${analysis.name}” como card, ou crie um novo.`
+          : 'Escolha um dashboard para adicionar esta análise como card, ou crie um novo.'
+      }
       onClose={onClose}
       open={open}
       title="Adicionar ao dashboard"
@@ -251,6 +280,20 @@ export function AddToDashboardDialog({
         <ErrorState compact error={dashboards.error} onRetry={() => void dashboards.refetch()} />
       ) : (
         <div className="flex flex-col gap-4">
+          {needsSave ? (
+            <Field
+              hint="A análise será salva como privada ao ser adicionada."
+              htmlFor="dashboard-analysis-name"
+              label="Nome da análise"
+            >
+              <Input
+                id="dashboard-analysis-name"
+                onChange={(event) => setAnalysisName(event.target.value)}
+                value={analysisName}
+              />
+            </Field>
+          ) : null}
+          <p className="m-0 text-[13px] font-semibold text-brand-navy">Seus dashboards</p>
           <ul className="m-0 flex max-h-56 list-none flex-col gap-1 overflow-y-auto p-0">
             {editable.map((dashboard) => (
               <li key={dashboard.id}>

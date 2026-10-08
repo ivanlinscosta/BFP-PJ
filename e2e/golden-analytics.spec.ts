@@ -56,3 +56,34 @@ test('Golden path 1: Explorar → canal → SP → 90 dias → barras → porte 
 
   expect(errors).toEqual([]);
 });
+
+test('Adicionar ao dashboard abre a lista de dashboards mesmo com a análise não salva', async ({
+  page,
+}) => {
+  const errors = trackConsoleErrors(page);
+  await login(page);
+  const spec = {
+    datasets: ['customer_360'],
+    metrics: [{ id: 'activation_d30_rate' }],
+    dimensions: [{ id: 'company_size' }],
+    filters: [],
+    dateRange: { type: 'LAST_N_DAYS', value: 90 },
+    visualization: { type: 'BAR' },
+  };
+  await page.goto(`/explorar?spec=${encodeURIComponent(JSON.stringify(spec))}`);
+  await expect(page.getByRole('heading', { name: /Ativação D30 por porte/i })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Adicionar ao dashboard' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Adicionar ao dashboard' });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Salvar análise' })).toHaveCount(0);
+  await expect(dialog.getByText('Seus dashboards')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Aquisição por canal/ })).toBeVisible();
+
+  await dialog.getByLabel('Nome da análise').fill('Ativação D30 por porte (E2E)');
+  await dialog.getByLabel('Ou crie um novo dashboard').fill('Ativação (E2E)');
+  await dialog.getByRole('button', { name: 'Criar e adicionar' }).click();
+  await expect(dialog.getByText('Análise adicionada a “Ativação (E2E)”.')).toBeVisible();
+
+  expect(errors).toEqual([]);
+});

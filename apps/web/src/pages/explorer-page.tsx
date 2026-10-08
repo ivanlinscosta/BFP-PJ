@@ -63,7 +63,6 @@ export function ExplorerPage() {
   const mesh = useMeshDatasets();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogName>(null);
-  const [afterSave, setAfterSave] = useState<DialogName>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [settings, setSettings] = useState<VisualizationSettings>({
     sort: 'DESC',
@@ -292,14 +291,7 @@ export function ExplorerPage() {
                   labels={labels}
                   loading={result.isLoading || !engineReady}
                   metricDetail={metricDetail.data}
-                  onAddToDashboard={() => {
-                    if (store.saved) {
-                      setDialog('dashboard');
-                      return;
-                    }
-                    setAfterSave('dashboard');
-                    setDialog('save');
-                  }}
+                  onAddToDashboard={() => setDialog('dashboard')}
                   onExplore={(exploration) =>
                     store.applyOperations(exploration.operations, exploration.message)
                   }
@@ -346,10 +338,7 @@ export function ExplorerPage() {
         <SaveAnalysisDialog
           defaultName={description.title}
           existing={store.saved}
-          onClose={() => {
-            setDialog(afterSave && useAnalysisStore.getState().saved ? afterSave : null);
-            setAfterSave(null);
-          }}
+          onClose={() => setDialog(null)}
           onSaved={(analysis) => store.markSaved({ id: analysis.id, name: analysis.name })}
           open
           spec={spec}
@@ -367,7 +356,14 @@ export function ExplorerPage() {
         <ShareDialog onClose={() => setDialog(null)} open saved={store.saved} spec={spec} />
       ) : null}
       {dialog === 'dashboard' ? (
-        <AddToDashboardDialog analysis={store.saved} onClose={() => setDialog(null)} open />
+        <AddToDashboardDialog
+          analysis={store.saved}
+          defaultName={description.title}
+          onClose={() => setDialog(null)}
+          onSaved={(analysis) => store.markSaved({ id: analysis.id, name: analysis.name })}
+          open
+          spec={spec}
+        />
       ) : null}
     </div>
   );
