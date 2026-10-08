@@ -77,6 +77,14 @@ describe('IntelligencePage', () => {
                 operations: [],
                 message: 'Google Search apresenta o melhor equilíbrio no período selecionado.',
                 answer: 'Google Search apresenta o melhor equilíbrio no período selecionado.',
+                analysisSpec: {
+                  datasets: ['customer_360'],
+                  metrics: [{ id: 'account_conversion_rate' }],
+                  dimensions: [{ id: 'acquisition_channel' }],
+                  filters: [{ field: 'state', operator: 'EQ', value: 'SP' }],
+                  dateRange: { type: 'LAST_N_DAYS', value: 90 },
+                  visualization: { type: 'BAR' },
+                },
                 basis: {
                   title: '',
                   items: ['Conversão de abertura', 'CAC', 'Estado = SP', 'Últimos 90 dias'],
@@ -109,9 +117,11 @@ describe('IntelligencePage', () => {
         'Google Search apresenta o melhor equilíbrio no período selecionado.',
       ),
     ).toBeInTheDocument();
+    // The answer brings the governed analysis behind it (chart/table, source and actions).
     expect(
-      screen.getByText('Conversão de abertura / CAC / Estado = SP / Últimos 90 dias'),
+      await screen.findByRole('region', { name: /Análise: Conversão de abertura por Canal/ }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir no Explorar' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Separar por porte' }));
     expect(await screen.findByText('Porte da empresa adicionado à análise.')).toBeInTheDocument();

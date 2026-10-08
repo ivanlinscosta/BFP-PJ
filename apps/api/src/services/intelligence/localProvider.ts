@@ -117,7 +117,8 @@ export async function runLocalProvider(input: {
       operations,
       analysisSpec: nextSpec,
       message: describeOperations(operations),
-      answer: '',
+      // The adjusted analysis is answered too, so the conversation shows what changed in the data.
+      answer: composeAnswer(result),
       basis: describeBasis(nextSpec),
       evidence: result.insights,
       suggestions: buildSuggestions(nextSpec, result),
@@ -167,7 +168,7 @@ export async function runLocalProvider(input: {
         action: 'UPDATE_ANALYSIS',
         operations,
         analysisSpec: spec,
-        message: 'Análise montada no playground a partir da sua pergunta.',
+        message: 'Montei a análise a partir da sua pergunta.',
         answer,
         basis: describeBasis(spec),
         evidence: result.insights,

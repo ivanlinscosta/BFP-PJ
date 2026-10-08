@@ -25,14 +25,21 @@ test('Golden path 2: Inteligência PJ consulta dados e altera o AnalysisSpec', a
   await expect(
     page.getByText(/apresenta o melhor equilíbrio no período selecionado/),
   ).toBeVisible();
-  await expect(page.getByText(/R\$/).first()).toBeVisible();
-  await expect(page.getByText('Base da resposta')).toBeVisible();
+  // The answer brings its analysis: chart, findings, source and actions.
+  const answer = page.getByRole('region', {
+    name: /Análise: Conversão de abertura e CAC por Canal/,
+  });
+  await expect(answer).toBeVisible();
+  await expect(answer.getByText(/Fonte:/)).toBeVisible();
+  await answer.getByRole('button', { name: 'Tabela' }).click();
+  await expect(answer.getByRole('columnheader', { name: 'CAC' })).toBeVisible();
 
   await input.fill('Agora separa por porte.');
   await input.press('Enter');
   await expect(page.getByText('Porte da empresa adicionado à análise.')).toBeVisible();
+  await expect(page.getByText(/Contexto da conversa:/)).toContainText('Porte da empresa');
 
-  await page.getByRole('button', { name: 'Abrir no playground' }).click();
+  await page.getByRole('button', { name: 'Abrir no Explorar' }).last().click();
   await expect(page).toHaveURL(/\/explorar$/);
   await expect(page.getByRole('button', { name: 'Remover Porte da empresa' })).toBeVisible();
   await expect(page.getByRole('heading', { name: /por Canal e Porte da empresa/ })).toBeVisible();
@@ -53,17 +60,14 @@ test('Inteligência PJ: estudo completo, salvar análise e exportar PDF', async 
   await expect(study).toBeVisible({ timeout: 30_000 });
   await expect(study.getByRole('heading', { name: 'Recomendações' })).toBeVisible();
 
-  // The first chapter becomes the active analysis and can be saved.
-  await page.getByRole('button', { name: 'Salvar análise' }).click();
+  // Each chapter can be saved on its own.
+  await study.getByRole('button', { name: 'Salvar' }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Salvar análise' });
   await dialog.getByRole('button', { name: 'Salvar análise' }).click();
   await expect(dialog).toBeHidden();
 
   const download = page.waitForEvent('download');
-  await page
-    .getByRole('complementary', { name: 'Contexto analítico' })
-    .getByRole('button', { name: 'Salvar PDF' })
-    .click();
+  await page.getByRole('button', { name: 'Baixar estudo em PDF' }).click();
   const file = await download;
   expect(file.suggestedFilename()).toBe('estudo-completo-da-jornada-pj.pdf');
   await file.saveAs('artifacts/estudo-completo-da-jornada-pj.pdf');

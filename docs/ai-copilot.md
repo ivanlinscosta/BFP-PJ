@@ -44,3 +44,26 @@ Ferramentas governadas: `getAvailableMetrics`, `getAvailableDimensions`, `getMet
 - RBAC por domínio aplicado em toda ferramenta; resultados limitados a 50 linhas agregadas.
 - CAC só é comparado entre canais pagos (`acquisition_source = PAID`).
 - Conversas persistidas (`aiConversation`) e logs `AI_REQUEST` / `AI_TOOL_CALL` sem o texto do prompt (hash).
+
+## Experiência conversacional
+
+- Coluna única de conversa com campo fixo (Enter envia, Shift+Enter quebra linha), tela inicial com
+  sugestões por tema e as bases de dados que o usuário pode consultar.
+- Cada resposta traz o **cartão de análise**: gráfico/tabela, até 3 achados do Insight Engine, fonte
+  (bases do data mesh) e ações (Abrir no Explorar, Salvar, Dashboard, PDF). Os números vêm da mesma
+  API governada do Explorar.
+- A análise respondida vira o **contexto da conversa** (linha acima do campo, com "Limpar"); pedidos
+  como "agora separa por porte" ajustam o contexto e mostram o novo recorte.
+- Erros aparecem na conversa com "Tentar de novo".
+
+## Estudo completo (tarefa em segundo plano)
+
+`POST /api/ai/chat` com um pedido de estudo ("estudo", "raio-x", "análise completa") cria uma tarefa
+`aiStudy` e responde na hora com `studyJob`; o chat acompanha `GET /api/ai/studies/:id`. Na AWS a
+Lambda se auto-invoca (`InvocationType=Event`, timeout 120 s); localmente roda no mesmo processo.
+
+- **Com Claude (Bedrock):** o modelo planeja de 5 a 10 capítulos, executa as consultas governadas em
+  paralelo, lê os resultados e escreve resumo, leituras e recomendações. Capítulos sem consulta
+  executada são descartados e frases com números ausentes dos resultados são removidas.
+- **Sem Claude:** estudo determinístico guiado pelos temas da pergunta (aquisição, ativação, app,
+  transações, NPS, atendimento, CRM, jornada digital), com o motivo exibido ao usuário.
