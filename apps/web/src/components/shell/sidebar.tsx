@@ -9,21 +9,21 @@ function SidebarLink({ item }: { item: NavigationItem }) {
       {({ isActive }) => (
         <span
           className={cn(
-            'flex h-11 items-center gap-3 rounded-[var(--radius-control)] px-4 text-sm transition-colors',
+            // Icon and label share the same color and weight in every state.
+            'relative flex h-11 items-center gap-3 rounded-[var(--radius-control)] px-4 text-sm transition-colors',
             isActive
               ? 'bg-cream font-semibold text-brand-navy'
-              : 'text-ink-soft hover:bg-muted hover:text-ink',
+              : 'text-ink-soft hover:bg-muted hover:text-brand-navy',
           )}
         >
-          <Icon
-            aria-hidden
-            className={cn(
-              'h-[18px] w-[18px] shrink-0',
-              isActive ? 'text-brand-orange' : 'text-ink-faint',
-            )}
-            strokeWidth={1.75}
-          />
-          {item.label}
+          {isActive ? (
+            <span
+              aria-hidden
+              className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-brand-orange"
+            />
+          ) : null}
+          <Icon aria-hidden className="h-5 w-5 shrink-0" strokeWidth={isActive ? 2.1 : 1.9} />
+          <span className="leading-none">{item.label}</span>
         </span>
       )}
     </NavLink>

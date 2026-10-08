@@ -1,4 +1,4 @@
-import { ExternalLink, Lightbulb, Save } from 'lucide-react';
+import { ExternalLink, Lightbulb, Save, Sparkles } from 'lucide-react';
 import type { AnalysisSpec } from '@bfp/domain';
 import { Card } from '@/components/ui/card';
 import { ResultView } from '@/features/viz/result-view';
@@ -26,9 +26,26 @@ export function StudyView({
     <section aria-label={study.title} className="mt-3 flex flex-col gap-3">
       <div>
         <h3 className="m-0 text-base font-semibold text-brand-navy">{study.title}</h3>
-        <p className="mt-0.5 text-xs text-ink-soft">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-soft">
+          <span
+            className={
+              study.generatedBy === 'ai'
+                ? 'inline-flex items-center gap-1 rounded bg-brand-navy px-1.5 py-0.5 text-[11px] font-semibold text-white'
+                : 'inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-ink'
+            }
+          >
+            {study.generatedBy === 'ai' ? (
+              <>
+                <Sparkles aria-hidden className="h-3 w-3" />
+                Gerado pela IA
+              </>
+            ) : (
+              'Motor determinístico'
+            )}
+          </span>
           {study.period} · {study.queryCount} consultas governadas
         </p>
+        {study.notice ? <p className="mt-1.5 text-xs text-ink-soft">{study.notice}</p> : null}
       </div>
 
       <ul

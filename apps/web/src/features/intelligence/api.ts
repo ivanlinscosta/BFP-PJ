@@ -23,6 +23,26 @@ export interface IntelligenceStudy {
   }>;
   recommendations: string[];
   skipped: string[];
+  themes: string[];
+  generatedBy: 'ai' | 'deterministic';
+  model?: string;
+  notice?: string;
+}
+
+/** Background study started from the chat (polled until it is done). */
+export interface IntelligenceStudyJob {
+  id: string;
+  prompt: string;
+  status: 'running' | 'done' | 'error';
+  progress: string;
+  study?: IntelligenceStudy;
+  error?: string;
+}
+
+export async function getStudyJob(id: string) {
+  return (
+    await apiRequest<{ study: IntelligenceStudyJob }>(`/ai/studies/${encodeURIComponent(id)}`)
+  ).study;
 }
 
 export interface IntelligenceReply {
@@ -38,6 +58,7 @@ export interface IntelligenceReply {
   evidence?: AnalyticsInsight[];
   suggestions: string[];
   study?: IntelligenceStudy;
+  studyJob?: { id: string; status: 'running' | 'done' | 'error'; progress: string };
   explainability: { tools: string[]; note: string; refusal?: string };
 }
 

@@ -169,7 +169,16 @@ describe('POST /api/ai/chat', () => {
     ]);
   });
 
-  it('builds a complete study with KPIs, charts, tables and recommendations', async () => {
+  async function waitForStudy(app: ReturnType<typeof createApp>, auth: string, id: string) {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const response = await request(app).get(`/api/ai/studies/${id}`).set('Authorization', auth);
+      if (response.body.study.status !== 'running') return response.body.study;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error('Estudo não terminou.');
+  }
+
+  it('builds a complete study in the background with KPIs, charts, tables and recommendations', async () => {
     const { app } = createHarness();
     const auth = await login(app);
 
@@ -178,9 +187,15 @@ describe('POST /api/ai/chat', () => {
     });
 
     expect(response.status).toBe(200);
-    const study = response.body.study;
+    expect(response.body.studyJob).toMatchObject({ status: 'running' });
+    const job = await waitForStudy(app, auth, response.body.studyJob.id);
+    expect(job.status).toBe('done');
+    expect(job).not.toHaveProperty('auth');
+    const study = job.study;
+    expect(study.generatedBy).toBe('deterministic');
+    expect(study.notice).toMatch(/motor determinístico/);
     expect(study.skipped).toEqual([]);
-    expect(study.kpis.length).toBeGreaterThanOrEqual(6);
+    expect(study.kpis.length).toBeGreaterThanOrEqual(8);
     expect(study.sections.map((section: { id: string }) => section.id)).toEqual([
       'acquisition',
       'trend',
@@ -192,13 +207,33 @@ describe('POST /api/ai/chat', () => {
       'ticket',
       'nps',
       'service',
+      'crm',
+      'digital',
     ]);
     for (const section of study.sections) {
       expect(section.result.rows.length).toBeGreaterThan(0);
       expect(section.findings.length).toBeGreaterThan(0);
     }
     expect(study.recommendations.length).toBeGreaterThanOrEqual(4);
-    expect(response.body.explainability.tools).toEqual(['runAnalyticsQuery']);
+  });
+
+  it('builds a study focused on the themes of the question', async () => {
+    const { app } = createHarness();
+    const auth = await login(app);
+
+    const response = await request(app).post('/api/ai/chat').set('Authorization', auth).send({
+      prompt: 'Faça um estudo sobre o uso do app e o ticket médio',
+    });
+    const job = await waitForStudy(app, auth, response.body.studyJob.id);
+
+    expect(job.study.themes).toEqual(['app', 'transactions']);
+    expect(job.study.title).toBe('Estudo: uso do app, transações');
+    expect(job.study.sections.map((section: { id: string }) => section.id)).toEqual([
+      'app-usage',
+      'app-quality',
+      'transactions',
+      'ticket',
+    ]);
   });
 
   it('refuses PII requests before touching data', async () => {

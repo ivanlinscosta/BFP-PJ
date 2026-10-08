@@ -9,7 +9,7 @@ import {
   Share2,
   Sparkles,
 } from 'lucide-react';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { describeAnalysisSpec, describeFilter } from '@bfp/shared';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,12 @@ import { useSpecLabels } from '@/features/catalog/hooks';
 import { SaveAnalysisDialog, ShareDialog } from '@/features/explorer/components/action-dialogs';
 import { useAnalysisResult } from '@/features/explorer/hooks';
 import { useAnalysisStore } from '@/features/explorer/store';
-import { askIntelligence, type IntelligenceReply } from '@/features/intelligence/api';
+import {
+  askIntelligence,
+  type IntelligenceReply,
+  type IntelligenceStudy,
+} from '@/features/intelligence/api';
+import { StudyJobProgress } from '@/features/intelligence/study-job';
 import { StudyView } from '@/features/intelligence/study-view';
 import { ThinkingIndicator } from '@/features/intelligence/thinking-indicator';
 import { downloadCsv } from '@/features/viz/csv';
@@ -110,7 +115,9 @@ export function IntelligencePage() {
       } else {
         // The answered analysis (or the first chapter of a study) becomes the active analysis,
         // so it can be saved, shared, exported or continued in the playground.
-        const answered = reply.analysisSpec ?? reply.study?.sections[0]?.spec;
+        const answered = reply.studyJob
+          ? undefined
+          : (reply.analysisSpec ?? reply.study?.sections[0]?.spec);
         if (answered) loadAnalysis(answered);
         entries.push({
           id: ++sequence.current,
@@ -151,10 +158,30 @@ export function IntelligencePage() {
     send(prompt);
   }
 
+  // A background study finished: keep it in the conversation and make chapter 1 the active analysis.
+  const handleStudyReady = useCallback(
+    (entryId: number, study: IntelligenceStudy) => {
+      setChat((current) => ({
+        ...current,
+        entries: current.entries.map((entry) =>
+          entry.id === entryId && entry.reply && !entry.reply.study
+            ? { ...entry, text: study.summary, reply: { ...entry.reply, study } }
+            : entry,
+        ),
+      }));
+      const first = study.sections[0]?.spec;
+      if (first) loadAnalysis(first);
+    },
+    [loadAnalysis],
+  );
+
   const lastReplyId = [...chat.entries].reverse().find((entry) => entry.reply)?.id;
   const lastAnswerId = [...chat.entries]
     .reverse()
-    .find((entry) => entry.role === 'assistant' && entry.reply)?.id;
+    .find(
+      (entry) =>
+        entry.role === 'assistant' && entry.reply && (!entry.reply.studyJob || entry.reply.study),
+    )?.id;
 
   async function exportEntry(entryId: number) {
     const element = document.getElementById(`chat-entry-${entryId}`);
@@ -216,7 +243,7 @@ export function IntelligencePage() {
 
           <div
             aria-live="polite"
-            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4"
+            className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4"
             ref={listRef}
           >
             {chat.entries.length === 0 ? (
@@ -264,6 +291,14 @@ export function IntelligencePage() {
                       {isUser ? (user?.name ?? 'Você') : 'Inteligência PJ'}
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-ink">{entry.text}</p>
+                    {entry.reply?.studyJob && !entry.reply.study && entry.role === 'assistant' ? (
+                      <div className="mt-3">
+                        <StudyJobProgress
+                          jobId={entry.reply.studyJob.id}
+                          onReady={(study) => handleStudyReady(entry.id, study)}
+                        />
+                      </div>
+                    ) : null}
                     {entry.reply?.study && entry.role === 'assistant' ? (
                       <StudyView
                         onOpen={(sectionSpec) => {
@@ -275,7 +310,9 @@ export function IntelligencePage() {
                       />
                     ) : null}
                   </div>
-                  {entry.reply && entry.role === 'assistant' ? (
+                  {entry.reply &&
+                  entry.role === 'assistant' &&
+                  (!entry.reply.studyJob || entry.reply.study) ? (
                     <div className="mt-2 flex justify-end" {...{ [PDF_IGNORE_ATTRIBUTE]: '' }}>
                       <Button
                         disabled={exporting !== null}

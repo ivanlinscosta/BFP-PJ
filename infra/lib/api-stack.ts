@@ -65,7 +65,9 @@ export class ApiStack extends Stack {
       code: lambda.Code.fromAsset(props.lambdaCodePath ?? LAMBDA_BUNDLE),
       handler: 'index.handler',
       memorySize: 1024,
-      timeout: Duration.seconds(29),
+      // HTTP requests are capped at 30 s by API Gateway; background studies (async self-invoke)
+      // run planning, governed queries and analysis with Claude and need more time.
+      timeout: Duration.seconds(120),
       tracing: lambda.Tracing.ACTIVE,
       logGroup: this.logGroup,
       environment: {
@@ -141,6 +143,13 @@ export class ApiStack extends Stack {
         }),
       );
     }
+    // Background studies: the API Lambda invokes itself asynchronously (InvocationType=Event).
+    this.handler.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction'],
+        resources: [`arn:aws:lambda:${this.region}:${this.account}:function:${config.prefix}-api`],
+      }),
+    );
     props.atlanSecret.grantRead(this.handler);
     props.fullstorySecret.grantRead(this.handler);
     props.dataLoadedAtParameter.grantRead(this.handler);

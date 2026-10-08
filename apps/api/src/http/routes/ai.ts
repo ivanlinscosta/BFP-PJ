@@ -11,6 +11,7 @@ import { normalizeSearchText } from '@api/http/textSearch';
 import { COPILOT_MAX_PROMPT_LENGTH } from '@api/services/copilot/guardrails';
 import { getCopilotToolSurface, runCopilot } from '@api/services/copilot';
 import { runIntelligence } from '@api/services/intelligence/service';
+import { getStudyJob } from '@api/services/intelligence/studyJobs';
 import type { StoredConversation } from '@api/services/intelligence/types';
 import { ApiError, NotFoundError } from '@api/common/errors';
 import { readFeatureFlags } from '@api/http/routes/admin';
@@ -204,6 +205,30 @@ export function createAiRouter(context: ApiContext) {
       res.json(
         await runIntelligence(context, req.auth!, { ...payload, analysisSpec }, req.correlationId),
       );
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/studies/:id', async (req, res, next) => {
+    try {
+      const job = await getStudyJob(context, req.auth!.userId, req.params.id);
+      if (!job) {
+        throw new NotFoundError('Estudo não encontrado.');
+      }
+      // The worker identity stays on the server.
+      res.json({
+        study: {
+          id: job.id,
+          prompt: job.prompt,
+          status: job.status,
+          progress: job.progress,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt,
+          study: job.study,
+          error: job.error,
+        },
+      });
     } catch (error) {
       next(error);
     }

@@ -97,6 +97,17 @@ describe('CDK stacks', () => {
       Permissions: ['SELECT', 'DESCRIBE'],
       Resource: { LFTagPolicy: Match.objectLike({ ResourceType: 'TABLE' }) },
     });
+    templates.api.hasResourceProperties('AWS::Lambda::Function', { Timeout: 120 });
+    templates.api.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: Match.objectLike({
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'lambda:InvokeFunction',
+            Resource: 'arn:aws:lambda:sa-east-1:123456789012:function:bfp-pj-dev-api',
+          }),
+        ]),
+      }),
+    });
     templates.api.hasResourceProperties('AWS::Lambda::Function', {
       Environment: {
         Variables: Match.objectLike({

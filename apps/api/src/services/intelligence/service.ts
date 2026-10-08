@@ -1,4 +1,5 @@
-import { buildStudy, isStudyRequest, studyAnswer } from '@api/services/intelligence/study';
+import { isStudyRequest } from '@api/services/intelligence/study';
+import { startStudyJob } from '@api/services/intelligence/studyJobs';
 import { randomUUID } from 'node:crypto';
 import type { AnalysisSpec } from '@bfp/domain';
 import type { AuthenticatedUser } from '@api/auth/types';
@@ -86,8 +87,17 @@ export async function runIntelligence(
       ),
     };
   } else if (isStudyRequest(request.prompt)) {
-    // A complete study is a fixed, governed plan of queries; it does not depend on the LLM.
-    result = studyAnswer(await buildStudy(toolContext));
+    // A study is agentic and slow (planning + queries + analysis): it runs as a background job
+    // and the client follows its progress.
+    const job = await startStudyJob(context, auth, request.prompt);
+    result = {
+      action: 'NONE',
+      operations: [],
+      message: 'Estou montando o estudo. Isso leva alguns segundos.',
+      answer: 'Estou montando o estudo. Isso leva alguns segundos.',
+      suggestions: [],
+      studyJob: { id: job.id, status: job.status, progress: job.progress },
+    };
   } else {
     try {
       result =

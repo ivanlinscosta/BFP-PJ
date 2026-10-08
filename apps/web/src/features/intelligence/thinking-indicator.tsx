@@ -10,7 +10,14 @@ const STEPS = [
 ];
 
 /** Assistant "thinking" bubble: pulsing mark, bouncing dots and the current step of the agent. */
-export function ThinkingIndicator({ study = false }: { study?: boolean }) {
+export function ThinkingIndicator({
+  study = false,
+  progress,
+}: {
+  study?: boolean;
+  /** Real progress reported by a background job; replaces the rotating steps. */
+  progress?: string;
+}) {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -46,7 +53,7 @@ export function ThinkingIndicator({ study = false }: { study?: boolean }) {
             ))}
           </span>
           <span className="text-[13px] text-ink-soft" key={step}>
-            {study && step >= 2 ? 'Montando o estudo completo' : STEPS[step]}…
+            {progress ?? (study && step >= 2 ? 'Montando o estudo completo' : STEPS[step])}…
           </span>
         </div>
       </div>

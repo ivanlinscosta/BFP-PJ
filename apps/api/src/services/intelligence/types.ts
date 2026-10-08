@@ -18,6 +18,8 @@ export interface ProviderResult {
   suggestions: string[];
   /** Complete multi-chapter study, when the user asked for one. */
   study?: Study;
+  /** Background study being built (poll GET /api/ai/studies/:id). */
+  studyJob?: { id: string; status: 'running' | 'done' | 'error'; progress: string };
 }
 
 /** One stored turn of an Inteligência PJ conversation. */

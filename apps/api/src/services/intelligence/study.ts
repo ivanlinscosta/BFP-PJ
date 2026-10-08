@@ -1,9 +1,9 @@
 import type { AnalysisSpec, ColumnFormat, VisualizationType } from '@bfp/domain';
 import { normalizeSearchText } from '@api/http/textSearch';
-import { withRequiredDatasets } from '@bfp/semantic-layer';
+import { getMetricDefinition, withRequiredDatasets } from '@bfp/semantic-layer';
+import { parseIntent } from '@api/services/intelligence/nlu';
 import { executeGovernedQuery, type GovernedQueryResult } from '@api/services/analyticsService';
 import type { ToolContext } from '@api/services/intelligence/tools';
-import type { ProviderResult } from '@api/services/intelligence/types';
 
 /** Headline indicator of the study (one governed metric over the whole period). */
 export interface StudyKpi {
@@ -35,6 +35,68 @@ export interface Study {
   skipped: string[];
   /** Governed queries executed to build the study. */
   queryCount: number;
+  /** Business themes the study covers (from the question). */
+  themes: StudyTheme[];
+  /** Who wrote the analysis: the generative AI (Claude) or the deterministic engine. */
+  generatedBy: 'ai' | 'deterministic';
+  model?: string;
+  /** Shown to the user when the generative AI could not be used. */
+  notice?: string;
+}
+
+export const STUDY_THEMES = [
+  'acquisition',
+  'activation',
+  'app',
+  'transactions',
+  'nps',
+  'service',
+  'crm',
+  'digital',
+] as const;
+export type StudyTheme = (typeof STUDY_THEMES)[number];
+
+export const THEME_LABELS: Record<StudyTheme, string> = {
+  acquisition: 'aquisição',
+  activation: 'ativação',
+  app: 'uso do app',
+  transactions: 'transações',
+  nps: 'satisfação (NPS)',
+  service: 'atendimento',
+  crm: 'relacionamento (CRM)',
+  digital: 'jornada digital',
+};
+
+/** Words that point a question at each theme (normalized, without accents). */
+const THEME_KEYWORDS: Record<StudyTheme, string[]> = {
+  acquisition: [
+    'aquisicao',
+    'conversao',
+    'cac',
+    'canal',
+    'canais',
+    'midia',
+    'lead',
+    'campanha',
+    'abertura',
+  ],
+  activation: ['ativacao', 'onboarding', 'ativam', 'd30'],
+  app: ['app', 'aplicativo', 'navegacao', 'telas', 'tela'],
+  transactions: ['transac', 'pix', 'boleto', 'ticket', 'ted', 'cartao', 'volume', 'pagamento'],
+  nps: ['nps', 'satisfacao', 'experiencia', 'recomendacao', 'detrator', 'promotor'],
+  service: ['atendimento', 'conversa', 'resolucao', 'suporte'],
+  crm: ['crm', 'relacionamento', 'gerente', 'comercial'],
+  digital: ['fullstory', 'digital', 'site', 'sessoes'],
+};
+
+/** Themes the question is about; a broad question ("jornada", "completo") covers all of them. */
+export function detectThemes(prompt: string): StudyTheme[] {
+  const normalized = normalizeSearchText(prompt);
+  const themes = STUDY_THEMES.filter((theme) =>
+    THEME_KEYWORDS[theme].some((keyword) => normalized.includes(keyword)),
+  );
+  const broad = /jornada|completo|completa|tudo|geral|raio/.test(normalized);
+  return themes.length === 0 || (broad && themes.length >= 4) ? [...STUDY_THEMES] : themes;
 }
 
 const STUDY_TRIGGERS = [
@@ -58,7 +120,7 @@ export function isStudyRequest(prompt: string) {
   return STUDY_TRIGGERS.some((trigger) => normalized.includes(trigger));
 }
 
-function spec(
+export function spec(
   metrics: string[],
   dimensions: Array<{ id: string; granularity?: 'month' }>,
   visualization: VisualizationType,
@@ -80,7 +142,7 @@ const currency = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 1,
 });
 
-function formatValue(value: unknown, format?: ColumnFormat) {
+export function formatValue(value: unknown, format?: ColumnFormat) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
   if (format === 'percent') return `${number.format(value * 100)}%`;
   if (format === 'currency') return currency.format(value);
@@ -88,7 +150,7 @@ function formatValue(value: unknown, format?: ColumnFormat) {
 }
 
 /** Rows of a result as (label, value) pairs for one metric, highest first. */
-function ranked(result: GovernedQueryResult, metricId: string, dimensionId: string) {
+export function ranked(result: GovernedQueryResult, metricId: string, dimensionId: string) {
   const labels = result.valueLabels[dimensionId] ?? {};
   return result.rows
     .map((row) => ({
@@ -105,7 +167,7 @@ function ranked(result: GovernedQueryResult, metricId: string, dimensionId: stri
  * spec, semantic validation, RBAC) and records it as evidence of the turn. Each call returns its
  * own result, so queries can run in parallel.
  */
-async function run(toolContext: ToolContext, analysisSpec: AnalysisSpec) {
+export async function run(toolContext: ToolContext, analysisSpec: AnalysisSpec) {
   const governedSpec = withRequiredDatasets(analysisSpec);
   const result = await executeGovernedQuery(
     toolContext.context,
@@ -120,6 +182,7 @@ async function run(toolContext: ToolContext, analysisSpec: AnalysisSpec) {
 
 interface SectionPlan {
   id: string;
+  theme: StudyTheme;
   title: string;
   question: string;
   spec: AnalysisSpec;
@@ -129,6 +192,7 @@ interface SectionPlan {
 const SECTION_PLANS: SectionPlan[] = [
   {
     id: 'acquisition',
+    theme: 'acquisition',
     title: 'Aquisição por canal',
     question: 'Quais canais convertem mais e a que custo?',
     spec: spec(['account_conversion_rate', 'cac'], [{ id: 'acquisition_channel' }], 'TABLE'),
@@ -153,6 +217,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'trend',
+    theme: 'acquisition',
     title: 'Evolução mensal de contas abertas',
     question: 'Como a abertura de contas evoluiu mês a mês?',
     spec: spec(['accounts_opened'], [{ id: 'account_opened_date', granularity: 'month' }], 'LINE'),
@@ -177,6 +242,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'channel-size',
+    theme: 'acquisition',
     title: 'Conversão por canal e porte',
     question: 'Quais combinações de canal e porte convertem melhor?',
     spec: spec(
@@ -201,6 +267,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'activation',
+    theme: 'activation',
     title: 'Ativação D30 por porte',
     question: 'Quais portes ativam mais rápido depois da abertura?',
     spec: spec(['activation_d30_rate'], [{ id: 'company_size' }], 'BAR'),
@@ -215,6 +282,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'app-usage',
+    theme: 'app',
     title: 'Uso do app Itaú Empresas',
     question: 'Quais telas do app concentram o uso?',
     spec: spec(['app_interactions'], [{ id: 'app_screen' }], 'BAR'),
@@ -231,6 +299,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'app-quality',
+    theme: 'app',
     title: 'Erros e conclusão no app',
     question: 'Onde o app mais falha?',
     spec: spec(['app_error_rate', 'app_completion_rate'], [{ id: 'app_screen' }], 'TABLE'),
@@ -245,6 +314,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'transactions',
+    theme: 'transactions',
     title: 'Volume transacionado por tipo',
     question: 'Como o dinheiro circula entre Pix, boletos, TED e cartão?',
     spec: spec(['transaction_volume'], [{ id: 'transaction_type' }], 'BAR'),
@@ -263,6 +333,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'ticket',
+    theme: 'transactions',
     title: 'Ticket médio e transações por porte',
     question: 'Quanto cada porte movimenta por transação?',
     spec: spec(['average_ticket', 'transactions_count'], [{ id: 'company_size' }], 'TABLE'),
@@ -277,6 +348,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'nps',
+    theme: 'nps',
     title: 'NPS por momento da relação',
     question: 'Em que momento a satisfação é maior ou menor?',
     spec: spec(['nps'], [{ id: 'nps_touchpoint' }], 'BAR'),
@@ -291,6 +363,7 @@ const SECTION_PLANS: SectionPlan[] = [
   },
   {
     id: 'service',
+    theme: 'service',
     title: 'Resolução no atendimento',
     question: 'Quais canais de atendimento resolvem mais?',
     spec: spec(['conversation_resolution_rate'], [{ id: 'conversation_channel' }], 'BAR'),
@@ -303,17 +376,117 @@ const SECTION_PLANS: SectionPlan[] = [
         : [];
     },
   },
+  {
+    id: 'crm',
+    theme: 'crm',
+    title: 'Relacionamento comercial (CRM)',
+    question: 'Qual o resultado das interações comerciais?',
+    spec: spec(['crm_interactions_total'], [{ id: 'crm_outcome' }], 'BAR'),
+    describe(result) {
+      const rows = ranked(result, 'crm_interactions_total', 'crm_outcome');
+      const total = rows.reduce((sum, row) => sum + row.value, 0);
+      return rows[0] && total
+        ? [
+            `${number.format(total)} interações no período; o resultado mais comum é ${rows[0].label} (${formatValue(rows[0].value / total, 'percent')}).`,
+          ]
+        : [];
+    },
+  },
+  {
+    id: 'digital',
+    theme: 'digital',
+    title: 'Jornada digital (FullStory)',
+    question: 'Quais segmentos mais usam os canais digitais?',
+    spec: spec(['digital_sessions'], [{ id: 'segment' }], 'BAR'),
+    describe(result) {
+      const rows = ranked(result, 'digital_sessions', 'segment');
+      return rows.length > 1
+        ? [
+            `${rows[0]!.label} lidera com ${number.format(rows[0]!.value)} sessões; ${rows.at(-1)!.label} tem ${number.format(rows.at(-1)!.value)}.`,
+          ]
+        : [];
+    },
+  },
 ];
 
 /** Headline indicators grouped by data product, so each group is one governed query. */
-const KPI_GROUPS: string[][] = [
-  ['accounts_opened', 'account_conversion_rate', 'activation_d30_rate'],
-  ['cac'],
-  ['transaction_volume'],
-  ['app_active_companies'],
-  ['nps'],
-  ['conversation_resolution_rate'],
+const KPI_GROUPS: Array<{ theme: StudyTheme; metrics: string[] }> = [
+  { theme: 'acquisition', metrics: ['accounts_opened', 'account_conversion_rate'] },
+  { theme: 'acquisition', metrics: ['cac'] },
+  { theme: 'activation', metrics: ['activation_d30_rate'] },
+  { theme: 'transactions', metrics: ['transaction_volume', 'average_ticket'] },
+  { theme: 'app', metrics: ['app_active_companies', 'app_error_rate'] },
+  { theme: 'nps', metrics: ['nps'] },
+  { theme: 'service', metrics: ['conversation_resolution_rate'] },
+  { theme: 'crm', metrics: ['crm_contacted_companies'] },
+  { theme: 'digital', metrics: ['digital_sessions'] },
 ];
+
+/** Runs headline indicators (one governed query per group of metrics of the same product). */
+export async function runKpis(toolContext: ToolContext, groups: string[][], skipped: string[]) {
+  const results = await Promise.all(
+    groups.map((metrics) =>
+      run(toolContext, spec(metrics, [], 'KPI')).catch(() => {
+        skipped.push(`Indicadores: ${metrics.join(', ')}`);
+        return null;
+      }),
+    ),
+  );
+  return results.flatMap((executed): StudyKpi[] => {
+    if (!executed) return [];
+    const row = executed.result.rows[0] ?? {};
+    return executed.result.columns
+      .filter((column) => column.role === 'value')
+      .map((column) => ({
+        metricId: column.key,
+        label: column.label,
+        value: typeof row[column.key] === 'number' ? (row[column.key] as number) : null,
+        format: column.format,
+      }));
+  });
+}
+
+/** Priority of dimensions used to break down a metric that has no curated chapter. */
+const DEFAULT_BREAKDOWNS = [
+  'acquisition_channel',
+  'company_size',
+  'app_screen',
+  'transaction_type',
+  'nps_touchpoint',
+  'conversation_channel',
+  'crm_outcome',
+  'segment',
+  'region',
+];
+
+/** Chapter for a metric the user named that the curated plan does not cover. */
+function genericPlan(metricId: string, dimensionIds: string[]): SectionPlan | null {
+  const metric = getMetricDefinition(metricId);
+  if (!metric) return null;
+  const allowed = new Set<string>(
+    Array.isArray(metric.allowedDimensions) ? metric.allowedDimensions : DEFAULT_BREAKDOWNS,
+  );
+  const dimension =
+    dimensionIds.find((id) => allowed.has(id)) ?? DEFAULT_BREAKDOWNS.find((id) => allowed.has(id));
+  if (!dimension) return null;
+  return {
+    id: `metric-${metricId}-${dimension}`,
+    theme: 'acquisition',
+    title: `${metric.shortName ?? metric.name} por ${dimension.replace(/_/g, ' ')}`,
+    question: `Como ${(metric.shortName ?? metric.name).toLowerCase()} varia entre os grupos?`,
+    spec: spec([metricId], [{ id: dimension }], 'BAR'),
+    describe(result) {
+      const column = result.columns.find((item) => item.key === metricId);
+      const dimensionColumn = result.columns.find((item) => item.key === dimension);
+      const rows = ranked(result, metricId, dimension);
+      return rows.length > 1
+        ? [
+            `${dimensionColumn?.label ?? 'Grupo'} com maior ${column?.label ?? metricId}: ${rows[0]!.label} (${formatValue(rows[0]!.value, column?.format)}); menor: ${rows.at(-1)!.label} (${formatValue(rows.at(-1)!.value, column?.format)}).`,
+          ]
+        : [];
+    },
+  };
+}
 
 function recommendationsFrom(sections: StudySection[]) {
   const byId = new Map(sections.map((section) => [section.id, section.result]));
@@ -364,6 +537,40 @@ function recommendationsFrom(sections: StudySection[]) {
       `Atendimento: revisar o fluxo de ${worstChannel.label}, o canal com menor taxa de resolução.`,
     );
   }
+  const ticket = byId.get('ticket');
+  const lowestTicket = ticket ? ranked(ticket, 'average_ticket', 'company_size').at(-1) : undefined;
+  if (lowestTicket) {
+    recommendations.push(
+      `Transações: estimular cobrança via Pix e boletos no porte ${lowestTicket.label}, que tem o menor ticket médio (${formatValue(lowestTicket.value, 'currency')}).`,
+    );
+  }
+  const transactions = byId.get('transactions');
+  const topType = transactions
+    ? ranked(transactions, 'transaction_volume', 'transaction_type')[0]
+    : undefined;
+  if (topType) {
+    recommendations.push(
+      `Transações: ${topType.label} concentra o maior volume (${formatValue(topType.value, 'currency')}); usar essa jornada como porta de entrada para crédito e investimentos.`,
+    );
+  }
+  const crm = byId.get('crm');
+  if (crm) {
+    const rows = ranked(crm, 'crm_interactions_total', 'crm_outcome');
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    const noAnswer = rows.find((row) => row.code === 'NO_ANSWER');
+    if (noAnswer && total) {
+      recommendations.push(
+        `CRM: rever a cadência de contato, pois ${formatValue(noAnswer.value / total, 'percent')} das interações terminam sem resposta.`,
+      );
+    }
+  }
+  const digital = byId.get('digital');
+  const quietSegment = digital ? ranked(digital, 'digital_sessions', 'segment').at(-1) : undefined;
+  if (quietSegment) {
+    recommendations.push(
+      `Digital: criar campanha de adoção do app para ${quietSegment.label}, o segmento com menos sessões digitais.`,
+    );
+  }
   return recommendations;
 }
 
@@ -372,32 +579,29 @@ function recommendationsFrom(sections: StudySection[]) {
  * through runAnalyticsQuery (semantic validation, RBAC and data mesh selection included).
  * Chapters the user cannot access are skipped and listed instead of failing the whole study.
  */
-export async function buildStudy(toolContext: ToolContext): Promise<Study> {
+export async function buildStudy(toolContext: ToolContext, prompt = ''): Promise<Study> {
   const skipped: string[] = [];
-
-  const kpiResults = await Promise.all(
-    KPI_GROUPS.map((metrics) =>
-      run(toolContext, spec(metrics, [], 'KPI')).catch(() => {
-        skipped.push(`Indicadores: ${metrics.join(', ')}`);
-        return null;
-      }),
-    ),
+  const themes = detectThemes(prompt);
+  const intent = parseIntent(prompt);
+  const curated = SECTION_PLANS.filter((plan) => themes.includes(plan.theme));
+  const coveredMetrics = new Set(
+    curated.flatMap((plan) => plan.spec.metrics.map((metric) => metric.id)),
   );
-  const kpis: StudyKpi[] = kpiResults.flatMap((executed) => {
-    if (!executed) return [];
-    const row = executed.result.rows[0] ?? {};
-    return executed.result.columns
-      .filter((column) => column.role === 'value')
-      .map((column) => ({
-        metricId: column.key,
-        label: column.label,
-        value: typeof row[column.key] === 'number' ? (row[column.key] as number) : null,
-        format: column.format,
-      }));
-  });
+  // Metrics named in the question that the curated chapters do not cover get their own chapter.
+  const extra = intent.metrics
+    .filter((metricId) => !coveredMetrics.has(metricId))
+    .map((metricId) => genericPlan(metricId, intent.dimensions))
+    .filter((plan): plan is SectionPlan => Boolean(plan));
+  const plans = [...extra, ...curated];
+
+  const kpis = await runKpis(
+    toolContext,
+    KPI_GROUPS.filter((group) => themes.includes(group.theme)).map((group) => group.metrics),
+    skipped,
+  );
 
   const sectionResults = await Promise.all(
-    SECTION_PLANS.map(async (plan) => {
+    plans.map(async (plan) => {
       try {
         const executed = await run(toolContext, plan.spec);
         return {
@@ -421,39 +625,19 @@ export async function buildStudy(toolContext: ToolContext): Promise<Study> {
     .slice(0, 4)
     .map((kpi) => `${kpi.label}: ${formatValue(kpi.value, kpi.format)}`)
     .join(' · ');
+  const allThemes = themes.length === STUDY_THEMES.length;
+  const themeText = themes.map((theme) => THEME_LABELS[theme]).join(', ');
 
   return {
-    title: 'Estudo completo da jornada PJ',
+    title: allThemes ? 'Estudo completo da jornada PJ' : `Estudo: ${themeText}`,
     period: 'Últimos 365 dias',
-    summary: `Estudo com ${sections.length} análises sobre aquisição, ativação, uso do app, transações, satisfação e atendimento. ${kpiText}.`,
+    summary: `Estudo com ${sections.length} análises sobre ${themeText}. ${kpiText}.`,
     kpis,
     sections,
     recommendations: recommendationsFrom(sections),
     skipped,
     queryCount: toolContext.queries.length,
-  };
-}
-
-/** Provider-shaped answer for a study request (deterministic narrative over governed data). */
-export function studyAnswer(study: Study): ProviderResult & { study: Study } {
-  return {
-    action: 'ANSWER_QUESTION',
-    operations: [],
-    message: study.summary,
-    answer: study.summary,
-    basis: {
-      title: 'Base da resposta',
-      items: [
-        `${study.queryCount} consultas governadas (runAnalyticsQuery)`,
-        study.period,
-        'Métricas certificadas do catálogo semântico',
-      ],
-    },
-    suggestions: [
-      'Agora separa a conversão por estado',
-      'Qual a taxa de erro no app por plataforma?',
-      'Qual o NPS por porte da empresa?',
-    ],
-    study,
+    themes,
+    generatedBy: 'deterministic',
   };
 }

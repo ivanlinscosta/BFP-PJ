@@ -38,7 +38,7 @@ export function AnalyticsBarChart({
   const { max, ticks } = niceScale(Math.max(0, ...bars.map((bar) => bar.value ?? 0)));
 
   return (
-    <figure aria-label={`${metric.label} por ${dimension.label}`} className="m-0">
+    <figure aria-label={`${metric.label} por ${dimension.label}`} className="relative m-0">
       <ul className="m-0 flex list-none flex-col gap-[8px] p-0">
         {bars.map((bar) => (
           <li className="grid grid-cols-[120px_1fr_56px] items-center gap-0" key={bar.label}>

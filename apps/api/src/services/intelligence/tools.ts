@@ -44,7 +44,7 @@ export interface GovernedTool {
   execute(input: unknown, toolContext: ToolContext): Promise<unknown>;
 }
 
-function domainAllowed(auth: AuthenticatedUser, domain: BusinessDomain) {
+export function domainAllowed(auth: AuthenticatedUser, domain: BusinessDomain) {
   const allowed = getAllowedDomains(auth.role);
   return allowed[0] === '*' || (allowed as readonly BusinessDomain[]).includes(domain);
 }
