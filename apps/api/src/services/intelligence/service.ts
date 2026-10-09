@@ -129,7 +129,7 @@ export async function runIntelligence(
   } else if (isStudyRequest(request.prompt)) {
     // A study is agentic and slow (planning + queries + analysis): it runs as a background job
     // and the client follows its progress.
-    const job = await startStudyJob(context, auth, request.prompt);
+    const job = await startStudyJob(context, auth, request.prompt, toolContext.datasets);
     result = {
       action: 'NONE',
       operations: [],

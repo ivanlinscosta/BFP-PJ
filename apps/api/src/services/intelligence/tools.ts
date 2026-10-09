@@ -69,6 +69,47 @@ export function withChartVisualization(spec: AnalysisSpec, prompt?: string): Ana
   return { ...spec, visualization: { ...spec.visualization, type: 'AUTO' } };
 }
 
+/**
+ * Models often write shorthand specs ("visualization": "BAR", "metrics": ["nps"]). They are
+ * normalized here, then validated by the schema and the semantic layer as usual.
+ */
+export function coerceSpecInput(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const spec = { ...(raw as Record<string, unknown>) };
+  const asSelections = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) => (typeof item === 'string' ? { id: item } : item))
+      : value;
+  spec.metrics = asSelections(spec.metrics);
+  spec.dimensions = asSelections(spec.dimensions ?? []);
+  if (typeof spec.visualization === 'string') spec.visualization = { type: spec.visualization };
+  if (!spec.visualization) spec.visualization = { type: 'AUTO' };
+  return spec;
+}
+
+/** Parses the tool input `{analysisSpec}`; issues go back to the model so it can fix them. */
+export function parseQueryInput(input: unknown) {
+  const raw = (input ?? {}) as { analysisSpec?: unknown };
+  const parsed = analysisSpecSchema.safeParse(coerceSpecInput(raw.analysisSpec));
+  if (!parsed.success) {
+    throw new ValidationError('AnalysisSpec inválida para runAnalyticsQuery.', {
+      issues: parsed.error.issues.slice(0, 6).map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+      example: {
+        datasets: ['transactions'],
+        metrics: [{ id: 'transaction_volume' }],
+        dimensions: [{ id: 'transaction_date', granularity: 'month' }],
+        filters: [{ field: 'segment', operator: 'EQ', value: 'Varejo' }],
+        dateRange: { type: 'LAST_N_DAYS', value: 365 },
+        visualization: { type: 'LINE' },
+      },
+    });
+  }
+  return parsed.data;
+}
+
 export class DatasetScopeError extends ApiError {
   constructor(message: string) {
     super(422, 'dataset_scope', message);
@@ -80,11 +121,11 @@ function datasetName(id: string) {
 }
 
 /** True when the metric can be computed only with the selected bases. */
-function metricInScope(metricId: string, scope?: MeshDatasetId[]) {
+export function metricInScope(metricId: string, scope?: MeshDatasetId[]) {
   return !scope || datasetsForMetric(metricId).every((dataset) => scope.includes(dataset));
 }
 
-function dimensionInScope(dimensionId: string, scope?: MeshDatasetId[]) {
+export function dimensionInScope(dimensionId: string, scope?: MeshDatasetId[]) {
   if (!scope) return true;
   const owner = datasetForDimension(dimensionId);
   return !owner || scope.includes(owner);
@@ -182,6 +223,8 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
               id: dimension.id,
               name: dimension.label,
               type: dimension.type,
+              // Codes to use in filters (code → label).
+              values: dimension.valueLabels,
             })),
         }));
     },
@@ -291,13 +334,9 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
       'Executa uma AnalysisSpec validada pela camada semântica e retorna agregados autorizados e insights determinísticos. Única fonte de números.',
     inputSchema: z.object({ analysisSpec: analysisSpecSchema }),
     async execute(input, toolContext) {
-      const parsed = z.object({ analysisSpec: analysisSpecSchema }).safeParse(input);
-      if (!parsed.success) {
-        throw new ValidationError('AnalysisSpec inválida para runAnalyticsQuery.');
-      }
       // The assistant selects the mesh bases it needs and reports them in the answer basis.
       const spec = withChartVisualization(
-        withRequiredDatasets(parsed.data.analysisSpec),
+        withRequiredDatasets(parseQueryInput(input)),
         toolContext.prompt,
       );
       assertSpecInScope(spec, toolContext.datasets);

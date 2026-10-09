@@ -1,9 +1,20 @@
 import type { AnalysisSpec, ColumnFormat, VisualizationType } from '@bfp/domain';
 import { normalizeSearchText } from '@api/http/textSearch';
-import { getMetricDefinition, withRequiredDatasets } from '@bfp/semantic-layer';
+import {
+  getMetricDefinition,
+  listMetricDefinitions,
+  MESH_DATASET_BY_ID,
+  withRequiredDatasets,
+} from '@bfp/semantic-layer';
 import { parseIntent } from '@api/services/intelligence/nlu';
 import { executeGovernedQuery, type GovernedQueryResult } from '@api/services/analyticsService';
-import type { ToolContext } from '@api/services/intelligence/tools';
+import {
+  assertSpecInScope,
+  dimensionInScope,
+  domainAllowed,
+  metricInScope,
+  type ToolContext,
+} from '@api/services/intelligence/tools';
 
 /** Headline indicator of the study (one governed metric over the whole period). */
 export interface StudyKpi {
@@ -169,6 +180,7 @@ export function ranked(result: GovernedQueryResult, metricId: string, dimensionI
  */
 export async function run(toolContext: ToolContext, analysisSpec: AnalysisSpec) {
   const governedSpec = withRequiredDatasets(analysisSpec);
+  assertSpecInScope(governedSpec, toolContext.datasets);
   const result = await executeGovernedQuery(
     toolContext.context,
     toolContext.auth,
@@ -460,11 +472,18 @@ const DEFAULT_BREAKDOWNS = [
 ];
 
 /** Chapter for a metric the user named that the curated plan does not cover. */
-function genericPlan(metricId: string, dimensionIds: string[]): SectionPlan | null {
+function genericPlan(
+  metricId: string,
+  dimensionIds: string[],
+  scope?: ToolContext['datasets'],
+): SectionPlan | null {
   const metric = getMetricDefinition(metricId);
   if (!metric) return null;
   const allowed = new Set<string>(
-    Array.isArray(metric.allowedDimensions) ? metric.allowedDimensions : DEFAULT_BREAKDOWNS,
+    (Array.isArray(metric.allowedDimensions)
+      ? metric.allowedDimensions
+      : DEFAULT_BREAKDOWNS
+    ).filter((id) => dimensionInScope(id, scope)),
   );
   const dimension =
     dimensionIds.find((id) => allowed.has(id)) ?? DEFAULT_BREAKDOWNS.find((id) => allowed.has(id));
@@ -581,22 +600,50 @@ function recommendationsFrom(sections: StudySection[]) {
  */
 export async function buildStudy(toolContext: ToolContext, prompt = ''): Promise<Study> {
   const skipped: string[] = [];
+  const scope = toolContext.datasets;
   const themes = detectThemes(prompt);
   const intent = parseIntent(prompt);
-  const curated = SECTION_PLANS.filter((plan) => themes.includes(plan.theme));
+  // With bases selected, only chapters that read those bases are planned.
+  const fits = (plan: SectionPlan) => {
+    try {
+      assertSpecInScope(withRequiredDatasets(plan.spec), scope);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  let curated = SECTION_PLANS.filter((plan) => themes.includes(plan.theme) && fits(plan));
+  if (scope && curated.length === 0) curated = SECTION_PLANS.filter(fits);
   const coveredMetrics = new Set(
     curated.flatMap((plan) => plan.spec.metrics.map((metric) => metric.id)),
   );
   // Metrics named in the question that the curated chapters do not cover get their own chapter.
   const extra = intent.metrics
-    .filter((metricId) => !coveredMetrics.has(metricId))
-    .map((metricId) => genericPlan(metricId, intent.dimensions))
-    .filter((plan): plan is SectionPlan => Boolean(plan));
+    .filter((metricId) => !coveredMetrics.has(metricId) && metricInScope(metricId, scope))
+    .map((metricId) => genericPlan(metricId, intent.dimensions, scope))
+    .filter((plan): plan is SectionPlan => Boolean(plan) && fits(plan!));
   const plans = [...extra, ...curated];
+  // Few chapters for the selected bases: complete with their certified metrics.
+  if (scope && plans.length < 4) {
+    const named = new Set(plans.flatMap((plan) => plan.spec.metrics.map((metric) => metric.id)));
+    for (const metric of listMetricDefinitions()) {
+      if (plans.length >= 6) break;
+      if (named.has(metric.id) || !metricInScope(metric.id, scope)) continue;
+      if (!domainAllowed(toolContext.auth, metric.domain)) continue;
+      if (metric.certificationStatus === 'DEPRECATED') continue;
+      const plan = genericPlan(metric.id, intent.dimensions, scope);
+      if (plan && fits(plan)) {
+        plans.push(plan);
+        named.add(metric.id);
+      }
+    }
+  }
 
   const kpis = await runKpis(
     toolContext,
-    KPI_GROUPS.filter((group) => themes.includes(group.theme)).map((group) => group.metrics),
+    KPI_GROUPS.filter((group) => (scope ? true : themes.includes(group.theme)))
+      .map((group) => group.metrics.filter((metricId) => metricInScope(metricId, scope)))
+      .filter((metrics) => metrics.length > 0),
     skipped,
   );
 
@@ -626,10 +673,18 @@ export async function buildStudy(toolContext: ToolContext, prompt = ''): Promise
     .map((kpi) => `${kpi.label}: ${formatValue(kpi.value, kpi.format)}`)
     .join(' · ');
   const allThemes = themes.length === STUDY_THEMES.length;
-  const themeText = themes.map((theme) => THEME_LABELS[theme]).join(', ');
+  // Bases covering the whole journey read like an unrestricted study.
+  const partialScope = scope !== undefined && !SECTION_PLANS.every(fits);
+  const themeText = partialScope
+    ? scope!.map((id) => MESH_DATASET_BY_ID.get(id)?.name ?? id).join(', ')
+    : themes.map((theme) => THEME_LABELS[theme]).join(', ');
 
   return {
-    title: allThemes ? 'Estudo completo da jornada PJ' : `Estudo: ${themeText}`,
+    title: partialScope
+      ? `Estudo: ${themeText}`
+      : allThemes
+        ? 'Estudo completo da jornada PJ'
+        : `Estudo: ${themeText}`,
     period: 'Últimos 365 dias',
     summary: `Estudo com ${sections.length} análises sobre ${themeText}. ${kpiText}.`,
     kpis,

@@ -5,9 +5,14 @@ import {
   type ToolResultContentBlock,
 } from '@aws-sdk/client-bedrock-runtime';
 import { z } from 'zod';
+import { ApiError } from '@api/common/errors';
 import { VISUALIZATION_TYPES, type AnalysisSpec } from '@bfp/domain';
 import { analysisSpecSchema } from '@bfp/schemas';
-import { listDimensionDefinitions, listMetricDefinitions } from '@bfp/semantic-layer';
+import {
+  listDimensionDefinitions,
+  listMetricDefinitions,
+  MESH_DATASET_BY_ID,
+} from '@bfp/semantic-layer';
 import type { GovernedQueryResult } from '@api/services/analyticsService';
 import type { BedrockConverseClient } from '@api/services/intelligence/bedrockProvider';
 import {
@@ -17,7 +22,16 @@ import {
   type Study,
   type StudySection,
 } from '@api/services/intelligence/study';
-import { domainAllowed, summarizeQuery, type ToolContext } from '@api/services/intelligence/tools';
+import type { ChatMessage, OpenAIChatClient } from '@api/services/intelligence/openaiProvider';
+import {
+  coerceSpecInput,
+  dimensionInScope,
+  domainAllowed,
+  metricInScope,
+  parseQueryInput,
+  summarizeQuery,
+  type ToolContext,
+} from '@api/services/intelligence/tools';
 
 const MAX_TURNS = 5;
 const MAX_CHAPTERS = 10;
@@ -58,6 +72,7 @@ function toDocument(value: unknown): JsonDocument {
 function catalogFor(toolContext: ToolContext) {
   const metrics = listMetricDefinitions()
     .filter((metric) => domainAllowed(toolContext.auth, metric.domain))
+    .filter((metric) => metricInScope(metric.id, toolContext.datasets))
     .map(
       (metric) =>
         `${metric.id} — ${metric.shortName ?? metric.name} (${metric.format}) · dimensões: ${Array.isArray(metric.allowedDimensions) ? metric.allowedDimensions.join(', ') : 'todas'}`,
@@ -65,17 +80,35 @@ function catalogFor(toolContext: ToolContext) {
   const dimensions = listDimensionDefinitions()
     .filter((dimension) => domainAllowed(toolContext.auth, dimension.domain))
     .filter((dimension) => dimension.sensitivity !== 'PII')
-    .map((dimension) => `${dimension.id} — ${dimension.label}`);
+    .filter((dimension) => dimensionInScope(dimension.id, toolContext.datasets))
+    // Filter values the model can use as-is (codes = labels), so it never guesses them.
+    .map((dimension) =>
+      dimension.valueLabels
+        ? `${dimension.id} — ${dimension.label} · valores: ${Object.entries(dimension.valueLabels)
+            .map(([code, label]) => `${code}=${label}`)
+            .join(', ')}`
+        : `${dimension.id} — ${dimension.label}`,
+    );
   return { metrics, dimensions };
 }
 
 function systemPrompt(toolContext: ToolContext, themes: string[]) {
   const { metrics, dimensions } = catalogFor(toolContext);
+  const scope = toolContext.datasets?.length
+    ? [
+        `Bases de dados selecionadas pelo usuário: ${toolContext.datasets
+          .map((id) => `${MESH_DATASET_BY_ID.get(id)?.name ?? id} (${id})`)
+          .join(', ')}. Use SOMENTE essas bases: o catálogo abaixo já está limitado a elas.`,
+      ]
+    : [`Temas da pergunta: ${themes.join(', ')}.`];
   return [
     'Você é analista de dados sênior do Itaú Empresas e escreve estudos analíticos para executivos.',
-    'Monte um estudo para a pergunta do usuário usando SOMENTE a ferramenta runAnalyticsQuery.',
-    `Temas da pergunta: ${themes.join(', ')}.`,
+    'Monte um estudo SOBRE O ASSUNTO PEDIDO pelo usuário usando SOMENTE a ferramenta runAnalyticsQuery.',
+    'Todos os capítulos devem responder perguntas desse assunto; não monte um panorama genérico da jornada se o usuário pediu um tema específico.',
+    ...scope,
     'Planeje de 5 a 10 capítulos. Cada capítulo é UMA consulta (AnalysisSpec) que responde a uma pergunta de negócio. Execute todas as consultas na mesma rodada (chamadas paralelas), com dateRange {"type":"LAST_N_DAYS","value":365}.',
+    'Formato exato da analysisSpec: {"datasets":["..."],"metrics":[{"id":"..."}],"dimensions":[{"id":"...","granularity":"month"}],"filters":[{"field":"...","operator":"EQ","value":"..."}],"dateRange":{"type":"LAST_N_DAYS","value":365},"visualization":{"type":"BAR"}}. Use somente ids do catálogo abaixo; para recortes como Pix, prefira métricas específicas (ex.: pix_volume) a filtros com valores adivinhados.',
+    'Se uma consulta voltar com erro, corrija-a com base nos detalhes e execute de novo antes de escrever o estudo. Nunca escreva capítulos sem resultado de consulta.',
     'Use no máximo 2 dimensões por consulta, apenas dimensões permitidas para a métrica. Para evolução no tempo use uma dimensão de data com granularity "month".',
     'Cada resultado volta com "queryRef". Depois de ver os resultados, analise: compare grupos, encontre extremos, concentração, tendência e relações entre capítulos.',
     'Regras de números: cite apenas números que aparecem nos resultados (percentuais como 14,9%, moeda como R$ 328,9). Nunca invente valores, metas ou benchmarks externos.',
@@ -153,6 +186,92 @@ export function isGrounded(text: string, pool: readonly number[]) {
   });
 }
 
+/** Chart of a chapter: the model's choice unless it is a table or does not fit the result. */
+function chartFor(
+  query: { spec: AnalysisSpec; result: GovernedQueryResult },
+  requested?: AnalysisSpec['visualization']['type'],
+): AnalysisSpec['visualization']['type'] {
+  const dimensions = query.result.columns.filter((column) => column.type === 'dimension');
+  const metrics = query.result.columns.filter((column) => column.role === 'value');
+  if (dimensions.length === 0) return 'KPI';
+  if (dimensions.length > 2) return 'TABLE';
+  if (requested && requested !== 'TABLE' && requested !== 'AUTO' && requested !== 'KPI') {
+    if (requested !== 'HEATMAP' || dimensions.length === 2) return requested;
+  }
+  if (dimensions.some((column) => column.role === 'time')) return 'LINE';
+  if (dimensions.length === 2) return metrics.length === 1 ? 'HEATMAP' : 'GROUPED_BAR';
+  return metrics.length >= 2 ? 'GROUPED_BAR' : 'BAR';
+}
+
+/**
+ * Turns the model's JSON draft into a study: every chapter must reference a query that ran and
+ * sentences with numbers that are not in the results are dropped. Null when nothing is usable.
+ */
+async function assembleStudy(
+  text: string,
+  executed: Array<{ spec: AnalysisSpec; result: GovernedQueryResult }>,
+  options: {
+    toolContext: ToolContext;
+    themes: Study['themes'];
+    model: string;
+    onProgress?: (message: string) => Promise<void> | void;
+  },
+): Promise<Study | null> {
+  const draft = extractJson(text);
+  if (!draft) return null;
+  await options.onProgress?.('Conferindo os números com as consultas');
+  const pool = numberPool(executed.map((query) => query.result));
+  const sections: StudySection[] = draft.chapters
+    .slice(0, MAX_CHAPTERS)
+    .flatMap((chapter, index) => {
+      const query = executed[chapter.queryRef];
+      if (!query) return [];
+      const chapterPool = numberPool([query.result]);
+      return [
+        {
+          id: `ai-${index + 1}`,
+          title: chapter.title,
+          question: chapter.question,
+          visualization: chartFor(query, chapter.visualization),
+          spec: query.spec,
+          result: query.result,
+          findings: chapter.findings.filter((finding) => isGrounded(finding, chapterPool)),
+        },
+      ];
+    });
+  if (sections.length === 0) return null;
+
+  const skipped: string[] = [];
+  const kpiIds = draft.kpis.filter((id, index, all) => all.indexOf(id) === index);
+  const kpis = await runKpis(
+    options.toolContext,
+    kpiIds.map((id) => [id]),
+    skipped,
+  );
+  const kpiPool = [...pool];
+  for (const kpi of kpis) {
+    if (kpi.value !== null) kpiPool.push(kpi.value, kpi.value * 100, kpi.value / 1_000_000);
+  }
+  const summary = draft.summary
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => isGrounded(sentence, kpiPool))
+    .join(' ');
+
+  return {
+    title: draft.title,
+    period: 'Últimos 365 dias',
+    summary: summary || `Estudo com ${sections.length} análises geradas pela IA.`,
+    kpis,
+    sections,
+    recommendations: draft.recommendations.filter((item) => isGrounded(item, kpiPool)),
+    skipped,
+    queryCount: options.toolContext.queries.length,
+    themes: options.themes,
+    generatedBy: 'ai',
+    model: options.model,
+  };
+}
+
 /**
  * Generative study: Claude (Bedrock) plans the chapters, runs them through the governed query
  * tool, reads the results and writes the analysis. The structure is validated, every chapter
@@ -196,9 +315,10 @@ export async function runAiStudy(input: {
       const results = await Promise.all(
         toolUses.map(async (block): Promise<ContentBlock> => {
           const { toolUseId } = block.toolUse;
+          const toolInput = (block.toolUse.input ?? {}) as { analysisSpec?: unknown };
           const parsed = z
             .object({ analysisSpec: analysisSpecSchema })
-            .safeParse(block.toolUse.input);
+            .safeParse({ analysisSpec: coerceSpecInput(toolInput.analysisSpec) });
           if (block.toolUse.name !== 'runAnalyticsQuery' || !parsed.success) {
             return {
               toolResult: {
@@ -235,60 +355,104 @@ export async function runAiStudy(input: {
     const text = (message.content ?? [])
       .map((block) => ('text' in block ? block.text : ''))
       .join('\n');
-    const draft = extractJson(text);
-    if (!draft) break;
-
-    await input.onProgress?.('Conferindo os números com as consultas');
-    const pool = numberPool(executed.map((query) => query.result));
-    const sections: StudySection[] = draft.chapters
-      .slice(0, MAX_CHAPTERS)
-      .flatMap((chapter, index) => {
-        const query = executed[chapter.queryRef];
-        if (!query) return [];
-        const chapterPool = numberPool([query.result]);
-        return [
-          {
-            id: `ai-${index + 1}`,
-            title: chapter.title,
-            question: chapter.question,
-            visualization: chapter.visualization ?? query.spec.visualization.type,
-            spec: query.spec,
-            result: query.result,
-            findings: chapter.findings.filter((finding) => isGrounded(finding, chapterPool)),
-          },
-        ];
-      });
-    if (sections.length === 0) break;
-
-    const skipped: string[] = [];
-    const kpiIds = draft.kpis.filter((id, index, all) => all.indexOf(id) === index);
-    const kpis = await runKpis(
-      input.toolContext,
-      kpiIds.map((id) => [id]),
-      skipped,
-    );
-    const kpiPool = [...pool];
-    for (const kpi of kpis) {
-      if (kpi.value !== null) kpiPool.push(kpi.value, kpi.value * 100, kpi.value / 1_000_000);
-    }
-    const summary = draft.summary
-      .split(/(?<=[.!?])\s+/)
-      .filter((sentence) => isGrounded(sentence, kpiPool))
-      .join(' ');
-
-    return {
-      title: draft.title,
-      period: 'Últimos 365 dias',
-      summary: summary || `Estudo com ${sections.length} análises geradas pela IA.`,
-      kpis,
-      sections,
-      recommendations: draft.recommendations.filter((item) => isGrounded(item, kpiPool)),
-      skipped,
-      queryCount: input.toolContext.queries.length,
+    const study = await assembleStudy(text, executed, {
+      toolContext: input.toolContext,
       themes,
-      generatedBy: 'ai',
       model: input.modelId,
-    };
+      onProgress: input.onProgress,
+    });
+    if (study) return study;
+    break;
+  }
+
+  throw new Error('A IA não produziu um estudo válido.');
+}
+
+const openAIQueryTool = {
+  type: 'function' as const,
+  function: {
+    name: 'runAnalyticsQuery',
+    description: queryTool.toolSpec.description,
+    parameters: z.toJSONSchema(z.object({ analysisSpec: analysisSpecSchema }), {
+      io: 'input',
+      unrepresentable: 'any',
+    }),
+  },
+};
+
+/**
+ * Same generative study with OpenAI: the model plans the chapters about the user's subject (only
+ * over the selected bases), runs them through the governed query tool and writes the analysis.
+ */
+export async function runOpenAIStudy(input: {
+  prompt: string;
+  toolContext: ToolContext;
+  model: string;
+  client: OpenAIChatClient;
+  onProgress?: (message: string) => Promise<void> | void;
+}): Promise<Study> {
+  const themes = detectThemes(input.prompt);
+  const executed: Array<{ spec: AnalysisSpec; result: GovernedQueryResult }> = [];
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt(input.toolContext, themes) },
+    { role: 'user', content: input.prompt },
+  ];
+
+  for (let turn = 0; turn < MAX_TURNS; turn += 1) {
+    await input.onProgress?.(
+      turn === 0 ? 'A IA está planejando o estudo' : 'A IA está analisando os resultados',
+    );
+    const completion = await input.client.complete({
+      model: input.model,
+      messages,
+      tools: [openAIQueryTool],
+      tool_choice: turn === 0 ? 'required' : 'auto',
+      temperature: 0.2,
+      max_tokens: 4_000,
+    });
+    const message = completion.choices[0]?.message;
+    if (!message) break;
+    messages.push({
+      role: 'assistant',
+      content: message.content ?? null,
+      tool_calls: message.tool_calls,
+    });
+
+    if (message.tool_calls?.length) {
+      await input.onProgress?.(`Executando ${message.tool_calls.length} consultas governadas`);
+      const results = await Promise.all(
+        message.tool_calls.map(async (call): Promise<ChatMessage> => {
+          let content: string;
+          try {
+            if (call.function.name !== 'runAnalyticsQuery') {
+              content = JSON.stringify({ error: 'Use somente runAnalyticsQuery.' });
+            } else {
+              const spec = parseQueryInput(JSON.parse(call.function.arguments || '{}'));
+              const query = await run(input.toolContext, spec);
+              const queryRef = executed.push(query) - 1;
+              content = JSON.stringify({ queryRef, ...summarizeQuery(query.result) });
+            }
+          } catch (error) {
+            content = JSON.stringify({
+              error: error instanceof Error ? error.message : 'Consulta não executada.',
+              details: error instanceof ApiError ? error.details : undefined,
+            });
+          }
+          return { role: 'tool', tool_call_id: call.id, content };
+        }),
+      );
+      messages.push(...results);
+      continue;
+    }
+
+    const study = await assembleStudy(message.content ?? '', executed, {
+      toolContext: input.toolContext,
+      themes,
+      model: input.model,
+      onProgress: input.onProgress,
+    });
+    if (study) return study;
+    break;
   }
 
   throw new Error('A IA não produziu um estudo válido.');

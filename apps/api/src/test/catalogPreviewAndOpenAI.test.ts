@@ -8,7 +8,8 @@ import { createApiContext } from '@api/http/context';
 import { createApp } from '@api/http/app';
 import type { OpenAIChatClient } from '@api/services/intelligence/openaiProvider';
 import { runIntelligence } from '@api/services/intelligence/service';
-import { withChartVisualization } from '@api/services/intelligence/tools';
+import { coerceSpecInput, withChartVisualization } from '@api/services/intelligence/tools';
+import { createStudyJob, getStudyJob, runStudyJob } from '@api/services/intelligence/studyJobs';
 
 const bundle = generateDatasetBundle({ scale: 0.05 });
 
@@ -370,5 +371,114 @@ describe('Charts for model queries', () => {
     expect(withChartVisualization(base, 'Mostre em tabela').visualization.type).toBe('TABLE');
     const kpi = { ...base, dimensions: [], visualization: { type: 'KPI' as const } };
     expect(withChartVisualization(kpi, 'Total').visualization.type).toBe('KPI');
+  });
+});
+
+describe('Studies over the selected bases', () => {
+  const auth: AuthenticatedUser = {
+    userId: 'usr-analyst',
+    email: 'analyst@example.local',
+    role: 'analyst',
+    groups: ['analyst'],
+    name: 'Mariana Souza',
+    team: 'Growth PJ',
+  };
+
+  it('normalizes shorthand specs written by the model', () => {
+    expect(
+      coerceSpecInput({ metrics: ['nps'], dimensions: ['nps_touchpoint'], visualization: 'BAR' }),
+    ).toEqual({
+      metrics: [{ id: 'nps' }],
+      dimensions: [{ id: 'nps_touchpoint' }],
+      visualization: { type: 'BAR' },
+    });
+  });
+
+  it('OpenAI plans a study about the requested subject using only the selected bases', async () => {
+    const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
+    const prompts: string[] = [];
+    let step = 0;
+    const client: OpenAIChatClient = {
+      async complete(body) {
+        const messages = body.messages as Array<{ role: string; content: string }>;
+        if (step === 0) prompts.push(messages[0]!.content);
+        step += 1;
+        if (step === 1) {
+          return {
+            choices: [
+              {
+                finish_reason: 'tool_calls',
+                message: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: 'q1',
+                      type: 'function',
+                      function: {
+                        name: 'runAnalyticsQuery',
+                        arguments: JSON.stringify({
+                          analysisSpec: {
+                            metrics: ['transaction_volume'],
+                            dimensions: ['transaction_type'],
+                            visualization: 'TABLE',
+                          },
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }
+        return {
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  title: 'Estudo sobre Pix',
+                  summary: 'O volume transacionado se concentra em poucos tipos de transação.',
+                  kpis: [],
+                  chapters: [
+                    {
+                      queryRef: 0,
+                      title: 'Volume por tipo de transação',
+                      question: 'Quais tipos concentram o volume?',
+                      findings: [],
+                    },
+                  ],
+                  recommendations: [],
+                }),
+              },
+            },
+          ],
+        };
+      },
+    };
+    const job = await createStudyJob(context, auth, 'Faça um estudo sobre o Pix', ['transactions']);
+    await runStudyJob(context, auth.userId, job.id, { openaiClient: client });
+    const study = (await getStudyJob(context, auth.userId, job.id))?.study;
+    expect(study?.generatedBy).toBe('ai');
+    expect(study?.title).toBe('Estudo sobre Pix');
+    expect(study?.sections[0]?.visualization).toBe('BAR');
+    expect(prompts[0]).toContain('transactions');
+    expect(prompts[0]).not.toContain('nps —');
+    expect(prompts[0]).toMatch(/PIX_IN=/);
+  });
+
+  it('the deterministic study only reads the selected bases', async () => {
+    const { context } = createHarness();
+    const job = await createStudyJob(context, auth, 'Faça um estudo completo da jornada PJ', [
+      'transactions',
+    ]);
+    await runStudyJob(context, auth.userId, job.id);
+    const study = (await getStudyJob(context, auth.userId, job.id))?.study;
+    expect(study?.sections.length).toBeGreaterThan(0);
+    for (const section of study?.sections ?? []) {
+      expect(section.spec.datasets).toEqual(['transactions']);
+    }
   });
 });

@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { AuthenticatedUser } from '@api/auth/types';
 import type { ApiContext } from '@api/http/context';
-import { runAiStudy } from '@api/services/intelligence/aiStudy';
+import { runAiStudy, runOpenAIStudy } from '@api/services/intelligence/aiStudy';
+import {
+  createOpenAIClient,
+  resolveOpenAIKey,
+  type OpenAIChatClient,
+} from '@api/services/intelligence/openaiProvider';
+import type { MeshDatasetId } from '@bfp/semantic-layer';
 import {
   createBedrockClient,
   type BedrockConverseClient,
@@ -20,6 +26,8 @@ export interface StudyJob {
   updatedAt: string;
   /** Identity the worker acts as (RBAC by domain is applied to every query). */
   auth: AuthenticatedUser;
+  /** Bases selected in the conversation: the study only reads them. */
+  datasets?: MeshDatasetId[];
   study?: Study;
   error?: string;
 }
@@ -72,7 +80,7 @@ export async function runStudyJob(
   context: ApiContext,
   userId: string,
   studyId: string,
-  dependencies: { bedrockClient?: BedrockConverseClient } = {},
+  dependencies: { bedrockClient?: BedrockConverseClient; openaiClient?: OpenAIChatClient } = {},
 ) {
   const job = await getStudyJob(context, userId, studyId);
   if (!job || job.status !== 'running') return;
@@ -81,12 +89,42 @@ export async function runStudyJob(
     job.progress = message;
     await save(context, job);
   };
-  const toolContext: ToolContext = { context, auth: job.auth, queries: [] };
+  const toolContext: ToolContext = {
+    context,
+    auth: job.auth,
+    queries: [],
+    datasets: job.datasets?.length ? job.datasets : undefined,
+  };
 
   try {
     let study: Study | undefined;
     let notice: string | undefined;
-    if (context.config.aiProvider === 'bedrock' && context.config.bedrockModelId) {
+    const openaiKey =
+      context.config.aiProvider === 'openai' && !dependencies.openaiClient
+        ? await resolveOpenAIKey(context.config).catch(() => null)
+        : null;
+    if (context.config.aiProvider === 'openai' && (dependencies.openaiClient || openaiKey)) {
+      try {
+        study = await runOpenAIStudy({
+          prompt: job.prompt,
+          toolContext,
+          model: context.config.openai.model,
+          client: dependencies.openaiClient ?? createOpenAIClient(openaiKey ?? ''),
+          onProgress: progress,
+        });
+      } catch (error) {
+        context.logger.warn('ai_study_fallback', {
+          studyId,
+          userId,
+          provider: 'openai',
+          errorName: error instanceof Error ? error.name : 'unknown',
+          errorMessage: error instanceof Error ? error.message.slice(0, 300) : String(error),
+        });
+        notice =
+          'Estudo montado pelo motor determinístico porque a IA não conseguiu concluir o estudo.';
+        toolContext.queries.splice(0);
+      }
+    } else if (context.config.aiProvider === 'bedrock' && context.config.bedrockModelId) {
       try {
         study = await runAiStudy({
           prompt: job.prompt,
@@ -139,7 +177,12 @@ export async function runStudyJob(
 }
 
 /** Persists a new study job in the running state. */
-export async function createStudyJob(context: ApiContext, auth: AuthenticatedUser, prompt: string) {
+export async function createStudyJob(
+  context: ApiContext,
+  auth: AuthenticatedUser,
+  prompt: string,
+  datasets?: MeshDatasetId[],
+) {
   const now = context.clock().toISOString();
   const job: StudyJob = {
     id: randomUUID(),
@@ -149,6 +192,7 @@ export async function createStudyJob(context: ApiContext, auth: AuthenticatedUse
     createdAt: now,
     updatedAt: now,
     auth,
+    datasets,
   };
   await save(context, job);
   return job;
@@ -158,8 +202,13 @@ export async function createStudyJob(context: ApiContext, auth: AuthenticatedUse
  * Creates a study job and starts it. In AWS the API Lambda invokes itself asynchronously (the
  * HTTP request returns immediately); locally the job runs in the same process.
  */
-export async function startStudyJob(context: ApiContext, auth: AuthenticatedUser, prompt: string) {
-  const job = await createStudyJob(context, auth, prompt);
+export async function startStudyJob(
+  context: ApiContext,
+  auth: AuthenticatedUser,
+  prompt: string,
+  datasets?: MeshDatasetId[],
+) {
+  const job = await createStudyJob(context, auth, prompt, datasets);
 
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (functionName) {

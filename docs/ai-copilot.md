@@ -81,11 +81,18 @@ restringe tudo o que a IA pode ler:
 `aiStudy` e responde na hora com `studyJob`; o chat acompanha `GET /api/ai/studies/:id`. Na AWS a
 Lambda se auto-invoca (`InvocationType=Event`, timeout 120 s); localmente roda no mesmo processo.
 
-- **Com Claude (Bedrock):** o modelo planeja de 5 a 10 capítulos, executa as consultas governadas em
-  paralelo, lê os resultados e escreve resumo, leituras e recomendações. Capítulos sem consulta
-  executada são descartados e frases com números ausentes dos resultados são removidas.
-- **Sem Claude:** estudo determinístico guiado pelos temas da pergunta (aquisição, ativação, app,
-  transações, NPS, atendimento, CRM, jornada digital), com o motivo exibido ao usuário.
+- **Com IA (OpenAI ou Claude no Bedrock):** o modelo planeja de 5 a 10 capítulos **sobre o assunto
+  pedido**, executa as consultas governadas em paralelo, lê os resultados e escreve resumo, leituras
+  e recomendações. Capítulos sem consulta executada são descartados e frases com números ausentes
+  dos resultados são removidas. Specs abreviadas do modelo são normalizadas e erros de validação
+  voltam com detalhes para ele corrigir; o catálogo enviado traz os códigos válidos de cada dimensão
+  (ex.: `PIX_IN=Pix recebido`). O gráfico de cada capítulo é escolhido pelo resultado (tabela só
+  com mais de duas dimensões).
+- **Bases selecionadas:** o estudo recebe as bases da conversa (`StudyJob.datasets`). O catálogo do
+  modelo e toda consulta (`run` → `assertSpecInScope`) ficam limitados a elas.
+- **Sem IA ou se ela falhar:** estudo determinístico guiado pelos temas da pergunta (aquisição,
+  ativação, app, transações, NPS, atendimento, CRM, jornada digital), só com capítulos e indicadores
+  das bases selecionadas (completado com as métricas dessas bases), com o motivo exibido ao usuário.
 
 ## Perguntas sobre um cliente (Cliente PJ)
 

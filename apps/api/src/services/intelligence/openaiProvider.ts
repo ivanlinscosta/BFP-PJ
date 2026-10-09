@@ -19,7 +19,7 @@ import { readJsonSecret } from '@api/services/integrations/secrets';
 const MAX_ITERATIONS = 8;
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
-type ChatMessage =
+export type ChatMessage =
   | { role: 'system' | 'user'; content: string }
   | {
       role: 'assistant';
