@@ -78,6 +78,7 @@ export async function runIntelligence(
     correlationId,
     queries: [],
     datasets: request.datasets?.length ? request.datasets : undefined,
+    prompt: request.prompt,
   };
   let provider: 'bedrock' | 'openai' | 'local' =
     context.config.aiProvider === 'bedrock' || context.config.aiProvider === 'openai'

@@ -195,7 +195,7 @@ const SECTION_PLANS: SectionPlan[] = [
     theme: 'acquisition',
     title: 'Aquisição por canal',
     question: 'Quais canais convertem mais e a que custo?',
-    spec: spec(['account_conversion_rate', 'cac'], [{ id: 'acquisition_channel' }], 'TABLE'),
+    spec: spec(['account_conversion_rate', 'cac'], [{ id: 'acquisition_channel' }], 'GROUPED_BAR'),
     describe(result) {
       const conversion = ranked(result, 'account_conversion_rate', 'acquisition_channel');
       const cac = ranked(result, 'cac', 'acquisition_channel').filter((row) =>
@@ -302,7 +302,7 @@ const SECTION_PLANS: SectionPlan[] = [
     theme: 'app',
     title: 'Erros e conclusão no app',
     question: 'Onde o app mais falha?',
-    spec: spec(['app_error_rate', 'app_completion_rate'], [{ id: 'app_screen' }], 'TABLE'),
+    spec: spec(['app_error_rate', 'app_completion_rate'], [{ id: 'app_screen' }], 'GROUPED_BAR'),
     describe(result) {
       const errors = ranked(result, 'app_error_rate', 'app_screen');
       return errors[0]
@@ -336,7 +336,7 @@ const SECTION_PLANS: SectionPlan[] = [
     theme: 'transactions',
     title: 'Ticket médio e transações por porte',
     question: 'Quanto cada porte movimenta por transação?',
-    spec: spec(['average_ticket', 'transactions_count'], [{ id: 'company_size' }], 'TABLE'),
+    spec: spec(['average_ticket', 'transactions_count'], [{ id: 'company_size' }], 'GROUPED_BAR'),
     describe(result) {
       const rows = ranked(result, 'average_ticket', 'company_size');
       return rows.length > 1

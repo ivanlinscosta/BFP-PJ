@@ -516,14 +516,24 @@ export function IntelligencePage() {
             {(chat.datasets ?? []).length === 0 ? (
               <span className="text-warning">nenhuma selecionada — escolha antes de perguntar</span>
             ) : (
-              (chat.datasets ?? []).map((id) => (
-                <span
-                  className="inline-flex items-center rounded bg-tint px-2 py-0.5 font-semibold text-brand-navy"
-                  key={id}
-                >
-                  {datasetName(id)}
-                </span>
-              ))
+              <>
+                {(chat.datasets ?? []).slice(0, 3).map((id) => (
+                  <span
+                    className="inline-flex items-center rounded bg-tint px-2 py-0.5 font-semibold text-brand-navy"
+                    key={id}
+                  >
+                    {datasetName(id)}
+                  </span>
+                ))}
+                {(chat.datasets ?? []).length > 3 ? (
+                  <span
+                    className="font-semibold text-ink-soft"
+                    title={(chat.datasets ?? []).slice(3).map(datasetName).join(', ')}
+                  >
+                    +{(chat.datasets ?? []).length - 3}
+                  </span>
+                ) : null}
+              </>
             )}
             <button
               className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold text-brand-navy hover:bg-muted"

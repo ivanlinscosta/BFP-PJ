@@ -46,6 +46,8 @@ export interface ToolContext {
   datasets?: MeshDatasetId[];
   /** Row samples read in the turn (they also ground the answer). */
   samples?: number;
+  /** User question of the turn (only used to honor an explicit request for a table). */
+  prompt?: string;
 }
 
 /** A question needs a base the user did not select. */
@@ -54,6 +56,18 @@ const previewInput = z.object({
   limit: z.number().int().min(1).max(20).default(10),
   where: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
+
+/**
+ * Models tend to ask for TABLE on every query; the answer card then shows no chart. Unless the
+ * user asked for a table, the visualization goes back to AUTO (the chart that fits the result).
+ */
+export function withChartVisualization(spec: AnalysisSpec, prompt?: string): AnalysisSpec {
+  const wantsTable = /\btabela\b|\btable\b/i.test(prompt ?? '');
+  const type = spec.visualization.type;
+  if (wantsTable || (type !== 'TABLE' && type !== 'KPI')) return spec;
+  if (type === 'KPI' && spec.dimensions.length === 0) return spec;
+  return { ...spec, visualization: { ...spec.visualization, type: 'AUTO' } };
+}
 
 export class DatasetScopeError extends ApiError {
   constructor(message: string) {
@@ -282,7 +296,10 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
         throw new ValidationError('AnalysisSpec inválida para runAnalyticsQuery.');
       }
       // The assistant selects the mesh bases it needs and reports them in the answer basis.
-      const spec = withRequiredDatasets(parsed.data.analysisSpec);
+      const spec = withChartVisualization(
+        withRequiredDatasets(parsed.data.analysisSpec),
+        toolContext.prompt,
+      );
       assertSpecInScope(spec, toolContext.datasets);
       const result = await executeGovernedQuery(
         toolContext.context,

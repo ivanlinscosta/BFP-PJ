@@ -8,6 +8,7 @@ import { createApiContext } from '@api/http/context';
 import { createApp } from '@api/http/app';
 import type { OpenAIChatClient } from '@api/services/intelligence/openaiProvider';
 import { runIntelligence } from '@api/services/intelligence/service';
+import { withChartVisualization } from '@api/services/intelligence/tools';
 
 const bundle = generateDatasetBundle({ scale: 0.05 });
 
@@ -348,5 +349,26 @@ describe('Inteligência PJ restricted to the selected bases', () => {
       .set('Authorization', await login(app))
       .send({ prompt: 'Quantos cliques?', datasets: ['base_inexistente'] });
     expect(response.status).toBe(422);
+  });
+});
+
+describe('Charts for model queries', () => {
+  const base = {
+    metrics: [{ id: 'accounts_opened' }],
+    dimensions: [{ id: 'state' }],
+    filters: [],
+    visualization: { type: 'TABLE' as const },
+  };
+
+  it('turns the TABLE picked by the model into an automatic chart', () => {
+    expect(
+      withChartVisualization(base, 'Quais estados abrem mais contas?').visualization.type,
+    ).toBe('AUTO');
+  });
+
+  it('keeps the table when the user asks for one and KPIs without dimensions', () => {
+    expect(withChartVisualization(base, 'Mostre em tabela').visualization.type).toBe('TABLE');
+    const kpi = { ...base, dimensions: [], visualization: { type: 'KPI' as const } };
+    expect(withChartVisualization(kpi, 'Total').visualization.type).toBe('KPI');
   });
 });
