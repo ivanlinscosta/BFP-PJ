@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChartNoAxesColumn, Ellipsis, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import type { SharingLevel } from '@bfp/domain';
 import { describeAnalysisSpec } from '@bfp/shared';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { Field, Input, SearchInput } from '@/components/ui/input';
 import { Notice } from '@/components/ui/notice';
 import { Popover } from '@/components/ui/popover';
 import { Select } from '@/components/ui/select';
+import { Tabs } from '@/components/ui/tabs';
 import { VisibilityPicker, sharingLabel } from '@/components/ui/visibility-picker';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState, ErrorState, LoadingRows } from '@/components/states/states';
@@ -24,6 +25,7 @@ import {
 } from '@/features/explorer/api';
 import { AddToDashboardDialog } from '@/features/explorer/components/action-dialogs';
 import { useAnalysisStore } from '@/features/explorer/store';
+import { SavedStudiesList } from '@/features/intelligence/saved-studies';
 import { describeError } from '@/lib/errors';
 import { formatRelative } from '@/lib/format';
 import { normalizeText } from '@/lib/text';
@@ -45,6 +47,8 @@ type Action = { kind: 'rename' | 'share' | 'dashboard' | 'delete'; analysis: Sav
 
 export function AnalysesPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('aba') === 'estudos' ? 'estudos' : 'analises';
   const queryClient = useQueryClient();
   const labels = useSpecLabels();
   const metrics = useMetricCatalog();
@@ -128,209 +132,236 @@ export function AnalysesPage() {
             Nova análise
           </Link>
         }
-        subtitle="Retome, organize e compartilhe as análises que você construiu no playground."
+        subtitle="Retome, organize e compartilhe as análises do playground e os estudos da Inteligência PJ."
         title="Minhas análises"
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(4,180px)]">
-        <SearchInput
-          aria-label="Buscar análise"
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar por nome ou owner"
-          value={query}
-        />
-        <Select
-          aria-label="Owner"
-          leadingChevron
-          onChange={(event) => setOwner(event.target.value as OwnerFilter)}
-          value={owner}
-        >
-          <option value="ALL">Todos os owners</option>
-          <option value="MINE">Minhas</option>
-          <option value="SHARED">Compartilhadas comigo</option>
-        </Select>
-        <Select
-          aria-label="Data"
-          leadingChevron
-          onChange={(event) => {
-            const next = event.target.value as DateFilter;
-            setDate(next);
-            setCutoff(next === 'ALL' ? null : Date.now() - Number(next) * 86_400_000);
-          }}
-          value={date}
-        >
-          <option value="ALL">Qualquer data</option>
-          <option value="1">Últimas 24 h</option>
-          <option value="7">Últimos 7 dias</option>
-          <option value="30">Últimos 30 dias</option>
-        </Select>
-        <Select
-          aria-label="Métrica"
-          leadingChevron
-          onChange={(event) => setMetric(event.target.value)}
-          value={metric}
-        >
-          <option value="ALL">Todas as métricas</option>
-          {(metrics.data ?? []).map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.shortName}
-            </option>
-          ))}
-        </Select>
-        <Select
-          aria-label="Compartilhamento"
-          leadingChevron
-          onChange={(event) => setSharing(event.target.value as 'ALL' | SharingLevel)}
-          value={sharing}
-        >
-          <option value="ALL">Todo compartilhamento</option>
-          <option value="PRIVATE">Privado</option>
-          <option value="TEAM">Time</option>
-          <option value="READ_ONLY">Somente leitura</option>
-        </Select>
-      </div>
+      <Tabs
+        className="mb-5"
+        idPrefix="analyses"
+        items={[
+          { value: 'analises', label: 'Análises' },
+          { value: 'estudos', label: 'Estudos' },
+        ]}
+        label="Tipo de conteúdo"
+        onChange={(value) =>
+          setSearchParams(value === 'estudos' ? { aba: 'estudos' } : {}, { replace: true })
+        }
+        value={tab}
+      />
 
-      <p className="mb-3 text-[13px] text-ink-soft">{filtered.length} análises</p>
-
-      {analyses.isLoading ? (
-        <LoadingRows rows={6} />
-      ) : analyses.isError ? (
-        <Card>
-          <ErrorState error={analyses.error} onRetry={() => void analyses.refetch()} />
-        </Card>
-      ) : filtered.length === 0 ? (
-        <Card>
-          <EmptyState
-            action={
-              <Link
-                className="text-sm font-semibold text-brand-navy hover:underline"
-                to="/explorar"
-              >
-                Ir para o Explorar
-              </Link>
-            }
-            description="Monte uma análise no playground e salve para encontrá-la aqui."
-            icon={<ChartNoAxesColumn aria-hidden className="h-8 w-8" />}
-            title="Nenhuma análise encontrada"
-          />
-        </Card>
+      {tab === 'estudos' ? (
+        <div aria-labelledby="analyses-tab-estudos" id="analyses-panel-estudos" role="tabpanel">
+          <SavedStudiesList />
+        </div>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {filtered.map((analysis) => {
-            const description = describeAnalysisSpec(analysis, labels);
-            return (
-              <li key={analysis.id}>
-                <Card className="grid items-center gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,230px)_auto]">
-                  <div className="min-w-0">
-                    <button
-                      className="text-left text-base font-semibold text-brand-navy hover:underline"
-                      onClick={() => open(analysis)}
-                      type="button"
-                    >
-                      {analysis.name}
-                    </button>
-                    <p className="mt-1 truncate text-[13px] text-ink-soft">
-                      {description.sentence}
-                    </p>
-                  </div>
-                  <dl className="m-0 text-[13px]">
-                    <dt className="text-ink-faint">Métricas · Dimensões</dt>
-                    <dd className="m-0 text-ink">
-                      {description.metrics.join(', ')}
-                      {description.dimensions.length
-                        ? ` · ${description.dimensions.join(', ')}`
-                        : ''}
-                    </dd>
-                  </dl>
-                  <dl className="m-0 text-[13px]">
-                    <dt className="text-ink-faint">Filtros · Visualização</dt>
-                    <dd className="m-0 text-ink">
-                      {description.filters.join(', ') || 'Sem filtros'} ·{' '}
-                      {VIZ_LABELS[analysis.visualization.type] ?? analysis.visualization.type}
-                    </dd>
-                  </dl>
-                  <div className="min-w-0 text-[13px]">
-                    <p className="truncate text-ink">
-                      {analysis.access === 'OWNER'
-                        ? 'Você'
-                        : (analysis.metadata?.ownerName ?? 'Outro owner')}{' '}
-                      · {formatRelative(analysis.metadata?.updatedAt)}
-                    </p>
-                    <Badge
-                      className="mt-1 max-w-full"
-                      title={sharingLabel(analysis.metadata?.visibility, analysis.metadata?.team)}
-                      tone={
-                        analysis.metadata?.visibility === 'PRIVATE' ||
-                        !analysis.metadata?.visibility
-                          ? 'neutral'
-                          : 'tint'
-                      }
-                    >
-                      <span className="truncate">
-                        {sharingLabel(analysis.metadata?.visibility, analysis.metadata?.team)}
-                      </span>
-                    </Badge>
-                  </div>
-                  <div className="flex shrink-0 items-center justify-end gap-2">
-                    <Button onClick={() => open(analysis)} size="sm">
-                      Abrir
-                    </Button>
-                    <Popover
-                      align="end"
-                      anchor={
-                        <Button
-                          aria-expanded={menuFor === analysis.id}
-                          aria-label={`Mais ações para ${analysis.name}`}
-                          onClick={() => setMenuFor(menuFor === analysis.id ? null : analysis.id)}
-                          size="icon"
-                          variant="ghost"
+        <div aria-labelledby="analyses-tab-analises" id="analyses-panel-analises" role="tabpanel">
+          <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_repeat(4,180px)]">
+            <SearchInput
+              aria-label="Buscar análise"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar por nome ou owner"
+              value={query}
+            />
+            <Select
+              aria-label="Owner"
+              leadingChevron
+              onChange={(event) => setOwner(event.target.value as OwnerFilter)}
+              value={owner}
+            >
+              <option value="ALL">Todos os owners</option>
+              <option value="MINE">Minhas</option>
+              <option value="SHARED">Compartilhadas comigo</option>
+            </Select>
+            <Select
+              aria-label="Data"
+              leadingChevron
+              onChange={(event) => {
+                const next = event.target.value as DateFilter;
+                setDate(next);
+                setCutoff(next === 'ALL' ? null : Date.now() - Number(next) * 86_400_000);
+              }}
+              value={date}
+            >
+              <option value="ALL">Qualquer data</option>
+              <option value="1">Últimas 24 h</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+            </Select>
+            <Select
+              aria-label="Métrica"
+              leadingChevron
+              onChange={(event) => setMetric(event.target.value)}
+              value={metric}
+            >
+              <option value="ALL">Todas as métricas</option>
+              {(metrics.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.shortName}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label="Compartilhamento"
+              leadingChevron
+              onChange={(event) => setSharing(event.target.value as 'ALL' | SharingLevel)}
+              value={sharing}
+            >
+              <option value="ALL">Todo compartilhamento</option>
+              <option value="PRIVATE">Privado</option>
+              <option value="TEAM">Time</option>
+              <option value="READ_ONLY">Somente leitura</option>
+            </Select>
+          </div>
+
+          <p className="mb-3 text-[13px] text-ink-soft">{filtered.length} análises</p>
+
+          {analyses.isLoading ? (
+            <LoadingRows rows={6} />
+          ) : analyses.isError ? (
+            <Card>
+              <ErrorState error={analyses.error} onRetry={() => void analyses.refetch()} />
+            </Card>
+          ) : filtered.length === 0 ? (
+            <Card>
+              <EmptyState
+                action={
+                  <Link
+                    className="text-sm font-semibold text-brand-navy hover:underline"
+                    to="/explorar"
+                  >
+                    Ir para o Explorar
+                  </Link>
+                }
+                description="Monte uma análise no playground e salve para encontrá-la aqui."
+                icon={<ChartNoAxesColumn aria-hidden className="h-8 w-8" />}
+                title="Nenhuma análise encontrada"
+              />
+            </Card>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {filtered.map((analysis) => {
+                const description = describeAnalysisSpec(analysis, labels);
+                return (
+                  <li key={analysis.id}>
+                    <Card className="grid items-center gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,230px)_auto]">
+                      <div className="min-w-0">
+                        <button
+                          className="text-left text-base font-semibold text-brand-navy hover:underline"
+                          onClick={() => open(analysis)}
+                          type="button"
                         >
-                          <Ellipsis aria-hidden className="h-4 w-4" />
-                        </Button>
-                      }
-                      className="w-56"
-                      onClose={() => setMenuFor(null)}
-                      open={menuFor === analysis.id}
-                    >
-                      <div className="flex flex-col" role="menu">
-                        {(
-                          [
-                            ['duplicate', 'Duplicar', true],
-                            ['rename', 'Renomear', analysis.access !== 'VIEW'],
-                            ['share', 'Compartilhar', analysis.access === 'OWNER'],
-                            ['dashboard', 'Adicionar ao dashboard', true],
-                            ['delete', 'Excluir', analysis.access === 'OWNER'],
-                          ] as const
-                        )
-                          .filter(([, , allowed]) => allowed)
-                          .map(([kind, label]) => (
-                            <button
-                              className={`rounded px-3 py-2 text-left text-sm hover:bg-muted ${kind === 'delete' ? 'text-danger' : 'text-ink'}`}
-                              key={kind}
-                              onClick={() => {
-                                setMenuFor(null);
-                                if (kind === 'duplicate') {
-                                  mutation.mutate({ kind: 'duplicate', analysis });
-                                  return;
-                                }
-                                setRenameValue(analysis.name);
-                                setVisibility(analysis.metadata?.visibility ?? 'TEAM');
-                                setAction({ kind, analysis });
-                              }}
-                              role="menuitem"
-                              type="button"
-                            >
-                              {label}
-                            </button>
-                          ))}
+                          {analysis.name}
+                        </button>
+                        <p className="mt-1 truncate text-[13px] text-ink-soft">
+                          {description.sentence}
+                        </p>
                       </div>
-                    </Popover>
-                  </div>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
+                      <dl className="m-0 text-[13px]">
+                        <dt className="text-ink-faint">Métricas · Dimensões</dt>
+                        <dd className="m-0 text-ink">
+                          {description.metrics.join(', ')}
+                          {description.dimensions.length
+                            ? ` · ${description.dimensions.join(', ')}`
+                            : ''}
+                        </dd>
+                      </dl>
+                      <dl className="m-0 text-[13px]">
+                        <dt className="text-ink-faint">Filtros · Visualização</dt>
+                        <dd className="m-0 text-ink">
+                          {description.filters.join(', ') || 'Sem filtros'} ·{' '}
+                          {VIZ_LABELS[analysis.visualization.type] ?? analysis.visualization.type}
+                        </dd>
+                      </dl>
+                      <div className="min-w-0 text-[13px]">
+                        <p className="truncate text-ink">
+                          {analysis.access === 'OWNER'
+                            ? 'Você'
+                            : (analysis.metadata?.ownerName ?? 'Outro owner')}{' '}
+                          · {formatRelative(analysis.metadata?.updatedAt)}
+                        </p>
+                        <Badge
+                          className="mt-1 max-w-full"
+                          title={sharingLabel(
+                            analysis.metadata?.visibility,
+                            analysis.metadata?.team,
+                          )}
+                          tone={
+                            analysis.metadata?.visibility === 'PRIVATE' ||
+                            !analysis.metadata?.visibility
+                              ? 'neutral'
+                              : 'tint'
+                          }
+                        >
+                          <span className="truncate">
+                            {sharingLabel(analysis.metadata?.visibility, analysis.metadata?.team)}
+                          </span>
+                        </Badge>
+                      </div>
+                      <div className="flex shrink-0 items-center justify-end gap-2">
+                        <Button onClick={() => open(analysis)} size="sm">
+                          Abrir
+                        </Button>
+                        <Popover
+                          align="end"
+                          anchor={
+                            <Button
+                              aria-expanded={menuFor === analysis.id}
+                              aria-label={`Mais ações para ${analysis.name}`}
+                              onClick={() =>
+                                setMenuFor(menuFor === analysis.id ? null : analysis.id)
+                              }
+                              size="icon"
+                              variant="ghost"
+                            >
+                              <Ellipsis aria-hidden className="h-4 w-4" />
+                            </Button>
+                          }
+                          className="w-56"
+                          onClose={() => setMenuFor(null)}
+                          open={menuFor === analysis.id}
+                        >
+                          <div className="flex flex-col" role="menu">
+                            {(
+                              [
+                                ['duplicate', 'Duplicar', true],
+                                ['rename', 'Renomear', analysis.access !== 'VIEW'],
+                                ['share', 'Compartilhar', analysis.access === 'OWNER'],
+                                ['dashboard', 'Adicionar ao dashboard', true],
+                                ['delete', 'Excluir', analysis.access === 'OWNER'],
+                              ] as const
+                            )
+                              .filter(([, , allowed]) => allowed)
+                              .map(([kind, label]) => (
+                                <button
+                                  className={`rounded px-3 py-2 text-left text-sm hover:bg-muted ${kind === 'delete' ? 'text-danger' : 'text-ink'}`}
+                                  key={kind}
+                                  onClick={() => {
+                                    setMenuFor(null);
+                                    if (kind === 'duplicate') {
+                                      mutation.mutate({ kind: 'duplicate', analysis });
+                                      return;
+                                    }
+                                    setRenameValue(analysis.name);
+                                    setVisibility(analysis.metadata?.visibility ?? 'TEAM');
+                                    setAction({ kind, analysis });
+                                  }}
+                                  role="menuitem"
+                                  type="button"
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                          </div>
+                        </Popover>
+                      </div>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       {mutation.isError && !action ? (

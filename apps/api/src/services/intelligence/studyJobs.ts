@@ -15,6 +15,8 @@ import {
 } from '@api/services/intelligence/bedrockProvider';
 import { buildStudy, type Study } from '@api/services/intelligence/study';
 import type { ToolContext } from '@api/services/intelligence/tools';
+import type { ConversationTurn, StoredConversation } from '@api/services/intelligence/types';
+import { describeQueryForMemory } from '@api/services/intelligence/memory';
 
 /** Background study requested from the chat (the agentic study outlives the 30 s API limit). */
 export interface StudyJob {
@@ -28,6 +30,8 @@ export interface StudyJob {
   auth: AuthenticatedUser;
   /** Bases selected in the conversation: the study only reads them. */
   datasets?: MeshDatasetId[];
+  /** Conversation that asked for the study: the result is added to its memory. */
+  conversationId?: string;
   study?: Study;
   error?: string;
 }
@@ -153,6 +157,7 @@ export async function runStudyJob(
     }
 
     await save(context, { ...job, status: 'done', progress: 'Estudo pronto', study });
+    await rememberStudy(context, job, study);
     context.logger.info('ai_study_completed', {
       studyId,
       userId,
@@ -176,12 +181,55 @@ export async function runStudyJob(
   }
 }
 
+/**
+ * Adds the finished study to the conversation memory (title, summary, chapters and their
+ * queries), so follow-up questions such as "aprofunde o capítulo de CAC" have the context.
+ */
+async function rememberStudy(context: ApiContext, job: StudyJob, study: Study) {
+  if (!job.conversationId) return;
+  const repository = context.getObjectRepository();
+  const stored = await repository.get<StoredConversation>(
+    job.auth.userId,
+    'aiConversation',
+    job.conversationId,
+  );
+  if (!stored) return;
+  const chapters = study.sections
+    .map(
+      (section, index) =>
+        `${index + 1}. ${section.title}: ${section.findings[0] ?? ''} ${describeQueryForMemory(section.spec)}`,
+    )
+    .join('\n');
+  const content = [
+    `Estudo pronto: ${study.title}.`,
+    study.summary,
+    `Capítulos:\n${chapters}`,
+    study.recommendations.length ? `Recomendações: ${study.recommendations.join(' ')}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 6_000);
+  const now = context.clock().toISOString();
+  const studyTurn: ConversationTurn = { role: 'assistant', content, at: now, action: 'NONE' };
+  await repository.put<StoredConversation>({
+    userId: job.auth.userId,
+    type: 'aiConversation',
+    id: job.conversationId,
+    value: {
+      ...stored.value,
+      turns: [...stored.value.turns, studyTurn].slice(-30),
+      updatedAt: now,
+    },
+  });
+}
+
 /** Persists a new study job in the running state. */
 export async function createStudyJob(
   context: ApiContext,
   auth: AuthenticatedUser,
   prompt: string,
   datasets?: MeshDatasetId[],
+  conversationId?: string,
 ) {
   const now = context.clock().toISOString();
   const job: StudyJob = {
@@ -193,6 +241,7 @@ export async function createStudyJob(
     updatedAt: now,
     auth,
     datasets,
+    conversationId,
   };
   await save(context, job);
   return job;
@@ -207,8 +256,9 @@ export async function startStudyJob(
   auth: AuthenticatedUser,
   prompt: string,
   datasets?: MeshDatasetId[],
+  conversationId?: string,
 ) {
-  const job = await createStudyJob(context, auth, prompt, datasets);
+  const job = await createStudyJob(context, auth, prompt, datasets, conversationId);
 
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (functionName) {

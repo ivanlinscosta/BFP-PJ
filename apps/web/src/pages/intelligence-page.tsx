@@ -31,6 +31,7 @@ import {
 } from '@/features/intelligence/api';
 import { Composer } from '@/features/intelligence/composer';
 import { ChatEmptyState } from '@/features/intelligence/empty-state';
+import { SaveStudyButton } from '@/features/intelligence/saved-studies';
 import { StudyJobProgress } from '@/features/intelligence/study-job';
 import { StudyView } from '@/features/intelligence/study-view';
 import { ThinkingIndicator } from '@/features/intelligence/thinking-indicator';
@@ -460,7 +461,13 @@ export function IntelligencePage() {
                           onSave={(sectionSpec, name) => setSaveTarget({ spec: sectionSpec, name })}
                           study={reply.study}
                         />
-                        <div {...ignore} className="mt-2 flex justify-end">
+                        <div {...ignore} className="mt-2 flex items-center justify-end gap-1">
+                          {reply.studyJob ? (
+                            <SaveStudyButton
+                              defaultName={reply.study.title}
+                              jobId={reply.studyJob.id}
+                            />
+                          ) : null}
                           <button
                             className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-brand-navy hover:bg-muted disabled:opacity-50"
                             disabled={exporting !== null}
@@ -587,7 +594,10 @@ export function IntelligencePage() {
         ) : null}
         <Composer
           busy={mutation.isPending}
-          disabled={!flags.aiCopilot}
+          disabled={!flags.aiCopilot || needsDatasets}
+          placeholder={
+            needsDatasets ? 'Selecione as bases de dados acima para começar a perguntar' : undefined
+          }
           onChange={setPrompt}
           onSend={() => send(prompt)}
           value={prompt}

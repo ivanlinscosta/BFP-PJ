@@ -18,6 +18,7 @@ import { IntelligencePage } from '@/pages/intelligence-page';
 import { LoginPage } from '@/pages/login-page';
 import { MetricDetailPage } from '@/pages/metric-detail-page';
 import { NotFoundPage } from '@/pages/not-found-page';
+import { SavedStudyPage } from '@/pages/saved-study-page';
 import { SearchPage } from '@/pages/search-page';
 import { hasAccessToken } from '@/services/auth';
 
@@ -36,6 +37,7 @@ export const appChildRoutes: RouteObject[] = [
   { path: 'explorar/adicionar', element: <AddAnalysisPage /> },
   { path: 'inteligencia', element: <IntelligencePage /> },
   { path: 'analises', element: <AnalysesPage /> },
+  { path: 'analises/estudos/:studyId', element: <SavedStudyPage /> },
   { path: 'dashboards', element: <DashboardsPage /> },
   { path: 'dashboards/novo', element: <DashboardEditorPage /> },
   { path: 'dashboards/:dashboardId', element: <DashboardDetailPage /> },

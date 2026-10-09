@@ -8,6 +8,7 @@ import { createApiContext } from '@api/http/context';
 import { createApp } from '@api/http/app';
 import type { OpenAIChatClient } from '@api/services/intelligence/openaiProvider';
 import { runIntelligence } from '@api/services/intelligence/service';
+import { isStudyRequest } from '@api/services/intelligence/study';
 import { coerceSpecInput, withChartVisualization } from '@api/services/intelligence/tools';
 import { createStudyJob, getStudyJob, runStudyJob } from '@api/services/intelligence/studyJobs';
 
@@ -480,5 +481,85 @@ describe('Studies over the selected bases', () => {
     for (const section of study?.sections ?? []) {
       expect(section.spec.datasets).toEqual(['transactions']);
     }
+  });
+});
+
+describe('Study requests vs follow-ups', () => {
+  it.each([
+    ['Faça um estudo completo da jornada PJ', true],
+    ['Crie um estudo sobre o uso do Pix', true],
+    ['Quero um raio-x da aquisição', true],
+    ['Estudo de NPS por momento', true],
+    ['No segundo capítulo do estudo, qual foi o principal achado?', false],
+    ['O que o estudo mostrou sobre CAC?', false],
+    ['Qual canal converte mais?', false],
+  ])('%s → %s', (prompt, expected) => {
+    expect(isStudyRequest(prompt)).toBe(expected);
+  });
+});
+
+describe('Saved studies', () => {
+  it('saves a finished study, lists, opens and deletes it', async () => {
+    const { app } = createHarness();
+    const token = await login(app);
+    const chat = await request(app)
+      .post('/api/ai/chat')
+      .set('Authorization', token)
+      .send({ prompt: 'Faça um estudo sobre transações', datasets: ['transactions'] });
+    const jobId = chat.body.studyJob.id as string;
+    let status = 'running';
+    for (let attempt = 0; attempt < 50 && status === 'running'; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      status = (await request(app).get(`/api/ai/studies/${jobId}`).set('Authorization', token)).body
+        .study.status;
+    }
+    expect(status).toBe('done');
+
+    const saved = await request(app)
+      .post(`/api/ai/studies/${jobId}/save`)
+      .set('Authorization', token)
+      .send({ name: 'Meu estudo de transações' });
+    expect(saved.status).toBe(201);
+    expect(saved.body.study).toMatchObject({
+      name: 'Meu estudo de transações',
+      datasets: ['transactions'],
+    });
+
+    const list = await request(app).get('/api/ai/saved-studies').set('Authorization', token);
+    expect(list.body.items.map((item: { id: string }) => item.id)).toContain(saved.body.study.id);
+
+    const detail = await request(app)
+      .get(`/api/ai/saved-studies/${saved.body.study.id}`)
+      .set('Authorization', token);
+    expect(detail.body.study.study.sections.length).toBeGreaterThan(0);
+
+    const other = await login(app, 'admin@example.local');
+    const foreign = await request(app)
+      .get(`/api/ai/saved-studies/${saved.body.study.id}`)
+      .set('Authorization', other);
+    expect(foreign.status).toBe(404);
+
+    const removed = await request(app)
+      .delete(`/api/ai/saved-studies/${saved.body.study.id}`)
+      .set('Authorization', token);
+    expect(removed.status).toBe(204);
+  });
+});
+
+describe('Conversation memory', () => {
+  it('keeps the answer and the query behind it for the next turns', async () => {
+    const { app } = createHarness();
+    const token = await login(app);
+    const first = await request(app)
+      .post('/api/ai/chat')
+      .set('Authorization', token)
+      .send({ prompt: 'Quantas empresas temos por região?', datasets: ['customer_360'] });
+    const conversation = await request(app)
+      .get(`/api/ai/conversations/${first.body.conversationId}`)
+      .set('Authorization', token);
+    const assistant = conversation.body.conversation.turns.at(-1);
+    expect(assistant.role).toBe('assistant');
+    expect(assistant.content).toContain(first.body.answer.slice(0, 20));
+    expect(assistant.content).toMatch(/\[Consulta usada: métricas .+ por region/);
   });
 });

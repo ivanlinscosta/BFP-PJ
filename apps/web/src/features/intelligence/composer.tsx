@@ -8,12 +8,14 @@ export function Composer({
   onSend,
   disabled,
   busy,
+  placeholder = 'Pergunte sobre seus dados — por exemplo, “qual canal converte mais?”',
 }: {
   value: string;
   onChange(value: string): void;
   onSend(): void;
   disabled?: boolean;
   busy?: boolean;
+  placeholder?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -33,7 +35,11 @@ export function Composer({
 
   return (
     <form
-      className="rounded-[18px] border border-line bg-card px-3 pt-2 pb-2 shadow-[0_4px_18px_rgba(0,26,71,0.08)] focus-within:border-brand-navy"
+      className={
+        disabled
+          ? 'rounded-[18px] border border-line bg-muted px-3 pt-2 pb-2'
+          : 'rounded-[18px] border border-line bg-card px-3 pt-2 pb-2 shadow-[0_4px_18px_rgba(0,26,71,0.08)] focus-within:border-brand-navy'
+      }
       onSubmit={(event) => {
         event.preventDefault();
         onSend();
@@ -43,13 +49,13 @@ export function Composer({
         Pergunte aos seus dados
       </label>
       <textarea
-        className="block max-h-40 min-h-[28px] w-full resize-none bg-transparent px-1 py-1.5 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-faint"
+        className="block max-h-40 min-h-[28px] w-full resize-none bg-transparent px-1 py-1.5 text-[15px] leading-relaxed text-ink outline-none placeholder:text-ink-faint disabled:cursor-not-allowed"
         disabled={disabled}
         id="intelligence-prompt"
         maxLength={4000}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Pergunte sobre seus dados — por exemplo, “qual canal converte mais?”"
+        placeholder={placeholder}
         ref={ref}
         rows={1}
         value={value}

@@ -99,7 +99,7 @@ export async function runOpenAIProvider(input: {
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt(input.analysisSpec, input.toolContext.datasets) },
     ...input.history
-      .slice(-8)
+      .slice(-12)
       .map((turn): ChatMessage => ({ role: turn.role, content: turn.content })),
     { role: 'user', content: input.prompt },
   ];

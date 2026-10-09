@@ -1,4 +1,5 @@
 import { runCustomerAssistant } from '@api/services/customerIntelligence/assistant';
+import { describeQueryForMemory } from '@api/services/intelligence/memory';
 import { isStudyRequest } from '@api/services/intelligence/study';
 import { startStudyJob } from '@api/services/intelligence/studyJobs';
 import { randomUUID } from 'node:crypto';
@@ -59,6 +60,17 @@ async function loadConversation(
     .getObjectRepository()
     .get<StoredConversation>(auth.userId, 'aiConversation', conversationId);
   return stored?.value;
+}
+
+/**
+ * What the assistant said, as the model will read it in the next turns: the full answer plus the
+ * query behind it ("e por porte?" then refines the same analysis instead of starting over).
+ */
+function turnMemory(result: ProviderResult) {
+  const text = result.answer || result.message;
+  return result.analysisSpec && result.analysisSpec.metrics.length > 0
+    ? `${text}\n${describeQueryForMemory(result.analysisSpec)}`
+    : text;
 }
 
 /** Runs one Inteligência PJ turn over the shared AnalysisSpec and persists the conversation. */
@@ -129,7 +141,13 @@ export async function runIntelligence(
   } else if (isStudyRequest(request.prompt)) {
     // A study is agentic and slow (planning + queries + analysis): it runs as a background job
     // and the client follows its progress.
-    const job = await startStudyJob(context, auth, request.prompt, toolContext.datasets);
+    const job = await startStudyJob(
+      context,
+      auth,
+      request.prompt,
+      toolContext.datasets,
+      conversationId,
+    );
     result = {
       action: 'NONE',
       operations: [],
@@ -255,7 +273,7 @@ export async function runIntelligence(
     { role: 'user' as const, content: request.prompt, at: now },
     {
       role: 'assistant' as const,
-      content: result.message || result.answer,
+      content: turnMemory(result),
       at: now,
       action: result.action,
     },

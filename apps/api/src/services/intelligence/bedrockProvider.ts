@@ -265,7 +265,7 @@ export async function runBedrockProvider(input: {
 }): Promise<ProviderResult> {
   const messages: Message[] = [
     ...input.history
-      .slice(-8)
+      .slice(-12)
       .map((turn): Message => ({ role: turn.role, content: [{ text: turn.content }] })),
     { role: 'user', content: [{ text: input.prompt }] },
   ];

@@ -94,3 +94,45 @@ export async function askIntelligence(input: {
     },
   });
 }
+
+/** Study kept in Minhas análises → Estudos (frozen copy of a finished study). */
+export interface SavedStudySummary {
+  id: string;
+  name: string;
+  prompt: string;
+  datasets?: string[];
+  sections: number;
+  generatedBy: 'ai' | 'deterministic';
+  summary: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedStudy extends Omit<
+  SavedStudySummary,
+  'sections' | 'generatedBy' | 'summary'
+> {
+  study: IntelligenceStudy;
+}
+
+export async function saveStudy(jobId: string, name?: string) {
+  return (
+    await apiRequest<{ study: SavedStudySummary }, { name?: string }>(
+      `/ai/studies/${encodeURIComponent(jobId)}/save`,
+      { method: 'POST', body: { name } },
+    )
+  ).study;
+}
+
+export async function listSavedStudies() {
+  return (await apiRequest<{ items: SavedStudySummary[] }>('/ai/saved-studies')).items;
+}
+
+export async function getSavedStudy(id: string) {
+  return (await apiRequest<{ study: SavedStudy }>(`/ai/saved-studies/${encodeURIComponent(id)}`))
+    .study;
+}
+
+export async function deleteSavedStudy(id: string) {
+  await apiRequest<void>(`/ai/saved-studies/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}

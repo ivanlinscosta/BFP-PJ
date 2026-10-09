@@ -321,6 +321,7 @@ export const OBJECT_TYPES = [
   'favorite',
   'aiConversation',
   'aiStudy',
+  'savedStudy',
   'preference',
 ] as const;
 

@@ -128,7 +128,16 @@ const PAID_CHANNELS = new Set(['GOOGLE_SEARCH', 'META', 'LINKEDIN']);
 /** True when the user asks for a complete study rather than a single answer. */
 export function isStudyRequest(prompt: string) {
   const normalized = normalizeSearchText(prompt);
-  return STUDY_TRIGGERS.some((trigger) => normalized.includes(trigger));
+  if (!STUDY_TRIGGERS.some((trigger) => normalized.includes(trigger))) return false;
+  // Follow-ups about a study already delivered ("no capítulo 2 do estudo…") are questions.
+  if (/capitulo|\b(do|no|desse|deste|nesse|neste|daquele|ultimo) estudo\b/.test(normalized)) {
+    return false;
+  }
+  return (
+    /\b(faca|faz|fazer|crie|criar|gere|gerar|monte|montar|elabore|elaborar|prepare|preparar|quero|preciso|novo|nova|um estudo|uma analise completa|um raio)\b/.test(
+      normalized,
+    ) || STUDY_TRIGGERS.some((trigger) => normalized.startsWith(trigger))
+  );
 }
 
 export function spec(

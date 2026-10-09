@@ -76,5 +76,14 @@ test('Inteligência PJ: estudo completo, salvar análise e exportar PDF', async 
   expect(file.suggestedFilename()).toBe('estudo-completo-da-jornada-pj.pdf');
   await file.saveAs('artifacts/estudo-completo-da-jornada-pj.pdf');
 
+  // The study is kept in Minhas análises → Estudos.
+  await page.getByRole('button', { name: 'Salvar estudo' }).click();
+  const saveDialog = page.getByRole('dialog', { name: 'Salvar estudo' });
+  await saveDialog.getByLabel('Nome do estudo').fill('Jornada PJ (E2E)');
+  await saveDialog.getByRole('button', { name: 'Salvar estudo' }).click();
+  await page.getByRole('link', { name: /Estudo salvo/ }).click();
+  await expect(page.getByRole('heading', { name: 'Jornada PJ (E2E)', level: 1 })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Estudo completo da jornada PJ' })).toBeVisible();
+
   expect(errors).toEqual([]);
 });

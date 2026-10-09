@@ -94,6 +94,22 @@ Lambda se auto-invoca (`InvocationType=Event`, timeout 120 s); localmente roda n
   ativação, app, transações, NPS, atendimento, CRM, jornada digital), só com capítulos e indicadores
   das bases selecionadas (completado com as métricas dessas bases), com o motivo exibido ao usuário.
 
+- **Salvar estudo:** o botão "Salvar estudo" guarda uma cópia do estudo pronto (números do momento)
+  em Minhas análises → aba **Estudos** (`/analises?aba=estudos`), que abre em
+  `/analises/estudos/:id` com PDF e ações por capítulo. API: `POST /ai/studies/:id/save`,
+  `GET /ai/saved-studies`, `GET|DELETE /ai/saved-studies/:id` (objeto `savedStudy`, por usuário).
+
+## Memória da conversa
+
+- Cada resposta é guardada com o texto completo e a consulta usada
+  (`[Consulta usada: métricas … por … · filtros …]`); o modelo recebe os últimos 12 turnos, então
+  pedidos como "e por porte?" ou "só para Micro" refinam a mesma análise.
+- Ao terminar, o estudo entra na conversa (título, resumo, capítulos com as consultas e
+  recomendações): "no capítulo 2 do estudo…" é respondido com esse contexto.
+- Só pedidos de criação viram estudo ("faça/crie/gere um estudo…"); menções a um estudo já entregue
+  ("o que o estudo mostrou…") são perguntas normais.
+- O campo de pergunta fica desabilitado até a conversa ter bases selecionadas.
+
 ## Perguntas sobre um cliente (Cliente PJ)
 
 Os atalhos "Perguntar à Inteligência PJ" da página do cliente abrem o chat com

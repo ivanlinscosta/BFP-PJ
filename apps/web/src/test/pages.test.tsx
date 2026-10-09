@@ -116,14 +116,15 @@ describe('IntelligencePage', () => {
     renderRoute(<IntelligencePage />, { path: '/inteligencia', url: '/inteligencia' });
 
     const input = await screen.findByLabelText('Pergunte aos seus dados');
+    // The text box stays disabled until the conversation has bases.
+    expect(input).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar bases de dados' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Customer 360/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Usar 1 base/ }));
+    expect(input).toBeEnabled();
     fireEvent.change(input, {
       target: { value: 'Qual canal combina melhor conversão com menor CAC?' },
     });
-    // Without bases selected, sending opens the picker and keeps the question in the composer.
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar pergunta' }));
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Customer 360/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Usar 1 base/ }));
-    expect(calls.some((call) => call.url.pathname === '/api/ai/chat')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Enviar pergunta' }));
     expect(
       await screen.findByText(

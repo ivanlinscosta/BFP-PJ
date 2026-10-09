@@ -11,6 +11,12 @@ import { normalizeSearchText } from '@api/http/textSearch';
 import { COPILOT_MAX_PROMPT_LENGTH } from '@api/services/copilot/guardrails';
 import { getCopilotToolSurface, runCopilot } from '@api/services/copilot';
 import { runIntelligence } from '@api/services/intelligence/service';
+import {
+  deleteSavedStudy,
+  getSavedStudy,
+  listSavedStudies,
+  saveStudy,
+} from '@api/services/intelligence/savedStudies';
 import { getStudyJob } from '@api/services/intelligence/studyJobs';
 import type { StoredConversation } from '@api/services/intelligence/types';
 import { ApiError, NotFoundError } from '@api/common/errors';
@@ -255,6 +261,46 @@ export function createAiRouter(context: ApiContext) {
           error: job.error,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Saved studies (Minhas análises → Estudos).
+  router.post('/studies/:id/save', async (req, res, next) => {
+    try {
+      const { name } = parseWithZod(
+        z.object({ name: z.string().trim().max(120).optional() }),
+        req.body ?? {},
+        { message: 'Nome do estudo inválido.' },
+      );
+      res.status(201).json({ study: await saveStudy(context, req.auth!, req.params.id, name) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/saved-studies', async (req, res, next) => {
+    try {
+      const items = await listSavedStudies(context, req.auth!);
+      res.json({ items, total: items.length });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/saved-studies/:id', async (req, res, next) => {
+    try {
+      res.json({ study: await getSavedStudy(context, req.auth!, req.params.id) });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.delete('/saved-studies/:id', async (req, res, next) => {
+    try {
+      await deleteSavedStudy(context, req.auth!, req.params.id);
+      res.status(204).end();
     } catch (error) {
       next(error);
     }
