@@ -218,13 +218,13 @@ export function CustomerDnaPanel({ data }: { data: CustomerIntelligenceResponse 
           {data.customer.tradeName.replace(/ Ltda\.?$/, '')}
         </span>
       </div>
-      <div className="mt-4 grid grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,150px)] items-stretch rounded-[var(--radius-card)] bg-tint px-3 py-3">
+      <div className="mt-4 grid grid-cols-2 items-stretch gap-x-2 rounded-[var(--radius-card)] bg-tint px-3 py-3 sm:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,150px)] sm:gap-x-0">
         <div className="flex flex-col justify-between gap-6 py-1">
           {LEFT.map((id) => (
             <DnaDimensionRow align="left" dna={dna} id={id} key={id} onOpen={setOpen} />
           ))}
         </div>
-        <div className="min-h-[300px] px-1">
+        <div className="order-first col-span-2 h-[220px] px-1 sm:order-none sm:col-span-1 sm:h-auto sm:min-h-[300px]">
           <DnaTree highlightIntent={dna.commercialIntent.level !== 'LOW'} />
         </div>
         <div className="flex flex-col justify-between gap-6 py-1">
