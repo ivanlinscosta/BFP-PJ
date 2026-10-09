@@ -22,6 +22,7 @@ import {
 import { getAllowedDomains } from '@api/auth/rbac';
 import type { AuthenticatedUser } from '@api/auth/types';
 import { ApiError, NotFoundError, ValidationError } from '@api/common/errors';
+import { sampleNumbers } from '@api/services/intelligence/grounding';
 import type { ApiContext } from '@api/http/context';
 import { buildCustomer360 } from '@api/http/customer360';
 import { buildDataProductQualityCatalog } from '@api/http/qualitySummary';
@@ -48,6 +49,13 @@ export interface ToolContext {
   samples?: number;
   /** User question of the turn (only used to honor an explicit request for a table). */
   prompt?: string;
+  /**
+   * Numbers the answer may also quote besides this turn's queries: sample rows, the question and
+   * earlier answers of the conversation (already grounded when they were given).
+   */
+  groundingValues?: number[];
+  /** Sentences removed from the answer because their numbers were not in the data. */
+  droppedSentences?: number;
 }
 
 /** A question needs a base the user did not select. */
@@ -269,6 +277,10 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
         )
         .slice(0, limit);
       toolContext.samples = (toolContext.samples ?? 0) + rows.length;
+      toolContext.groundingValues = [
+        ...(toolContext.groundingValues ?? []),
+        ...sampleNumbers(rows),
+      ];
       return {
         dataset: dataset.name,
         columns: preview.columns.map((column) => column.name),

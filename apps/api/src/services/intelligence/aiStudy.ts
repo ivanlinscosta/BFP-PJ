@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import { z } from 'zod';
 import { ApiError } from '@api/common/errors';
+import { GROUNDING_RULES, isGrounded, numberPool } from '@api/services/intelligence/grounding';
 import { VISUALIZATION_TYPES, type AnalysisSpec } from '@bfp/domain';
 import { analysisSpecSchema } from '@bfp/schemas';
 import {
@@ -111,7 +112,8 @@ function systemPrompt(toolContext: ToolContext, themes: string[]) {
     'Se uma consulta voltar com erro, corrija-a com base nos detalhes e execute de novo antes de escrever o estudo. Nunca escreva capítulos sem resultado de consulta.',
     'Use no máximo 2 dimensões por consulta, apenas dimensões permitidas para a métrica. Para evolução no tempo use uma dimensão de data com granularity "month".',
     'Cada resultado volta com "queryRef". Depois de ver os resultados, analise: compare grupos, encontre extremos, concentração, tendência e relações entre capítulos.',
-    'Regras de números: cite apenas números que aparecem nos resultados (percentuais como 14,9%, moeda como R$ 328,9). Nunca invente valores, metas ou benchmarks externos.',
+    ...GROUNDING_RULES,
+    'No estudo: cada capítulo e cada leitura se baseiam só no resultado da sua consulta (queryRef); recomendações precisam citar o dado que as sustenta; se uma consulta voltar vazia, o capítulo diz que não há dados em vez de supor.',
     'CAC só pode ser comparado entre canais pagos (Google Search, Meta, LinkedIn).',
     'Ao final responda SOMENTE um JSON:',
     '{"title":"...","summary":"3 a 5 frases com as conclusões principais","kpis":["metricId", ...até 8],"chapters":[{"queryRef":0,"title":"...","question":"...","visualization":"BAR|GROUPED_BAR|LINE|HEATMAP","findings":["até 4 leituras com números"]}],"recommendations":["até 6 ações objetivas baseadas nos dados"]}',
@@ -149,42 +151,7 @@ function extractJson(text: string) {
   }
 }
 
-/** Parses a pt-BR number written by the model ("1.996", "14,9", "R$ 328,9 mi"). */
-function parseNumber(token: string) {
-  const value = Number(token.replace(/\./g, '').replace(',', '.'));
-  return Number.isFinite(value) ? value : null;
-}
-
-/** Every number that can legitimately be quoted: query values in the units people read them. */
-export function numberPool(results: GovernedQueryResult[]) {
-  const pool: number[] = [];
-  for (const result of results) {
-    for (const row of result.rows) {
-      for (const value of Object.values(row)) {
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          pool.push(value, value * 100, value / 1_000, value / 1_000_000);
-        }
-      }
-    }
-  }
-  return pool;
-}
-
-/**
- * True when every number in the text comes from the governed results (rounding tolerated).
- * Small counts, years and the "D30" label are not data and are allowed.
- */
-export function isGrounded(text: string, pool: readonly number[]) {
-  const tokens = text.replace(/D30/gi, '').match(/\d[\d.]*(?:,\d+)?/g) ?? [];
-  return tokens.every((token) => {
-    const value = parseNumber(token);
-    if (value === null) return true;
-    if (Number.isInteger(value) && (value <= 12 || (value >= 2000 && value <= 2100))) return true;
-    return pool.some(
-      (candidate) => Math.abs(candidate - value) <= Math.max(0.051, Math.abs(candidate) * 0.006),
-    );
-  });
-}
+export { isGrounded, numberPool } from '@api/services/intelligence/grounding';
 
 /** Chart of a chapter: the model's choice unless it is a table or does not fit the result. */
 function chartFor(

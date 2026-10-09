@@ -39,8 +39,15 @@ Ferramentas governadas: `getAvailableMetrics`, `getAvailableDimensions`, `getMet
 
 - Recusa de prompt injection e pedidos de PII antes de qualquer chamada.
 - Operações do modelo são validadas uma a uma pela camada semântica; ids inventados são descartados.
-- Resposta com números sem `runAnalyticsQuery` (ou `previewDatasetRows`) no turno é descartada e substituída pela narrativa
-  determinística.
+- **Regras de fidelidade aos dados** (`grounding.ts`, `GROUNDING_RULES`) no início dos prompts do
+  chat e do estudo: só fatos e números das ferramentas e das respostas anteriores; sem conhecimento
+  externo, benchmarks, projeções ou causas (explicação só como "hipótese a validar"); lacunas ditas
+  com clareza; período e filtros informados; na dúvida, resposta curta e correta.
+- **Checagem de números da resposta do chat:** cada frase com número precisa bater (com
+  arredondamento) com os resultados do turno, seus totais, participações e diferenças, os insights,
+  as amostras de linhas, o período/filtros consultados, a pergunta ou respostas anteriores da
+  conversa. Frases sem respaldo são removidas (a resposta avisa); sem consulta no turno, a resposta
+  é descartada e vale a leitura determinística ou a recusa honesta.
 - RBAC por domínio aplicado em toda ferramenta; resultados limitados a 50 linhas agregadas.
 - CAC só é comparado entre canais pagos (`acquisition_source = PAID`).
 - Conversas persistidas (`aiConversation`) e logs `AI_REQUEST` / `AI_TOOL_CALL` sem o texto do prompt (hash).

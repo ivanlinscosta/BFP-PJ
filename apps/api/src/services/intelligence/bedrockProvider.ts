@@ -17,6 +17,12 @@ import {
 import { applyAnalysisOperations, type AnalysisOperation } from '@bfp/shared';
 import { ApiError } from '@api/common/errors';
 import {
+  GROUNDING_RULES,
+  groundText,
+  numberPool,
+  specNumbers,
+} from '@api/services/intelligence/grounding';
+import {
   buildSuggestions,
   composeAnswer,
   describeBasis,
@@ -93,7 +99,8 @@ export function systemPrompt(spec: AnalysisSpec | undefined, datasets?: readonly
     ...scope,
     'Você é a Inteligência PJ, interface conversacional do mesmo AnalysisSpec do playground analítico.',
     'Responda sempre em português do Brasil, de forma curta e executiva.',
-    'Use SOMENTE as ferramentas para obter definições e números. Todo número da resposta deve vir de runAnalyticsQuery.',
+    ...GROUNDING_RULES,
+    'Use SOMENTE as ferramentas para obter definições e números: consulte antes de responder, mesmo que ache que sabe a resposta.',
     'Nunca invente métricas, dimensões, valores, tabelas, SQL ou filtros. Nunca exponha dados pessoais.',
     'Respeite os filtros e o período do contexto atual, a menos que o usuário peça para mudá-los.',
     'Nas consultas use visualization {"type": "AUTO"} (a tela escolhe o gráfico), exceto se o usuário pedir um tipo específico.',
@@ -193,6 +200,35 @@ function stripBaseNames(text: string) {
   return stripped;
 }
 
+/**
+ * Every number of the answer must come from this turn's queries or samples, from the deterministic
+ * insights or from earlier answers of the conversation (simple totals, shares and differences
+ * included). Sentences with other numbers are dropped; with nothing left, the answer falls back to
+ * the deterministic reading of the last query.
+ */
+function groundAnswer(
+  answer: string,
+  toolContext: ToolContext,
+  lastQuery: ToolContext['queries'][number] | undefined,
+) {
+  // Base names and ids (e.g. "Customer 360") are not figures.
+  const text = stripBaseNames(answer);
+  if (!/\d/.test(text)) return answer || (lastQuery ? composeAnswer(lastQuery.result) : '');
+  const pool = [
+    ...numberPool(toolContext.queries.map((query) => query.result)),
+    ...specNumbers(toolContext.queries.map((query) => query.spec)),
+    ...(toolContext.groundingValues ?? []),
+  ];
+  const checked = groundText(answer, pool);
+  if (checked.removed === 0) return answer;
+  toolContext.droppedSentences = (toolContext.droppedSentences ?? 0) + checked.removed;
+  if (checked.text) {
+    return `${checked.text} (Trechos com números que não estão nos dados consultados foram omitidos.)`;
+  }
+  // Nothing grounded: the provider falls back (deterministic answer or an honest refusal).
+  return lastQuery ? composeAnswer(lastQuery.result) : '';
+}
+
 export function finalizeModelAnswer(
   text: string,
   input: { analysisSpec?: AnalysisSpec; toolContext: ToolContext },
@@ -210,13 +246,7 @@ export function finalizeModelAnswer(
   };
   const { accepted, spec } = sanitizeOperations(context, parsed.data.operations);
   const lastQuery = input.toolContext.queries[input.toolContext.queries.length - 1];
-  // Base names and ids (e.g. "Customer 360") are not figures: only other digits need a query.
-  const hasNumbers = /\d/.test(stripBaseNames(parsed.data.answer));
-  const grounded = Boolean(lastQuery) || (input.toolContext.samples ?? 0) > 0;
-  const groundedAnswer =
-    hasNumbers && !grounded
-      ? ''
-      : parsed.data.answer || (lastQuery ? composeAnswer(lastQuery.result) : '');
+  const groundedAnswer = groundAnswer(parsed.data.answer, input.toolContext, lastQuery);
 
   if (parsed.data.action === 'UPDATE_ANALYSIS' && accepted.length > 0) {
     return {

@@ -1,4 +1,5 @@
 import { runCustomerAssistant } from '@api/services/customerIntelligence/assistant';
+import { numbersIn } from '@api/services/intelligence/grounding';
 import { describeQueryForMemory } from '@api/services/intelligence/memory';
 import { isStudyRequest } from '@api/services/intelligence/study';
 import { startStudyJob } from '@api/services/intelligence/studyJobs';
@@ -91,6 +92,15 @@ export async function runIntelligence(
     queries: [],
     datasets: request.datasets?.length ? request.datasets : undefined,
     prompt: request.prompt,
+    // The question and earlier answers (grounded when given) may be quoted again.
+    groundingValues: numbersIn(
+      [
+        request.prompt,
+        ...(conversation?.turns ?? [])
+          .filter((turn) => turn.role === 'assistant')
+          .map((turn) => turn.content),
+      ].join('\n'),
+    ),
   };
   let provider: 'bedrock' | 'openai' | 'local' =
     context.config.aiProvider === 'bedrock' || context.config.aiProvider === 'openai'

@@ -7,6 +7,13 @@ import { logger } from '@api/common/logger';
 import { createApiContext } from '@api/http/context';
 import { createApp } from '@api/http/app';
 import type { OpenAIChatClient } from '@api/services/intelligence/openaiProvider';
+import { systemPrompt } from '@api/services/intelligence/bedrockProvider';
+import {
+  GROUNDING_RULES,
+  groundText,
+  isGrounded,
+  numberPool,
+} from '@api/services/intelligence/grounding';
 import { runIntelligence } from '@api/services/intelligence/service';
 import { isStudyRequest } from '@api/services/intelligence/study';
 import { coerceSpecInput, withChartVisualization } from '@api/services/intelligence/tools';
@@ -561,5 +568,107 @@ describe('Conversation memory', () => {
     expect(assistant.role).toBe('assistant');
     expect(assistant.content).toContain(first.body.answer.slice(0, 20));
     expect(assistant.content).toMatch(/\[Consulta usada: métricas .+ por region/);
+  });
+});
+
+describe('Answers stick to the data', () => {
+  const result = {
+    columns: [],
+    rows: [
+      { channel: 'META', accounts: 76 },
+      { channel: 'GOOGLE', accounts: 59 },
+      { channel: 'EMAIL', accounts: 15 },
+    ],
+    insights: [],
+  } as unknown as Parameters<typeof numberPool>[0][number];
+
+  it('keeps numbers from the results, totals, shares and differences', () => {
+    const pool = numberPool([result]);
+    expect(isGrounded('Meta abriu 76 contas, 17 a mais que Google.', pool)).toBe(true);
+    expect(isGrounded('O total foi de 150 contas e Meta tem 50,7% delas.', pool)).toBe(true);
+  });
+
+  it('drops sentences with invented figures and keeps the rest', () => {
+    const pool = numberPool([result]);
+    const checked = groundText(
+      'Meta lidera com 76 contas. A média do mercado é de 230 contas por canal.',
+      pool,
+    );
+    expect(checked.removed).toBe(1);
+    expect(checked.text).toBe('Meta lidera com 76 contas.');
+  });
+
+  it('puts the fidelity rules in the chat and study prompts', () => {
+    expect(systemPrompt(undefined, ['customer_360'])).toContain(GROUNDING_RULES[0]);
+  });
+
+  it('removes an invented benchmark from an OpenAI answer', async () => {
+    const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
+    let step = 0;
+    const client: OpenAIChatClient = {
+      async complete() {
+        step += 1;
+        if (step === 1) {
+          return {
+            choices: [
+              {
+                finish_reason: 'tool_calls',
+                message: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: 'q',
+                      type: 'function',
+                      function: {
+                        name: 'runAnalyticsQuery',
+                        arguments: JSON.stringify({
+                          analysisSpec: {
+                            metrics: [{ id: 'companies_total' }],
+                            dimensions: [],
+                            filters: [],
+                            visualization: { type: 'KPI' },
+                          },
+                        }),
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }
+        return {
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  action: 'ANSWER_QUESTION',
+                  operations: [],
+                  answer: 'O mercado brasileiro tem 987.654 empresas PJ ativas.',
+                  suggestions: [],
+                }),
+              },
+            },
+          ],
+        };
+      },
+    };
+    const auth: AuthenticatedUser = {
+      userId: 'usr-analyst',
+      email: 'analyst@example.local',
+      role: 'analyst',
+      groups: ['analyst'],
+    };
+    const reply = await runIntelligence(
+      context,
+      auth,
+      { prompt: 'Quantas empresas PJ existem no Brasil?', datasets: ['customer_360'] },
+      'corr-bench',
+      { openaiClient: client },
+    );
+    expect(reply.answer).not.toContain('987.654');
   });
 });
