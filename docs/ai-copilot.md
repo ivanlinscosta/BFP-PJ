@@ -113,6 +113,13 @@ Lambda se auto-invoca (`InvocationType=Event`, timeout 120 s); localmente roda n
   pedidos como "e por porte?" ou "só para Micro" refinam a mesma análise.
 - Ao terminar, o estudo entra na conversa (título, resumo, capítulos com as consultas e
   recomendações): "no capítulo 2 do estudo…" é respondido com esse contexto.
+- **Recorte do último estudo:** depois de um estudo, um pedido de recorte ("faça um recorte do
+  segmento agronegócio", "agora só para Micro") refaz **o mesmo estudo** (`StoredConversation.
+lastStudyJobId` → `StudyJob.baseStudy`): mesmos capítulos e consultas, com o filtro aplicado em
+  código a todas as consultas (`ToolContext.requiredFilters`). A IA recebe a estrutura do estudo
+  anterior; sem IA, o motor determinístico refaz os capítulos com o filtro. Segmentos e regiões são
+  reconhecidos como filtros (ex.: agronegócio → `segment = Agronegócio`). Perguntas sobre o recorte
+  ("qual o NPS do agronegócio?") e pedidos de "novo estudo" seguem o fluxo normal.
 - Só pedidos de criação viram estudo ("faça/crie/gere um estudo…"); menções a um estudo já entregue
   ("o que o estudo mostrou…") são perguntas normais.
 - O campo de pergunta fica desabilitado até a conversa ter bases selecionadas.

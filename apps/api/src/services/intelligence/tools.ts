@@ -4,7 +4,14 @@ import {
   previewAudience,
   type AnalyticsInsight,
 } from '@bfp/analytics-engine';
-import type { AnalysisSpec, BusinessDomain, Company, CompanyProduct, Product } from '@bfp/domain';
+import type {
+  AnalysisSpec,
+  BusinessDomain,
+  Company,
+  CompanyProduct,
+  FilterCondition,
+  Product,
+} from '@bfp/domain';
 import { analysisSpecSchema, audienceRuleGroupSchema } from '@bfp/schemas';
 import {
   BUSINESS_GLOSSARY,
@@ -56,6 +63,14 @@ export interface ToolContext {
   groundingValues?: number[];
   /** Sentences removed from the answer because their numbers were not in the data. */
   droppedSentences?: number;
+  /** Cut of a refined study: added to every query of the job (replacing the same field). */
+  requiredFilters?: FilterCondition[];
+  /** Previous study being refined (its chapters are redone with `requiredFilters`). */
+  refines?: {
+    prompt: string;
+    title: string;
+    sections: Array<{ title: string; question: string; spec: AnalysisSpec }>;
+  };
 }
 
 /** A question needs a base the user did not select. */

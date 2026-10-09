@@ -1,8 +1,8 @@
 import { runCustomerAssistant } from '@api/services/customerIntelligence/assistant';
 import { numbersIn } from '@api/services/intelligence/grounding';
 import { describeQueryForMemory } from '@api/services/intelligence/memory';
-import { isStudyRequest } from '@api/services/intelligence/study';
-import { startStudyJob } from '@api/services/intelligence/studyJobs';
+import { describeCut, isStudyRequest, studyRecutFilters } from '@api/services/intelligence/study';
+import { baseStudyFrom, startStudyJob } from '@api/services/intelligence/studyJobs';
 import { randomUUID } from 'node:crypto';
 import type { AnalysisSpec } from '@bfp/domain';
 import type { MeshDatasetId } from '@bfp/semantic-layer';
@@ -116,6 +116,13 @@ export async function runIntelligence(
   let customerTools: string[] = [];
 
   let result: ProviderResult;
+  // A cut asked right after a study ("só agronegócio") refines that study instead of starting over.
+  const recutFilters =
+    !request.customerId && conversation?.lastStudyJobId ? studyRecutFilters(request.prompt) : null;
+  const recut = recutFilters
+    ? await baseStudyFrom(context, auth.userId, conversation!.lastStudyJobId!, recutFilters)
+    : null;
+
   if (refusal) {
     context.logger.warn('ai_request_refused', {
       correlationId,
@@ -148,16 +155,30 @@ export async function runIntelligence(
     provider = customer.provider;
     model = customer.model;
     customerTools = customer.tools;
+  } else if (recut) {
+    // Follow-up cut of the last study: same chapters and queries, with the new filters.
+    const job = await startStudyJob(context, auth, request.prompt, {
+      datasets: toolContext.datasets,
+      conversationId,
+      baseStudy: recut,
+    });
+    const cut = describeCut(recut.study.filters);
+    const message = `Estou refazendo o estudo “${recut.study.title}” com o recorte ${cut}. Isso leva alguns segundos.`;
+    result = {
+      action: 'NONE',
+      operations: [],
+      message,
+      answer: message,
+      suggestions: [],
+      studyJob: { id: job.id, status: job.status, progress: job.progress },
+    };
   } else if (isStudyRequest(request.prompt)) {
     // A study is agentic and slow (planning + queries + analysis): it runs as a background job
     // and the client follows its progress.
-    const job = await startStudyJob(
-      context,
-      auth,
-      request.prompt,
-      toolContext.datasets,
+    const job = await startStudyJob(context, auth, request.prompt, {
+      datasets: toolContext.datasets,
       conversationId,
-    );
+    });
     result = {
       action: 'NONE',
       operations: [],

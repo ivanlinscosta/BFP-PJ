@@ -128,6 +128,37 @@ const VALUE_LEXICON: Array<{ field: string; value: string; phrases: string[] }> 
   { field: 'state', value: 'MG', phrases: ['minas gerais', ' mg'] },
   { field: 'state', value: 'PR', phrases: ['parana', ' pr'] },
   { field: 'state', value: 'RS', phrases: ['rio grande do sul', ' rs'] },
+  { field: 'segment', value: 'Agronegócio', phrases: ['agronegocio', 'agronegocios', ' agro'] },
+  { field: 'segment', value: 'Varejo', phrases: ['varejo', 'varejistas'] },
+  { field: 'segment', value: 'Serviços', phrases: ['segmento servicos', 'segmento de servicos'] },
+  {
+    field: 'segment',
+    value: 'Tecnologia',
+    phrases: ['segmento tecnologia', 'segmento de tecnologia'],
+  },
+  { field: 'segment', value: 'Saúde', phrases: ['segmento saude', 'segmento de saude'] },
+  { field: 'segment', value: 'Logística', phrases: ['logistica'] },
+  { field: 'segment', value: 'Educação', phrases: ['segmento educacao', 'segmento de educacao'] },
+  {
+    field: 'segment',
+    value: 'Construção',
+    phrases: ['construcao civil', 'segmento construcao', 'segmento de construcao'],
+  },
+  {
+    field: 'segment',
+    value: 'Indústria',
+    phrases: ['segmento industria', 'segmento de industria', 'industrial'],
+  },
+  {
+    field: 'segment',
+    value: 'Alimentação',
+    phrases: ['segmento alimentacao', 'segmento de alimentacao'],
+  },
+  { field: 'region', value: 'Nordeste', phrases: ['nordeste'] },
+  { field: 'region', value: 'Sudeste', phrases: ['sudeste'] },
+  { field: 'region', value: 'Centro-Oeste', phrases: ['centro-oeste', 'centro oeste'] },
+  { field: 'region', value: 'Norte', phrases: ['regiao norte'] },
+  { field: 'region', value: 'Sul', phrases: ['regiao sul'] },
 ];
 
 const VISUALIZATION_LEXICON: Array<{ type: VisualizationType; phrases: string[] }> = [

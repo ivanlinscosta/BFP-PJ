@@ -102,7 +102,30 @@ function systemPrompt(toolContext: ToolContext, themes: string[]) {
           .join(', ')}. Use SOMENTE essas bases: o catálogo abaixo já está limitado a elas.`,
       ]
     : [`Temas da pergunta: ${themes.join(', ')}.`];
+  const refines = toolContext.refines
+    ? [
+        'ESTE PEDIDO REFINA O ESTUDO ANTERIOR DA CONVERSA. Não monte um estudo novo sobre outro assunto.',
+        `Estudo anterior: "${toolContext.refines.title}" (pedido original: "${toolContext.refines.prompt}").`,
+        `Recorte pedido agora: ${JSON.stringify(toolContext.requiredFilters ?? [])}. Ele é aplicado automaticamente a todas as consultas.`,
+        'Refaça os MESMOS capítulos (mesmas métricas, cortes e período) com o recorte, um runAnalyticsQuery por capítulo, e escreva leituras e recomendações específicas do recorte. Indique o recorte no título do estudo e dos capítulos. Se um capítulo não se aplicar ao recorte, explique em vez de substituí-lo por outro assunto.',
+        `Capítulos e consultas do estudo anterior:\n${toolContext.refines.sections
+          .map(
+            (section, index) =>
+              `${index + 1}. ${section.title} — ${section.question}\n   analysisSpec: ${JSON.stringify(
+                {
+                  metrics: section.spec.metrics,
+                  dimensions: section.spec.dimensions,
+                  filters: section.spec.filters,
+                  dateRange: section.spec.dateRange,
+                  visualization: section.spec.visualization,
+                },
+              )}`,
+          )
+          .join('\n')}`,
+      ]
+    : [];
   return [
+    ...refines,
     'Você é analista de dados sênior do Itaú Empresas e escreve estudos analíticos para executivos.',
     'Monte um estudo SOBRE O ASSUNTO PEDIDO pelo usuário usando SOMENTE a ferramenta runAnalyticsQuery.',
     'Todos os capítulos devem responder perguntas desse assunto; não monte um panorama genérico da jornada se o usuário pediu um tema específico.',

@@ -15,7 +15,7 @@ import {
   numberPool,
 } from '@api/services/intelligence/grounding';
 import { runIntelligence } from '@api/services/intelligence/service';
-import { isStudyRequest } from '@api/services/intelligence/study';
+import { isStudyRequest, studyRecutFilters } from '@api/services/intelligence/study';
 import { coerceSpecInput, withChartVisualization } from '@api/services/intelligence/tools';
 import { createStudyJob, getStudyJob, runStudyJob } from '@api/services/intelligence/studyJobs';
 
@@ -466,7 +466,9 @@ describe('Studies over the selected bases', () => {
         };
       },
     };
-    const job = await createStudyJob(context, auth, 'Faça um estudo sobre o Pix', ['transactions']);
+    const job = await createStudyJob(context, auth, 'Faça um estudo sobre o Pix', {
+      datasets: ['transactions'],
+    });
     await runStudyJob(context, auth.userId, job.id, { openaiClient: client });
     const study = (await getStudyJob(context, auth.userId, job.id))?.study;
     expect(study?.generatedBy).toBe('ai');
@@ -479,9 +481,9 @@ describe('Studies over the selected bases', () => {
 
   it('the deterministic study only reads the selected bases', async () => {
     const { context } = createHarness();
-    const job = await createStudyJob(context, auth, 'Faça um estudo completo da jornada PJ', [
-      'transactions',
-    ]);
+    const job = await createStudyJob(context, auth, 'Faça um estudo completo da jornada PJ', {
+      datasets: ['transactions'],
+    });
     await runStudyJob(context, auth.userId, job.id);
     const study = (await getStudyJob(context, auth.userId, job.id))?.study;
     expect(study?.sections.length).toBeGreaterThan(0);
@@ -670,5 +672,71 @@ describe('Answers stick to the data', () => {
       { openaiClient: client },
     );
     expect(reply.answer).not.toContain('987.654');
+  });
+});
+
+describe('Follow-up cut of the last study', () => {
+  it.each([
+    ['Faça um recorte específico do segmento agronegócio', 'Agronegócio'],
+    ['Agora só para o varejo', 'Varejo'],
+    ['Refaça o estudo apenas para empresas Micro', 'Micro'],
+  ])('%s → filter %s', (prompt, value) => {
+    expect(JSON.stringify(studyRecutFilters(prompt))).toContain(value);
+  });
+
+  it.each([
+    'Qual o NPS do agronegócio?',
+    'No capítulo 2, o que muda no agronegócio?',
+    'Faça um novo estudo sobre o agronegócio',
+    'Faça um recorte do estudo',
+  ])('%s → not a cut', (prompt) => {
+    expect(studyRecutFilters(prompt)).toBeNull();
+  });
+
+  it('redoes the previous study chapters with the new cut', async () => {
+    const { app } = createHarness();
+    const token = await login(app);
+    const waitStudy = async (id: string) => {
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        const job = (await request(app).get(`/api/ai/studies/${id}`).set('Authorization', token))
+          .body.study;
+        if (job.status !== 'running') return job;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw new Error('study did not finish');
+    };
+    const first = await request(app)
+      .post('/api/ai/chat')
+      .set('Authorization', token)
+      .send({
+        prompt: 'Faça um estudo sobre transações',
+        datasets: ['transactions', 'customer_360'],
+      });
+    const original = await waitStudy(first.body.studyJob.id);
+
+    const cut = await request(app)
+      .post('/api/ai/chat')
+      .set('Authorization', token)
+      .send({
+        prompt: 'Faça um recorte específico do segmento agronegócio',
+        conversationId: first.body.conversationId,
+        datasets: ['transactions', 'customer_360'],
+      });
+    expect(cut.body.answer).toMatch(/refazendo o estudo/);
+    const refined = await waitStudy(cut.body.studyJob.id);
+    expect(refined.study.title).toContain('Agronegócio');
+    const originalTitles = original.study.sections.map(
+      (section: { title: string }) => section.title,
+    );
+    for (const section of refined.study.sections) {
+      expect(section.spec.filters).toEqual(
+        expect.arrayContaining([{ field: 'segment', operator: 'EQ', value: 'Agronegócio' }]),
+      );
+      expect(originalTitles.some((title: string) => section.title.startsWith(title))).toBe(true);
+    }
+    expect(
+      refined.study.sections.length +
+        refined.study.skipped.filter((item: string) => /recorte/.test(item)).length,
+    ).toBe(original.study.sections.length);
   });
 });

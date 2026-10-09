@@ -38,6 +38,8 @@ export interface StoredConversation {
   title: string;
   turns: ConversationTurn[];
   analysisSpec?: AnalysisSpec;
+  /** Last study delivered in the conversation: follow-up cuts ("só agronegócio") refine it. */
+  lastStudyJobId?: string;
   createdAt: string;
   updatedAt: string;
 }

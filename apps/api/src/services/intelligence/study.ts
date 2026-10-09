@@ -1,4 +1,4 @@
-import type { AnalysisSpec, ColumnFormat, VisualizationType } from '@bfp/domain';
+import type { AnalysisSpec, ColumnFormat, FilterCondition, VisualizationType } from '@bfp/domain';
 import { normalizeSearchText } from '@api/http/textSearch';
 import {
   getMetricDefinition,
@@ -125,6 +125,23 @@ const PERIOD = { type: 'LAST_N_DAYS', value: 365 } as const;
 /** Channels whose acquisition_source is PAID: CAC is only compared among them (governance rule). */
 const PAID_CHANNELS = new Set(['GOOGLE_SEARCH', 'META', 'LINKEDIN']);
 
+/**
+ * Filters of a follow-up cut of the last study ("faça um recorte do agronegócio", "refaça só para
+ * empresas Micro"), or null when the prompt is something else: a question about the study, a
+ * request for a new study on another subject or a message without a recognizable cut.
+ */
+export function studyRecutFilters(prompt: string) {
+  const normalized = normalizeSearchText(prompt);
+  if (/capitulo|\b(novo|outro) estudo\b/.test(normalized)) return null;
+  const { filters } = parseIntent(prompt);
+  if (filters.length === 0) return null;
+  const asksForCut =
+    /recort|refa[cz]|refazer|mesmo estudo|mesma analise|\bso (para|do|da|de|dos|das|no|na|com)\b|somente|apenas|filtr|aplique|aplicar|considerando|foca|foco|\bagora\b|\be (para|no|na|do|da|nos|nas)\b|segment|recorte/.test(
+      normalized,
+    );
+  return asksForCut || isStudyRequest(prompt) ? filters : null;
+}
+
 /** True when the user asks for a complete study rather than a single answer. */
 export function isStudyRequest(prompt: string) {
   const normalized = normalizeSearchText(prompt);
@@ -182,13 +199,25 @@ export function ranked(result: GovernedQueryResult, metricId: string, dimensionI
     .sort((left, right) => right.value - left.value);
 }
 
+/** Adds the cut of a refined study to a query (a filter on the same field is replaced). */
+export function withRequiredFilters(spec: AnalysisSpec, required?: FilterCondition[]) {
+  if (!required?.length) return spec;
+  const fields = new Set(required.map((filter) => filter.field));
+  return {
+    ...spec,
+    filters: [...spec.filters.filter((filter) => !fields.has(filter.field)), ...required],
+  };
+}
+
 /**
  * Runs one governed query exactly like the runAnalyticsQuery tool (mesh bases selected for the
  * spec, semantic validation, RBAC) and records it as evidence of the turn. Each call returns its
  * own result, so queries can run in parallel.
  */
 export async function run(toolContext: ToolContext, analysisSpec: AnalysisSpec) {
-  const governedSpec = withRequiredDatasets(analysisSpec);
+  const governedSpec = withRequiredDatasets(
+    withRequiredFilters(analysisSpec, toolContext.requiredFilters),
+  );
   assertSpecInScope(governedSpec, toolContext.datasets);
   const result = await executeGovernedQuery(
     toolContext.context,
@@ -702,6 +731,78 @@ export async function buildStudy(toolContext: ToolContext, prompt = ''): Promise
     skipped,
     queryCount: toolContext.queries.length,
     themes,
+    generatedBy: 'deterministic',
+  };
+}
+
+/** "segment = Agronegócio · company_size = Micro" in words people read. */
+export function describeCut(filters: FilterCondition[]) {
+  return filters
+    .map((filter) => ('value' in filter ? [filter.value].flat().join(', ') : filter.field))
+    .join(' · ');
+}
+
+/**
+ * Deterministic version of a follow-up cut: the chapters of the previous study run again with
+ * the new filters (applied by `run`), so the result is directly comparable with the original.
+ */
+export async function buildRefinedStudy(
+  toolContext: ToolContext,
+  base: {
+    title: string;
+    sections: Array<{ title: string; question: string; spec: AnalysisSpec }>;
+    filters: FilterCondition[];
+  },
+): Promise<Study> {
+  const skipped: string[] = [];
+  const cut = describeCut(base.filters);
+  const results = await Promise.all(
+    base.sections.map(async (section, index) => {
+      try {
+        const executed = await run(toolContext, section.spec);
+        const [dimension] = executed.result.columns.filter((column) => column.type === 'dimension');
+        const [metric] = executed.result.columns.filter((column) => column.role === 'value');
+        const rows = dimension && metric ? ranked(executed.result, metric.key, dimension.key) : [];
+        const findings =
+          rows.length > 1
+            ? [
+                `${dimension!.label} com maior ${metric!.label} (${cut}): ${rows[0]!.label} (${formatValue(rows[0]!.value, metric!.format)}); menor: ${rows.at(-1)!.label} (${formatValue(rows.at(-1)!.value, metric!.format)}).`,
+              ]
+            : executed.result.insights.slice(0, 2).map((insight) => insight.title);
+        return {
+          id: `recut-${index + 1}`,
+          title: `${section.title} — ${cut}`,
+          question: section.question,
+          visualization: executed.spec.visualization.type,
+          spec: executed.spec,
+          result: executed.result,
+          findings,
+        } satisfies StudySection;
+      } catch {
+        skipped.push(`${section.title} (o recorte ${cut} não se aplica a esta métrica)`);
+        return null;
+      }
+    }),
+  );
+  const sections = results.filter((section): section is StudySection => Boolean(section));
+  const metricIds = [
+    ...new Set(sections.map((section) => section.spec.metrics[0]?.id).filter(Boolean)),
+  ] as string[];
+  const kpis = await runKpis(
+    toolContext,
+    metricIds.slice(0, 6).map((id) => [id]),
+    skipped,
+  );
+  return {
+    title: `${base.title} — recorte: ${cut}`,
+    period: 'Últimos 365 dias',
+    summary: `Mesmo estudo anterior refeito só para ${cut}: ${sections.length} de ${base.sections.length} capítulos se aplicam ao recorte.`,
+    kpis,
+    sections,
+    recommendations: [],
+    skipped,
+    queryCount: toolContext.queries.length,
+    themes: [],
     generatedBy: 'deterministic',
   };
 }

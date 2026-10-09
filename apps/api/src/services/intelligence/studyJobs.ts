@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { AnalysisSpec, FilterCondition } from '@bfp/domain';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { AuthenticatedUser } from '@api/auth/types';
 import type { ApiContext } from '@api/http/context';
@@ -13,7 +14,7 @@ import {
   createBedrockClient,
   type BedrockConverseClient,
 } from '@api/services/intelligence/bedrockProvider';
-import { buildStudy, type Study } from '@api/services/intelligence/study';
+import { buildRefinedStudy, buildStudy, type Study } from '@api/services/intelligence/study';
 import type { ToolContext } from '@api/services/intelligence/tools';
 import type { ConversationTurn, StoredConversation } from '@api/services/intelligence/types';
 import { describeQueryForMemory } from '@api/services/intelligence/memory';
@@ -32,8 +33,22 @@ export interface StudyJob {
   datasets?: MeshDatasetId[];
   /** Conversation that asked for the study: the result is added to its memory. */
   conversationId?: string;
+  /**
+   * Study this one refines (same chapters and queries with a new cut, e.g. segment =
+   * Agronegócio). Only the structure is kept, not the previous results.
+   */
+  baseStudy?: BaseStudy;
   study?: Study;
   error?: string;
+}
+
+/** Structure of a previous study reused by a follow-up cut. */
+export interface BaseStudy {
+  prompt: string;
+  title: string;
+  sections: Array<{ title: string; question: string; spec: AnalysisSpec }>;
+  /** Filters of the new cut, applied to every chapter. */
+  filters: FilterCondition[];
 }
 
 /** Event that makes the API Lambda run a study job instead of an HTTP request. */
@@ -98,6 +113,8 @@ export async function runStudyJob(
     auth: job.auth,
     queries: [],
     datasets: job.datasets?.length ? job.datasets : undefined,
+    requiredFilters: job.baseStudy?.filters,
+    refines: job.baseStudy,
   };
 
   try {
@@ -153,7 +170,12 @@ export async function runStudyJob(
 
     if (!study) {
       await progress('Montando o estudo com o motor determinístico');
-      study = { ...(await buildStudy(toolContext, job.prompt)), notice };
+      study = {
+        ...(job.baseStudy
+          ? await buildRefinedStudy(toolContext, job.baseStudy)
+          : await buildStudy(toolContext, job.prompt)),
+        notice,
+      };
     }
 
     await save(context, { ...job, status: 'done', progress: 'Estudo pronto', study });
@@ -217,10 +239,45 @@ async function rememberStudy(context: ApiContext, job: StudyJob, study: Study) {
     id: job.conversationId,
     value: {
       ...stored.value,
+      lastStudyJobId: job.id,
       turns: [...stored.value.turns, studyTurn].slice(-30),
       updatedAt: now,
     },
   });
+}
+
+export interface StudyJobOptions {
+  datasets?: MeshDatasetId[];
+  conversationId?: string;
+  /** Previous study to refine, with the bases it used. */
+  baseStudy?: { study: BaseStudy; datasets?: MeshDatasetId[] };
+}
+
+/**
+ * Structure of a delivered study job, ready to be refined with a new cut. Null when the job is
+ * missing, not finished or belongs to someone else.
+ */
+export async function baseStudyFrom(
+  context: ApiContext,
+  userId: string,
+  studyJobId: string,
+  filters: FilterCondition[],
+) {
+  const job = await getStudyJob(context, userId, studyJobId);
+  if (!job?.study || job.status !== 'done') return null;
+  return {
+    datasets: job.datasets,
+    study: {
+      prompt: job.prompt,
+      title: job.study.title,
+      sections: job.study.sections.map((section) => ({
+        title: section.title,
+        question: section.question,
+        spec: section.spec,
+      })),
+      filters,
+    } satisfies BaseStudy,
+  };
 }
 
 /** Persists a new study job in the running state. */
@@ -228,8 +285,7 @@ export async function createStudyJob(
   context: ApiContext,
   auth: AuthenticatedUser,
   prompt: string,
-  datasets?: MeshDatasetId[],
-  conversationId?: string,
+  options: StudyJobOptions = {},
 ) {
   const now = context.clock().toISOString();
   const job: StudyJob = {
@@ -240,8 +296,9 @@ export async function createStudyJob(
     createdAt: now,
     updatedAt: now,
     auth,
-    datasets,
-    conversationId,
+    datasets: options.datasets ?? options.baseStudy?.datasets,
+    conversationId: options.conversationId,
+    baseStudy: options.baseStudy?.study,
   };
   await save(context, job);
   return job;
@@ -255,10 +312,9 @@ export async function startStudyJob(
   context: ApiContext,
   auth: AuthenticatedUser,
   prompt: string,
-  datasets?: MeshDatasetId[],
-  conversationId?: string,
+  options: StudyJobOptions = {},
 ) {
-  const job = await createStudyJob(context, auth, prompt, datasets, conversationId);
+  const job = await createStudyJob(context, auth, prompt, options);
 
   const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (functionName) {
