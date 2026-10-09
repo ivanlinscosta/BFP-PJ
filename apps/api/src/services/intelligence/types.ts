@@ -45,7 +45,7 @@ export interface StoredConversation {
 /** Response returned by POST /api/ai/chat. */
 export interface IntelligenceResponse extends ProviderResult {
   conversationId: string;
-  provider: 'local' | 'bedrock';
+  provider: 'local' | 'bedrock' | 'openai';
   model: string;
   explainability: {
     tools: string[];

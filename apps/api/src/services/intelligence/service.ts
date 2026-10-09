@@ -14,6 +14,13 @@ import {
 } from '@api/services/intelligence/bedrockProvider';
 import { buildSuggestions } from '@api/services/intelligence/compose';
 import { runLocalProvider } from '@api/services/intelligence/localProvider';
+import {
+  createOpenAIClient,
+  OpenAIKeyMissingError,
+  resolveOpenAIKey,
+  runOpenAIProvider,
+  type OpenAIChatClient,
+} from '@api/services/intelligence/openaiProvider';
 import type { ToolContext } from '@api/services/intelligence/tools';
 import type {
   IntelligenceResponse,
@@ -33,6 +40,7 @@ export interface IntelligenceRequest {
 
 export interface IntelligenceDependencies {
   bedrockClient?: BedrockConverseClient;
+  openaiClient?: OpenAIChatClient;
 }
 
 async function loadConversation(
@@ -62,8 +70,16 @@ export async function runIntelligence(
   const conversation = await loadConversation(context, auth, request.conversationId);
   const conversationId = conversation?.id ?? request.conversationId ?? randomUUID();
   const toolContext: ToolContext = { context, auth, correlationId, queries: [] };
-  let provider: 'bedrock' | 'local' = context.config.aiProvider === 'bedrock' ? 'bedrock' : 'local';
-  let model = provider === 'bedrock' ? context.config.bedrockModelId : 'deterministic-insights';
+  let provider: 'bedrock' | 'openai' | 'local' =
+    context.config.aiProvider === 'bedrock' || context.config.aiProvider === 'openai'
+      ? context.config.aiProvider
+      : 'local';
+  let model =
+    provider === 'bedrock'
+      ? context.config.bedrockModelId
+      : provider === 'openai'
+        ? context.config.openai.model
+        : 'deterministic-insights';
   const refusal = detectGuardrailRefusal(request.prompt);
   let customerTools: string[] = [];
 
@@ -114,25 +130,45 @@ export async function runIntelligence(
     };
   } else {
     try {
+      const history = (conversation?.turns ?? []).map((turn) => ({
+        role: turn.role,
+        content: turn.content,
+      }));
+      const openaiKey =
+        provider === 'openai' && !dependencies.openaiClient
+          ? await resolveOpenAIKey(context.config)
+          : null;
+      if (provider === 'openai' && !dependencies.openaiClient && !openaiKey) {
+        throw new OpenAIKeyMissingError();
+      }
       result =
-        provider === 'bedrock'
-          ? await runBedrockProvider({
+        provider === 'openai'
+          ? await runOpenAIProvider({
               prompt: request.prompt,
               analysisSpec: request.analysisSpec,
-              history: (conversation?.turns ?? []).map((turn) => ({
-                role: turn.role,
-                content: turn.content,
-              })),
+              history,
               toolContext,
-              modelId: context.config.bedrockModelId,
-              client:
-                dependencies.bedrockClient ?? createBedrockClient(context.config.bedrockRegion),
+              model: context.config.openai.model,
+              client: dependencies.openaiClient ?? createOpenAIClient(openaiKey ?? ''),
             })
-          : await runLocalProvider({
-              prompt: request.prompt,
-              analysisSpec: request.analysisSpec,
-              toolContext,
-            });
+          : provider === 'bedrock'
+            ? await runBedrockProvider({
+                prompt: request.prompt,
+                analysisSpec: request.analysisSpec,
+                history: (conversation?.turns ?? []).map((turn) => ({
+                  role: turn.role,
+                  content: turn.content,
+                })),
+                toolContext,
+                modelId: context.config.bedrockModelId,
+                client:
+                  dependencies.bedrockClient ?? createBedrockClient(context.config.bedrockRegion),
+              })
+            : await runLocalProvider({
+                prompt: request.prompt,
+                analysisSpec: request.analysisSpec,
+                toolContext,
+              });
     } catch (error) {
       context.logger.error('ai_request_failed', {
         correlationId,
@@ -147,7 +183,7 @@ export async function runIntelligence(
       if (error instanceof ApiError && error.statusCode < 500) {
         throw error;
       }
-      if (provider !== 'bedrock') {
+      if (provider === 'local') {
         throw new ApiError(
           503,
           'ai_unavailable',
@@ -155,13 +191,13 @@ export async function runIntelligence(
         );
       }
 
-      // Bedrock unavailable (model access, quota, region): answer with the deterministic
+      // Generative provider unavailable (key, model access, quota): answer with the deterministic
       // provider over the same governed tools instead of leaving the user without a reply.
       context.logger.warn('ai_provider_fallback', {
         correlationId,
         userId: auth.userId,
         operation: 'AI_REQUEST',
-        from: 'bedrock',
+        from: provider,
         to: 'local',
       });
       toolContext.queries.splice(0);

@@ -21,6 +21,7 @@ export interface MeshDataset {
   grain: string;
   sourceSystem: string;
   joinKey: string;
+  dataProductId: string;
   location: { catalog: 'local' | 'glue'; database: string; table: string };
   columns: Array<{ name: string; type: string; description: string }>;
   tags: Record<string, string>;
@@ -87,3 +88,28 @@ export const SOURCE_LABELS = {
   atlan: { not_configured: 'Não configurado', ok: 'Conectado', error: 'Falha na conexão' },
   fullstory: { configured: 'Conectado', not_configured: 'Não configurado' },
 } as const;
+
+/** First rows of a base (catalog preview, up to 100 rows of governed columns). */
+export interface DatasetPreview {
+  dataset: string;
+  table: string;
+  columns: Array<{ name: string; type: string; description: string }>;
+  rows: Array<Record<string, string | number | boolean | null>>;
+  limit: number;
+  source: 'athena' | 'local';
+}
+
+export function useDatasetPreview(datasetId: string) {
+  return useQuery({
+    queryKey: ['mesh', 'preview', datasetId],
+    queryFn: async () =>
+      (
+        await apiRequest<{ preview: DatasetPreview }>(
+          `/mesh/datasets/${encodeURIComponent(datasetId)}/preview?limit=100`,
+        )
+      ).preview,
+    enabled: Boolean(datasetId),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}

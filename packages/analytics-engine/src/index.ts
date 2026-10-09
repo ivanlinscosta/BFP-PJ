@@ -2070,3 +2070,4 @@ export {
 } from './athena/compiler';
 
 export { planMeshExecution, type MeshExecutionPlan } from './mesh-plan';
+export { buildMeshRows, toFullStoryRow, type MeshRow } from './mesh-rows';

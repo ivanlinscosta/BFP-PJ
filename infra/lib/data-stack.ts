@@ -40,6 +40,7 @@ export class DataStack extends Stack {
   readonly objectsTable: dynamodb.Table;
   readonly dataKey: kms.Key;
   readonly atlanSecret: secretsmanager.Secret;
+  readonly openaiSecret: secretsmanager.Secret;
   readonly fullstorySecret: secretsmanager.Secret;
   readonly dataLoadedAtParameter: ssm.StringParameter;
   readonly domainTagValues: string[];
@@ -217,6 +218,16 @@ export class DataStack extends Stack {
     });
 
     // Integration credentials are filled by operators after deploy (never in the repository).
+    // OpenAI key for Inteligência PJ: created empty; the operator stores {"apiKey":"sk-..."}.
+    this.openaiSecret = new secretsmanager.Secret(this, 'OpenAISecret', {
+      secretName: `${config.prefix}/openai`,
+      description: 'OpenAI (Inteligência PJ): {"apiKey":"sk-..."}',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({}),
+        generateStringKey: 'placeholder',
+      },
+      removalPolicy,
+    });
     this.atlanSecret = new secretsmanager.Secret(this, 'AtlanSecret', {
       secretName: `${config.prefix}/atlan`,
       description:

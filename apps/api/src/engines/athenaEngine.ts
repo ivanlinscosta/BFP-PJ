@@ -148,6 +148,36 @@ export class AthenaAnalyticsQueryEngine {
     return result;
   }
 
+  /**
+   * Catalog preview: the first rows of a mesh table. Table and column names come from the governed
+   * mesh contract (never from the request), so the SQL is not built from user input.
+   */
+  async previewTable(dataset: MeshDatasetId, columns: readonly string[], limit: number) {
+    const select = columns.map((column) => `"${column.replace(/"/g, '')}"`).join(', ');
+    const started = await this.options.client.send(
+      new StartQueryExecutionCommand({
+        QueryString: `SELECT ${select} FROM ${this.resolveTable(dataset)} LIMIT ${Math.max(1, Math.min(100, Math.floor(limit)))}`,
+        QueryExecutionContext: { Database: `${this.options.meshDatabasePrefix}_customer360` },
+        WorkGroup: this.options.workgroup,
+        ResultConfiguration: this.options.outputLocation
+          ? { OutputLocation: this.options.outputLocation }
+          : undefined,
+      }),
+    );
+    const executionId = started.QueryExecutionId;
+    if (!executionId) {
+      throw new ApiError(502, 'athena_query_failed', 'O motor analítico não iniciou a consulta.');
+    }
+    await this.waitForCompletion(executionId);
+    const page = await this.options.client.send(
+      new GetQueryResultsCommand({ QueryExecutionId: executionId }),
+    );
+    const [, ...rows] = (page.ResultSet?.Rows ?? []).map((row) =>
+      (row.Data ?? []).map((cell) => cell.VarCharValue ?? ''),
+    );
+    return rows;
+  }
+
   /** Fully qualified mesh table for a data product. */
   resolveTable(dataset: MeshDatasetId) {
     const definition = MESH_DATASET_BY_ID.get(dataset);

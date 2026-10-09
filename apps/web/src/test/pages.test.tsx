@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { AdminPage } from '@/pages/admin-page';
 import { AudienceBuilderPage } from '@/pages/audience-builder-page';
+import { CatalogDatasetPage } from '@/pages/catalog-dataset-page';
 import { CatalogPage } from '@/pages/catalog-page';
 import { CustomerDetailPage } from '@/pages/customer-detail-page';
 import { DashboardEditorPage } from '@/pages/dashboard-editor-page';
@@ -629,6 +630,71 @@ describe('CustomerDetailPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Me explique este cliente' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/inteligencia'));
     expect(router.state.location.search).toContain('cliente=company-1');
+  });
+});
+
+describe('Catalog base preview', () => {
+  it('shows the first rows of a base and its columns', async () => {
+    signIn();
+    mockApi([
+      {
+        path: '/mesh/datasets',
+        respond: {
+          items: [
+            {
+              id: 'transactions',
+              name: 'Transações PJ',
+              description: 'Pix, boletos, TED e cartões.',
+              domain: 'products',
+              owner: 'Pagamentos PJ',
+              grain: '1 linha por transação',
+              sourceSystem: 'Pix · Boletos',
+              joinKey: 'company_id',
+              dataProductId: 'payments_transactions',
+              location: { catalog: 'glue', database: 'bfp_pj_dev_payments', table: 'transactions' },
+              columns: [
+                { name: 'transaction_id', type: 'string', description: 'Identificador' },
+                { name: 'amount', type: 'double', description: 'Valor (BRL)' },
+              ],
+              tags: {},
+              available: true,
+              metricIds: ['transaction_volume'],
+            },
+          ],
+          total: 1,
+          sources: { mesh: 'glue', datazone: 'disabled', atlan: 'not_configured' },
+        },
+      },
+      {
+        path: '/mesh/datasets/transactions/preview',
+        respond: {
+          preview: {
+            dataset: 'transactions',
+            table: 'bfp_pj_dev_payments.transactions',
+            columns: [
+              { name: 'transaction_id', type: 'string', description: 'Identificador' },
+              { name: 'amount', type: 'double', description: 'Valor (BRL)' },
+            ],
+            rows: [
+              { transaction_id: 'tx-1', amount: 1520.5 },
+              { transaction_id: 'tx-2', amount: 98 },
+            ],
+            limit: 100,
+            source: 'athena',
+          },
+        },
+      },
+    ]);
+    renderRoute(<CatalogDatasetPage />, {
+      path: '/catalogo/bases/:datasetId',
+      url: '/catalogo/bases/transactions',
+    });
+    expect(await screen.findByRole('heading', { name: 'Transações PJ' })).toBeInTheDocument();
+    expect(await screen.findByText('tx-1')).toBeInTheDocument();
+    expect(screen.getByText('1.520,5')).toBeInTheDocument();
+    expect(screen.getByText(/primeiras 2 linhas \(limite de 100\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /Colunas/ }));
+    expect(screen.getByText('Valor (BRL)')).toBeInTheDocument();
   });
 });
 

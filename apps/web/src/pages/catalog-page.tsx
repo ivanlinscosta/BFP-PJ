@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, ChartNoAxesColumn, Database, Layers } from 'lucide-react';
+import { ArrowRight, BookOpen, ChartNoAxesColumn, Database, Layers, Table2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Badge, CertificationBadge } from '@/components/ui/badge';
@@ -37,6 +37,13 @@ const TYPE_LABELS: Record<string, string> = {
   number: 'Número',
   boolean: 'Sim/Não',
 };
+
+/** "Diária" for 1440 minutes, otherwise hours or minutes. */
+function sloLabel(minutes: number) {
+  if (minutes % 1440 === 0) return minutes === 1440 ? 'Diária' : `A cada ${minutes / 1440} dias`;
+  if (minutes >= 60) return `A cada ${Math.round(minutes / 60)} h`;
+  return `A cada ${minutes} min`;
+}
 
 function GridSkeleton() {
   return (
@@ -85,6 +92,15 @@ export function CatalogPage() {
     queryFn: ({ signal }) => fetchGlossary(q, signal),
     ...common,
   });
+  // Metric names for the product cards (independent of the current search).
+  const allMetrics = useQuery({
+    queryKey: ['catalog', 'metrics', ''],
+    queryFn: ({ signal }) => fetchMetrics('', signal),
+    staleTime: 5 * 60_000,
+  });
+  const metricNameById = new Map(
+    (allMetrics.data ?? []).map((metric) => [metric.id, metric.shortName]),
+  );
   const active = { datasets: mesh, metrics, dimensions, products, glossary }[tab];
   const meshItems = (mesh.data?.items ?? []).filter((dataset) =>
     normalizeText(
@@ -185,6 +201,13 @@ export function CatalogPage() {
                       </dd>
                     </div>
                   </dl>
+                  <Link
+                    className="mt-4 inline-flex h-8 w-fit items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-navy px-3 text-[13px] font-semibold text-white hover:opacity-90"
+                    to={`/catalogo/bases/${dataset.id}`}
+                  >
+                    <Table2 aria-hidden className="h-4 w-4" />
+                    Ver dados da base
+                  </Link>
                   <p className="mt-3 text-xs text-ink-soft">
                     {dataset.columns.length} colunas · {dataset.metricIds.length} métricas
                     governadas
@@ -275,23 +298,83 @@ export function CatalogPage() {
             />
           ) : (
             <ul className="m-0 grid list-none gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
-              {(products.data ?? []).map((product) => (
-                <li key={product.id}>
-                  <Card className="h-full px-5 py-5">
-                    <p className="text-[11px] tracking-wide text-ink-soft uppercase">
-                      {product.goldDataset}
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold text-brand-navy">{product.name}</h2>
-                    <p className="mt-1.5 text-sm text-ink-soft">{product.description}</p>
-                    <p className="mt-4 text-[13px] text-ink">
-                      Owner: <span className="font-semibold">{product.owner}</span>
-                    </p>
-                    <p className="mt-1 text-[13px] text-ink-soft">
-                      Fontes: {product.businessSources.join(', ')}
-                    </p>
-                  </Card>
-                </li>
-              ))}
+              {(products.data ?? []).map((product) => {
+                const bases = (mesh.data?.items ?? []).filter(
+                  (dataset) => dataset.dataProductId === product.id,
+                );
+                const metricNames = product.metricIds.map((id) => metricNameById.get(id) ?? id);
+                return (
+                  <li key={product.id}>
+                    <Card className="flex h-full flex-col gap-3 px-5 py-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone="neutral">
+                          {DOMAIN_LABELS[product.domain] ?? product.domain}
+                        </Badge>
+                        <Badge tone="tint">Produto de dados</Badge>
+                      </div>
+                      <div>
+                        <h2 className="m-0 text-lg font-semibold text-brand-navy">
+                          {product.name}
+                        </h2>
+                        <p className="m-0 mt-1 text-sm text-ink-soft">{product.description}</p>
+                      </div>
+                      <dl className="m-0 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <dt className="text-ink-faint">Dono do produto</dt>
+                          <dd className="m-0 font-semibold text-ink">{product.owner}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-faint">Atualização (SLO)</dt>
+                          <dd className="m-0 font-semibold text-ink">
+                            {sloLabel(product.freshnessSLOMinutes)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-faint">Qualidade mínima</dt>
+                          <dd className="m-0 font-semibold text-ink">
+                            {Math.round(product.qualityThreshold * 100)}%
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-faint">Camada gold</dt>
+                          <dd className="m-0 font-semibold text-ink">{product.goldDataset}</dd>
+                        </div>
+                      </dl>
+                      <div>
+                        <p className="m-0 text-xs text-ink-faint">
+                          Métricas certificadas · {product.metricIds.length}
+                        </p>
+                        <p className="m-0 mt-1 text-[13px] text-ink">
+                          {metricNames.slice(0, 6).join(', ')}
+                          {metricNames.length > 6 ? ` e mais ${metricNames.length - 6}` : ''}
+                        </p>
+                      </div>
+                      <p className="m-0 text-xs text-ink-soft">
+                        Fontes de negócio: {product.businessSources.join(', ')}
+                      </p>
+                      <div className="mt-auto flex flex-wrap gap-2 border-t border-line pt-3">
+                        <span className="text-xs text-ink-faint">Bases físicas:</span>
+                        {bases.length === 0 ? (
+                          <span className="text-xs text-ink-soft">
+                            sem tabela própria (métricas calculadas sobre outras bases)
+                          </span>
+                        ) : (
+                          bases.map((dataset) => (
+                            <Link
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-brand-navy hover:underline"
+                              key={dataset.id}
+                              to={`/catalogo/bases/${dataset.id}`}
+                            >
+                              <Database aria-hidden className="h-3.5 w-3.5" />
+                              {dataset.location.table}
+                            </Link>
+                          ))
+                        )}
+                      </div>
+                    </Card>
+                  </li>
+                );
+              })}
             </ul>
           )
         ) : (glossary.data ?? []).length === 0 ? (

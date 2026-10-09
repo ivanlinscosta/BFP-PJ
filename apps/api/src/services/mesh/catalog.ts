@@ -20,6 +20,8 @@ export interface MeshDatasetView {
   grain: string;
   sourceSystem: string;
   joinKey: string;
+  /** Business data product (catalog) the table belongs to. */
+  dataProductId: string;
   location: { catalog: 'local' | 'glue'; database: string; table: string };
   columns: Array<{ name: string; type: string; description: string }>;
   tags: Record<string, string>;
@@ -49,6 +51,7 @@ function localView(dataset: MeshDatasetDefinition, prefix: string): MeshDatasetV
     grain: dataset.grain,
     sourceSystem: dataset.sourceSystem,
     joinKey: 'company_id',
+    dataProductId: dataset.dataProductId,
     location: {
       catalog: 'local',
       database: `${prefix}_${dataset.glueDatabase}`,

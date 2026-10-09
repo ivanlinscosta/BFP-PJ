@@ -47,7 +47,7 @@ export async function getStudyJob(id: string) {
 
 export interface IntelligenceReply {
   conversationId: string;
-  provider: 'local' | 'bedrock';
+  provider: 'local' | 'bedrock' | 'openai';
   model: string;
   action: 'UPDATE_ANALYSIS' | 'ANSWER_QUESTION' | 'NONE';
   operations: AnalysisOperation[];

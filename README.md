@@ -441,22 +441,23 @@ Ambientes independentes: `bfp-pj-dev`, `bfp-pj-homol`, `bfp-pj-prod`. Pipelines 
 
 ## Variáveis de ambiente (API)
 
-| Variável                                                  | Uso                                                                       |
-| --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `AUTH_MODE`                                               | `dev` (JWT local HS256) ou `cognito`                                      |
-| `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`               | Cognito (modo `cognito`)                                                  |
-| `DATASET_TABLE`, `OBJECTS_TABLE`                          | DynamoDB; vazio = repositórios em memória                                 |
-| `ANALYTICS_ENGINE`                                        | `memory` · `dynamodb` · `athena`                                          |
-| `ATHENA_DATABASE`, `ATHENA_WORKGROUP`                     | prefixo dos bancos do mesh e workgroup do Athena                          |
-| `MESH_CATALOG`, `MESH_DATABASE_PREFIX`                    | catálogo do data mesh (`local` ou `glue`) e prefixo `bfp_pj_<env>`        |
-| `DATAZONE_DOMAIN_ID`                                      | opcional: vincula listings do Amazon DataZone                             |
-| `ATLAN_SECRET_ID` (ou `ATLAN_BASE_URL`/`ATLAN_API_TOKEN`) | Atlan, catálogo oficial                                                   |
-| `FULLSTORY_SECRET_ID` (ou `FULLSTORY_API_KEY`)            | FullStory, jornada digital                                                |
-| `DATA_LOADED_AT_PARAMETER`                                | parâmetro SSM com o horário da última carga (freshness)                   |
-| `AI_PROVIDER`, `BEDROCK_MODEL_ID`                         | `local` (padrão) ou `bedrock`; o model id vem de env/SSM, nunca do código |
-| `DATA_PATH`, `DATA_LOADED_AT`                             | dataset local e horário de carga exibido como freshness                   |
-| `SEED_DEMO_WORKSPACE`                                     | carrega o workspace de demonstração no modo em memória                    |
-| `INTELLIGENCE_RAW_BUCKET`                                 | bucket com o comportamento bruto lido pela Lambda de rebuild diário       |
+| Variável                                                       | Uso                                                                                                                      |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `AUTH_MODE`                                                    | `dev` (JWT local HS256) ou `cognito`                                                                                     |
+| `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`                    | Cognito (modo `cognito`)                                                                                                 |
+| `DATASET_TABLE`, `OBJECTS_TABLE`                               | DynamoDB; vazio = repositórios em memória                                                                                |
+| `ANALYTICS_ENGINE`                                             | `memory` · `dynamodb` · `athena`                                                                                         |
+| `ATHENA_DATABASE`, `ATHENA_WORKGROUP`                          | prefixo dos bancos do mesh e workgroup do Athena                                                                         |
+| `MESH_CATALOG`, `MESH_DATABASE_PREFIX`                         | catálogo do data mesh (`local` ou `glue`) e prefixo `bfp_pj_<env>`                                                       |
+| `DATAZONE_DOMAIN_ID`                                           | opcional: vincula listings do Amazon DataZone                                                                            |
+| `ATLAN_SECRET_ID` (ou `ATLAN_BASE_URL`/`ATLAN_API_TOKEN`)      | Atlan, catálogo oficial                                                                                                  |
+| `FULLSTORY_SECRET_ID` (ou `FULLSTORY_API_KEY`)                 | FullStory, jornada digital                                                                                               |
+| `DATA_LOADED_AT_PARAMETER`                                     | parâmetro SSM com o horário da última carga (freshness)                                                                  |
+| `AI_PROVIDER`, `BEDROCK_MODEL_ID`                              | `local` (padrão) ou `bedrock`; o model id vem de env/SSM, nunca do código                                                |
+| `DATA_PATH`, `DATA_LOADED_AT`                                  | dataset local e horário de carga exibido como freshness                                                                  |
+| `SEED_DEMO_WORKSPACE`                                          | carrega o workspace de demonstração no modo em memória                                                                   |
+| `INTELLIGENCE_RAW_BUCKET`                                      | bucket com o comportamento bruto lido pela Lambda de rebuild diário                                                      |
+| `OPENAI_SECRET_ID` (ou `OPENAI_API_KEY` local), `OPENAI_MODEL` | Inteligência PJ com OpenAI (`AI_PROVIDER=openai`); a chave fica no segredo `bfp-pj-<env>/openai` como `{"apiKey":"..."}` |
 
 ---
 

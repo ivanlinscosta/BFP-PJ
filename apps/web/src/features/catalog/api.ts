@@ -71,7 +71,9 @@ export interface CatalogDataProduct {
   goldDataset: string;
   businessSources: string[];
   freshnessSLOMinutes: number;
+  qualityThreshold: number;
   metricIds: string[];
+  dimensionIds: string[];
 }
 
 export interface MetricDetail {

@@ -32,7 +32,7 @@ const MAX_ITERATIONS = 6;
 type JsonDocument =
   null | boolean | number | string | JsonDocument[] | { [key: string]: JsonDocument };
 
-function toDocument(value: unknown): JsonDocument {
+export function toDocument(value: unknown): JsonDocument {
   return JSON.parse(JSON.stringify(value ?? null)) as JsonDocument;
 }
 const TIMEOUT_MS = 30_000;
@@ -52,7 +52,7 @@ export interface BedrockConverseClient {
   }>;
 }
 
-function systemPrompt(spec: AnalysisSpec | undefined) {
+export function systemPrompt(spec: AnalysisSpec | undefined) {
   return [
     'Você é a Inteligência PJ, interface conversacional do mesmo AnalysisSpec do playground analítico.',
     'Responda sempre em português do Brasil, de forma curta e executiva.',
@@ -79,7 +79,7 @@ function toBedrockTools(): Tool[] {
   }));
 }
 
-function extractJson(text: string) {
+export function extractJson(text: string) {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) {
@@ -120,7 +120,7 @@ function sanitizeOperations(spec: AnalysisSpec, operations: AnalysisOperation[])
   };
 }
 
-async function withTimeout<T>(promise: Promise<T>) {
+export async function withTimeout<T>(promise: Promise<T>) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -138,6 +138,67 @@ async function withTimeout<T>(promise: Promise<T>) {
       clearTimeout(timer);
     }
   }
+}
+
+/**
+ * Turns the model's final JSON into a ProviderResult (shared by Bedrock and OpenAI). Operations
+ * are validated against the semantic layer and an answer with numbers is only accepted when a
+ * governed query ran in the turn. Returns null when nothing usable came back.
+ */
+export function finalizeModelAnswer(
+  text: string,
+  input: { analysisSpec?: AnalysisSpec; toolContext: ToolContext },
+): ProviderResult | null {
+  const parsed = extractJson(text);
+  if (!parsed?.success) {
+    return null;
+  }
+
+  const context = input.analysisSpec ?? {
+    metrics: [],
+    dimensions: [],
+    filters: [],
+    visualization: { type: 'AUTO' as const },
+  };
+  const { accepted, spec } = sanitizeOperations(context, parsed.data.operations);
+  const lastQuery = input.toolContext.queries[input.toolContext.queries.length - 1];
+  const hasNumbers = /\d/.test(parsed.data.answer);
+  const groundedAnswer =
+    hasNumbers && !lastQuery
+      ? ''
+      : parsed.data.answer || (lastQuery ? composeAnswer(lastQuery.result) : '');
+
+  if (parsed.data.action === 'UPDATE_ANALYSIS' && accepted.length > 0) {
+    return {
+      action: 'UPDATE_ANALYSIS',
+      operations: accepted,
+      analysisSpec: spec,
+      message: describeOperations(accepted),
+      answer: groundedAnswer,
+      basis: describeBasis(spec),
+      evidence: lastQuery?.result.insights,
+      suggestions: parsed.data.suggestions.length
+        ? parsed.data.suggestions
+        : buildSuggestions(spec, lastQuery?.result),
+    };
+  }
+
+  if (groundedAnswer) {
+    const usedSpec = lastQuery?.spec ?? input.analysisSpec;
+    return {
+      action: lastQuery ? 'ANSWER_QUESTION' : 'NONE',
+      operations: [],
+      analysisSpec: usedSpec,
+      message: groundedAnswer,
+      answer: groundedAnswer,
+      basis: usedSpec && usedSpec.metrics.length > 0 ? describeBasis(usedSpec) : undefined,
+      evidence: lastQuery?.result.insights,
+      suggestions: parsed.data.suggestions.length
+        ? parsed.data.suggestions
+        : buildSuggestions(usedSpec ?? context, lastQuery?.result),
+    };
+  }
+  return null;
 }
 
 /**
@@ -186,55 +247,8 @@ export async function runBedrockProvider(input: {
       const text = (message.content ?? [])
         .map((block) => ('text' in block ? block.text : ''))
         .join('\n');
-      const parsed = extractJson(text);
-      if (!parsed?.success) {
-        break;
-      }
-
-      const context = input.analysisSpec ?? {
-        metrics: [],
-        dimensions: [],
-        filters: [],
-        visualization: { type: 'AUTO' as const },
-      };
-      const { accepted, spec } = sanitizeOperations(context, parsed.data.operations);
-      const lastQuery = input.toolContext.queries[input.toolContext.queries.length - 1];
-      const hasNumbers = /\d/.test(parsed.data.answer);
-      const groundedAnswer =
-        hasNumbers && !lastQuery
-          ? ''
-          : parsed.data.answer || (lastQuery ? composeAnswer(lastQuery.result) : '');
-
-      if (parsed.data.action === 'UPDATE_ANALYSIS' && accepted.length > 0) {
-        return {
-          action: 'UPDATE_ANALYSIS',
-          operations: accepted,
-          analysisSpec: spec,
-          message: describeOperations(accepted),
-          answer: groundedAnswer,
-          basis: describeBasis(spec),
-          evidence: lastQuery?.result.insights,
-          suggestions: parsed.data.suggestions.length
-            ? parsed.data.suggestions
-            : buildSuggestions(spec, lastQuery?.result),
-        };
-      }
-
-      if (groundedAnswer) {
-        const usedSpec = lastQuery?.spec ?? input.analysisSpec;
-        return {
-          action: lastQuery ? 'ANSWER_QUESTION' : 'NONE',
-          operations: [],
-          analysisSpec: usedSpec,
-          message: groundedAnswer,
-          answer: groundedAnswer,
-          basis: usedSpec && usedSpec.metrics.length > 0 ? describeBasis(usedSpec) : undefined,
-          evidence: lastQuery?.result.insights,
-          suggestions: parsed.data.suggestions.length
-            ? parsed.data.suggestions
-            : buildSuggestions(usedSpec ?? context, lastQuery?.result),
-        };
-      }
+      const final = finalizeModelAnswer(text, input);
+      if (final) return final;
       break;
     }
 

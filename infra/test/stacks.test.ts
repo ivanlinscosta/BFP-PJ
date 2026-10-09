@@ -44,6 +44,7 @@ function synthesize(envName = 'dev') {
     modelParameterName: ai.modelParameterName,
     dataLoadedAtParameter: data.dataLoadedAtParameter,
     atlanSecret: data.atlanSecret,
+    openaiSecret: data.openaiSecret,
     fullstorySecret: data.fullstorySecret,
     lambdaCodePath: fakeBundle('index.js'),
   });
@@ -88,7 +89,7 @@ describe('CDK stacks', () => {
       TagValues: Match.arrayWith(['customer360', 'media', 'digital']),
     });
     templates.data.resourceCountIs('AWS::LakeFormation::TagAssociation', 10);
-    templates.data.resourceCountIs('AWS::SecretsManager::Secret', 2);
+    templates.data.resourceCountIs('AWS::SecretsManager::Secret', 3);
     templates.data.hasResourceProperties('AWS::Athena::WorkGroup', {
       Name: 'bfp-pj-dev-etl',
       WorkGroupConfiguration: Match.objectLike({ EnforceWorkGroupConfiguration: false }),
@@ -193,6 +194,18 @@ describe('CDK stacks', () => {
       Targets: Match.arrayWith([
         Match.objectLike({ Input: JSON.stringify({ bfpTask: 'intelligenceRebuild' }) }),
       ]),
+    });
+  });
+
+  it('configures Inteligência PJ with OpenAI and the key in Secrets Manager', () => {
+    templates.data.hasResourceProperties('AWS::SecretsManager::Secret', {
+      Name: 'bfp-pj-dev/openai',
+    });
+    templates.api.hasResourceProperties('AWS::Lambda::Function', {
+      Handler: 'index.handler',
+      Environment: {
+        Variables: Match.objectLike({ AI_PROVIDER: 'openai', OPENAI_SECRET_ID: Match.anyValue() }),
+      },
     });
   });
 

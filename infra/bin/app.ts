@@ -47,6 +47,7 @@ const api = new ApiStack(app, `${config.prefix}-api`, {
   modelParameterName: ai.modelParameterName,
   dataLoadedAtParameter: data.dataLoadedAtParameter,
   atlanSecret: data.atlanSecret,
+  openaiSecret: data.openaiSecret,
   fullstorySecret: data.fullstorySecret,
   datazoneDomainId: String(app.node.tryGetContext('datazoneDomainId') ?? '') || undefined,
 });

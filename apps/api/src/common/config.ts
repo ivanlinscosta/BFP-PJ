@@ -20,7 +20,10 @@ const envSchema = z.object({
   ATHENA_WORKGROUP: z.string().default('primary'),
   ATHENA_DATABASE: z.string().default('bfp_pj_dev'),
   ATHENA_OUTPUT_LOCATION: z.string().optional(),
-  AI_PROVIDER: z.enum(['local', 'bedrock', 'anthropic']).optional(),
+  AI_PROVIDER: z.enum(['local', 'bedrock', 'anthropic', 'openai']).optional(),
+  OPENAI_SECRET_ID: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default('gpt-4.1-mini'),
   MESH_CATALOG: z.enum(['local', 'glue']).optional(),
   MESH_DATABASE_PREFIX: z.string().optional(),
   DATAZONE_DOMAIN_ID: z.string().optional(),
@@ -46,7 +49,7 @@ export type AuthMode = 'dev' | 'cognito';
 export type AnalyticsEngineKind = 'memory' | 'dynamodb' | 'athena';
 
 /** Provider that narrates governed answers in Inteligência PJ. */
-export type AiProviderKind = 'local' | 'bedrock' | 'anthropic';
+export type AiProviderKind = 'local' | 'bedrock' | 'anthropic' | 'openai';
 
 export interface AppConfig {
   nodeEnv: string;
@@ -69,6 +72,8 @@ export interface AppConfig {
     database: string;
     outputLocation?: string;
   };
+  /** OpenAI: key from env (local) or Secrets Manager (cloud); never in code or frontend. */
+  openai: { secretId?: string; apiKey?: string; model: string };
   aiProvider: AiProviderKind;
   mesh: {
     catalog: 'local' | 'glue';
@@ -152,6 +157,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       workgroup: parsed.ATHENA_WORKGROUP,
       database: parsed.ATHENA_DATABASE,
       outputLocation: parsed.ATHENA_OUTPUT_LOCATION,
+    },
+    openai: {
+      secretId: parsed.OPENAI_SECRET_ID?.trim() || undefined,
+      apiKey: parsed.OPENAI_API_KEY?.trim() || undefined,
+      model: parsed.OPENAI_MODEL,
     },
     aiProvider:
       parsed.AI_PROVIDER ??

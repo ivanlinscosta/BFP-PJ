@@ -36,6 +36,8 @@ export interface ApiStackProps extends StackProps {
   modelParameterName: string;
   dataLoadedAtParameter: ssm.StringParameter;
   atlanSecret: secretsmanager.Secret;
+  /** OpenAI key for Inteligência PJ (AI_PROVIDER=openai). */
+  openaiSecret: secretsmanager.Secret;
   fullstorySecret: secretsmanager.Secret;
   /** Optional Amazon DataZone domain whose listings are linked to the mesh tables. */
   datazoneDomainId?: string;
@@ -75,6 +77,9 @@ export class ApiStack extends Stack {
       MESH_DATABASE_PREFIX: props.meshDatabasePrefix,
       DATA_LOADED_AT_PARAMETER: props.dataLoadedAtParameter.parameterName,
       ATLAN_SECRET_ID: props.atlanSecret.secretName,
+      AI_PROVIDER: 'openai',
+      OPENAI_SECRET_ID: props.openaiSecret.secretName,
+      OPENAI_MODEL: 'gpt-4.1-mini',
       FULLSTORY_SECRET_ID: props.fullstorySecret.secretName,
       ...(props.datazoneDomainId ? { DATAZONE_DOMAIN_ID: props.datazoneDomainId } : {}),
       BEDROCK_MODEL_ID: ssm.StringParameter.valueForStringParameter(this, props.modelParameterName),
@@ -153,6 +158,7 @@ export class ApiStack extends Stack {
       }),
     );
     props.atlanSecret.grantRead(this.handler);
+    props.openaiSecret.grantRead(this.handler);
     props.fullstorySecret.grantRead(this.handler);
     props.dataLoadedAtParameter.grantRead(this.handler);
 

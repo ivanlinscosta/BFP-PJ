@@ -24,6 +24,7 @@ import {
 } from '@bfp/analytics-engine';
 import type { AudienceDefinition, AuditLogEntry, DatasetBundle } from '@bfp/domain';
 import { buildDemoWorkspace } from '@api/demo/workspace';
+import type { MeshDatasetId } from '@bfp/semantic-layer';
 import { AthenaAnalyticsQueryEngine } from '@api/engines/athenaEngine';
 import type { ValidatedAnalysisQuery } from '@bfp/semantic-layer';
 import { AuthService } from '@api/auth/authService';
@@ -46,6 +47,12 @@ const PROCESS_STARTED_AT = new Date().toISOString();
 
 export interface HttpAnalyticsEngine {
   execute(query: ValidatedAnalysisQuery): Promise<AnalyticsExecutionResult>;
+  /** First rows of a mesh table (catalog preview); only engines that read the lake have it. */
+  previewTable?(
+    dataset: MeshDatasetId,
+    columns: readonly string[],
+    limit: number,
+  ): Promise<string[][]>;
 }
 
 export interface ApiContext {
@@ -58,6 +65,8 @@ export interface ApiContext {
   getAnalyticsEngine(user: AuthenticatedUser): HttpAnalyticsEngine;
   /** When the analytical dataset was last loaded (drives freshness indicators). */
   getDataLoadedAt(): Promise<string>;
+  /** Local dataset bundle (memory mode only; the cloud reads the lake through Athena). */
+  getDatasetBundle(): DatasetBundle | undefined;
   /** Customer Intelligence read model (DNA, signals, NBA) materialized by the rebuild. */
   getCustomerIntelligenceRepository(): CustomerIntelligenceRepository;
   getRecommendationOutcomeRepository(): RecommendationOutcomeRepository;
@@ -290,6 +299,8 @@ export function createApiContext(options: ApiContextOptions = {}): ApiContext {
     getObjectRepository,
     getAnalyticsEngine,
     getDataLoadedAt,
+    getDatasetBundle: () =>
+      config.useDynamo ? undefined : loadDevDatasetBundle(config, options.datasetBundle),
     getCustomerIntelligenceRepository,
     getRecommendationOutcomeRepository,
   };

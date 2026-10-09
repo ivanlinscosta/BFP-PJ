@@ -346,7 +346,11 @@ export function IntelligencePage() {
                       Inteligência PJ
                       {reply ? (
                         <span className="font-normal text-ink-faint">
-                          {reply.provider === 'bedrock' ? 'Claude' : 'Motor analítico'}
+                          {reply.provider === 'bedrock'
+                            ? 'Claude'
+                            : reply.provider === 'openai'
+                              ? `OpenAI · ${reply.model}`
+                              : 'Motor analítico'}
                         </span>
                       ) : null}
                     </p>
