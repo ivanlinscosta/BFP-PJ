@@ -50,6 +50,7 @@ export const SIGNAL_LABELS: Record<string, string> = {
   PRODUCT_GAP_PIX_COLLECTION: 'Gap: Pix Cobrança',
   PRODUCT_GAP_CARD: 'Gap: Cartão PJ',
   ONBOARDING_INCOMPLETE: 'Onboarding incompleto',
+  ACCOUNT_OPENING_PENDING: 'Abertura de conta pendente',
   RECENT_COMPLAINT: 'Reclamação recente',
   UNRESOLVED_SERVICE: 'Atendimento sem resolução',
   RELATIONSHIP_COOLDOWN: 'Relacionamento esfriando',

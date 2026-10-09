@@ -12,7 +12,7 @@ import type {
   ServiceCase,
   TransactionAggregate,
 } from '@bfp/customer-intelligence';
-import type { Company, DatasetBundle } from '@bfp/domain';
+import type { CRMInteraction, Company, DatasetBundle } from '@bfp/domain';
 import { DATASET_SEED } from '../constants';
 import { createKeyedRandom } from '../prng';
 
@@ -34,7 +34,7 @@ export const PERSONAS = [
   'LOW_ENGAGEMENT',
   'MATURE_MULTIPRODUCT',
 ] as const;
-export type Persona = (typeof PERSONAS)[number] | 'ATLAS';
+export type Persona = (typeof PERSONAS)[number] | 'ATLAS' | 'PROSPECT';
 
 const MANAGER_NAMES = [
   'Mariana Souza',
@@ -273,6 +273,8 @@ function behaviorOf(persona: Persona, rand: Rand): PersonaBehavior {
         crmPer90: between(rand, 3, 5),
       };
     case 'ATLAS':
+    case 'PROSPECT':
+      // Scripted separately (atlasRaw / prospectRaw).
       return {
         growth: 0,
         pixShare: 0.45,
@@ -1024,6 +1026,119 @@ function atlasRaw(company: Company): CustomerRawData {
   };
 }
 
+const CRM_CHANNELS: Record<CRMInteraction['interactionType'], InteractionChannel> = {
+  CALL: 'PHONE',
+  EMAIL: 'EMAIL',
+  WHATSAPP: 'WHATSAPP',
+  MEETING: 'BRANCH',
+  TASK: 'PHONE',
+};
+
+const CRM_RESULTS: Record<CRMInteraction['outcome'], string> = {
+  CONNECTED: 'Contato realizado',
+  NO_ANSWER: 'Sem resposta',
+  FOLLOW_UP: 'Retorno agendado',
+  RESOLVED: 'Concluído',
+  OPEN: 'Em aberto',
+};
+
+const PROSPECT_TOPICS: ContentTopic[] = ['PIX_COBRANCA', 'MAQUININHA', 'CARTOES', 'BOLETO'];
+
+/**
+ * Leads and accounts in opening (no account yet): site visits around the lead, the opening
+ * journey when it started, recent interest when the lead is fresh and the CRM history of the
+ * dataset. No products or transactions — the profile shows where the company is in the journey.
+ */
+function prospectRaw(
+  company: Company,
+  crm: CRMInteraction[],
+  touchpoints: DatasetBundle['mediaTouchpoints'],
+  manager: string | null,
+  rand: Rand,
+): CustomerRawData {
+  const asOf = new Date(INTELLIGENCE_AS_OF).getTime();
+  const daysAgo = (value: string) =>
+    Math.max(0, Math.floor((asOf - new Date(value).getTime()) / DAY_MS));
+  const sessions: DigitalSession[] = [];
+  const events: DigitalEvent[] = [];
+  const visit = (ago: number, source: string, topic?: ContentTopic) => {
+    const timestamp = stamp(rand, ago);
+    sessions.push({
+      customerId: company.id,
+      timestamp,
+      channel: 'WEB',
+      device: rand() < 0.6 ? 'DESKTOP' : 'ANDROID',
+      durationSeconds: int(rand, 60, 600),
+      pages: int(rand, 2, 9),
+      featuresUsed: [],
+      source,
+    });
+    events.push({ customerId: company.id, timestamp, kind: 'PAGE_VIEW', channel: 'WEB', topic });
+  };
+  const leadAgo = daysAgo(company.leadCreatedAt);
+  for (let index = 0; index < int(rand, 1, 3); index += 1)
+    visit(Math.min(DIGITAL_DAYS, leadAgo + int(rand, 0, 2)), 'Site Itaú Empresas');
+  if (company.accountOpeningStartedAt) {
+    const openingAgo = daysAgo(company.accountOpeningStartedAt);
+    visit(openingAgo, 'Abertura de conta digital');
+    if (openingAgo > 1 && rand() < 0.6)
+      visit(int(rand, 0, Math.min(openingAgo, 20)), 'Abertura de conta digital');
+  }
+  // Fresh leads keep researching products while they decide.
+  if (leadAgo <= 45) {
+    for (let index = 0; index < int(rand, 0, 4); index += 1)
+      visit(int(rand, 0, Math.min(leadAgo, 29)), 'Site Itaú Empresas', pick(rand, PROSPECT_TOPICS));
+  }
+  const interactions: CrmInteraction[] = crm
+    .filter((item) => item.occurredAt <= INTELLIGENCE_AS_OF)
+    .map((item) => ({
+      id: item.id,
+      customerId: company.id,
+      timestamp: item.occurredAt,
+      channel: CRM_CHANNELS[item.interactionType],
+      subject: company.accountOpeningStartedAt ? 'Apoio à abertura de conta' : 'Contato com lead',
+      result: CRM_RESULTS[item.outcome],
+      resolved: item.outcome !== 'OPEN',
+      relationshipManager: manager,
+      direction: item.direction,
+      commercial: item.direction === 'OUTBOUND',
+    }));
+  return {
+    identity: {
+      customerId: company.id,
+      tradeName: company.tradeName,
+      legalName: company.legalName,
+      cnpjMasked: company.cnpjMasked,
+      industry: company.industry,
+      segment: company.segment,
+      companySize: company.companySize,
+      state: company.state,
+      city: company.city,
+      region: company.region,
+      status: 'PROSPECT',
+      relationshipStartDate: company.leadCreatedAt,
+      accountOpenedAt: null,
+      onboardingCompletedAt: null,
+      relationshipManager: manager,
+      acquisitionChannel: company.acquisitionChannel,
+      acquisitionCampaign: company.acquisitionCampaignId,
+    },
+    consent: { commercialContact: company.lgpdConsent, digitalCommunication: company.lgpdConsent },
+    products: [],
+    transactions: [],
+    sessions,
+    events,
+    interactions,
+    serviceCases: [],
+    outcomes: [],
+    milestones: buildMilestones(
+      { ...company, accountOpenedAt: null, onboardingCompletedAt: null },
+      { mediaTouchpoints: touchpoints },
+    ),
+    sourceCoverage: between(rand, 0.86, 1),
+  };
+}
+
 /**
  * Generates the raw behavioral data of every customer with an open account (~5,000): 18 months
  * of weekly transactions, 120 days of digital sessions/events, CRM, service and previous
@@ -1042,8 +1157,19 @@ export function generateIntelligenceRaw(bundle: DatasetBundle, seed = DATASET_SE
     touchpointsByCompany.set(touchpoint.companyId, [touchpoint]);
   }
 
+  const crmByCompany = new Map<string, CRMInteraction[]>();
+  for (const item of bundle.crmInteractions)
+    crmByCompany.set(item.companyId, [...(crmByCompany.get(item.companyId) ?? []), item]);
+  const managerOf = (company: Company) =>
+    company.relationshipManagerId
+      ? (MANAGER_NAMES[
+          Number(company.relationshipManagerId.replace(/\D/g, '')) % MANAGER_NAMES.length
+        ] ?? null)
+      : null;
+
+  // Every company of the dataset gets a profile: customers with an account and prospects.
   const customers = bundle.companies.filter(
-    (company) => company.accountOpenedAt !== null && company.accountOpenedAt <= INTELLIGENCE_AS_OF,
+    (company) => company.leadCreatedAt <= INTELLIGENCE_AS_OF,
   );
   const personas = new Map<string, Persona>();
   const raws = customers.map((company): CustomerRawData => {
@@ -1052,17 +1178,23 @@ export function generateIntelligenceRaw(bundle: DatasetBundle, seed = DATASET_SE
       return atlasRaw(company);
     }
     const rand = createKeyedRandom(seed, `intelligence:${company.id}`);
+    if (!company.accountOpenedAt || company.accountOpenedAt > INTELLIGENCE_AS_OF) {
+      personas.set(company.id, 'PROSPECT');
+      return prospectRaw(
+        company,
+        crmByCompany.get(company.id) ?? [],
+        touchpointsByCompany.get(company.id) ?? [],
+        managerOf(company),
+        rand,
+      );
+    }
     const mainProducts = productsByCompany.get(company.id);
     const persona = choosePersona(company, mainProducts ?? [], rand);
     personas.set(company.id, persona);
     const codes = mainProducts ?? personaProducts(persona, rand);
     const products = buildProducts(company, codes, persona, rand);
     const behavior = behaviorOf(persona, rand);
-    const manager = company.relationshipManagerId
-      ? (MANAGER_NAMES[
-          Number(company.relationshipManagerId.replace(/\D/g, '')) % MANAGER_NAMES.length
-        ] ?? null)
-      : null;
+    const manager = managerOf(company);
     const openedAt = company.accountOpenedAt ?? company.createdAt;
     const digital = buildDigital(
       company.id,

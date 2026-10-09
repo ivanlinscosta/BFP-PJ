@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shell/page-header';
-import { ErrorState } from '@/components/states/states';
+import { EmptyState, ErrorState } from '@/components/states/states';
+import { describeError } from '@/lib/errors';
 import { useCustomerIntelligence } from '@/features/customer-intelligence/api';
 import { AskIntelligenceCard, SimilarCustomersCard } from '@/features/customer-intelligence/bottom';
 import {
@@ -57,6 +58,23 @@ function CustomerDetail({ companyId }: { companyId: string }) {
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
         </div>
+      </div>
+    );
+  }
+
+  if (intelligence.isError && describeError(intelligence.error).kind === 'not_found') {
+    return (
+      <div className="px-2">
+        <PageHeader
+          breadcrumbs={[{ label: 'Clientes PJ', to: '/clientes' }, { label: 'Cliente' }]}
+          title="Cliente"
+        />
+        <Card>
+          <EmptyState
+            description="O perfil deste cliente ainda não foi calculado. Ele aparece no próximo recálculo diário da inteligência."
+            title="Inteligência ainda não disponível"
+          />
+        </Card>
       </div>
     );
   }

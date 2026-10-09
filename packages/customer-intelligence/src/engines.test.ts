@@ -292,6 +292,53 @@ describe('NextBestActionEngine', () => {
   });
 });
 
+describe('Prospects (no account yet)', () => {
+  function prospect(leadDaysAgo: number, openingDaysAgo?: number): CustomerRawData {
+    const raw = baseRaw('lead-1');
+    return {
+      ...raw,
+      identity: {
+        ...raw.identity,
+        status: 'PROSPECT',
+        relationshipStartDate: daysAgo(leadDaysAgo),
+        accountOpenedAt: null,
+        onboardingCompletedAt: null,
+      },
+      products: [],
+      transactions: [],
+      sessions: [],
+      events: [],
+      milestones:
+        openingDaysAgo === undefined
+          ? []
+          : [
+              {
+                date: daysAgo(openingDaysAgo),
+                title: 'Início da abertura',
+                source: 'Abertura',
+                kind: 'OPENING',
+              },
+            ],
+    };
+  }
+
+  it('recommends completing the account opening for a fresh journey, never product offers', () => {
+    const profile = profileOf(prospect(12, 5));
+    expect(profile.signals.map((signal) => signal.type)).toContain('ACCOUNT_OPENING_PENDING');
+    expect(profile.recommendations[0]?.actionId).toBe('COMPLETE_ACCOUNT_OPENING');
+    const offers = profile.recommendations.filter(
+      (item) => item.actionId.startsWith('OFFER') || item.actionId.startsWith('PROMOTE'),
+    );
+    expect(offers).toEqual([]);
+  });
+
+  it('does not push an old lead whose journey went cold', () => {
+    const profile = profileOf(prospect(200));
+    expect(profile.signals.map((signal) => signal.type)).not.toContain('ACCOUNT_OPENING_PENDING');
+    expect(profile.recommendations[0]?.actionId).toBe('NO_ACTION');
+  });
+});
+
 describe('Explanation, similarity and clusters', () => {
   it('explains deterministically from reason codes, labeled as non-AI', () => {
     const profile = profileOf(creditIntentRaw());

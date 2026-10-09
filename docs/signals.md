@@ -24,6 +24,7 @@ digital), natureza (`OPPORTUNITY`, `OBSERVATION`, `RISK`), força 0–1, evidên
 | `PRODUCT_GAP_WORKING_CAPITAL` | PRODUCT_GAP  | OPPORTUNITY | 60         | productDepth         |
 | `PRODUCT_GAP_PIX_COLLECTION`  | PRODUCT_GAP  | OPPORTUNITY | 60         | productDepth         |
 | `PRODUCT_GAP_CARD`            | PRODUCT_GAP  | OPPORTUNITY | 60         | productDepth         |
+| `ACCOUNT_OPENING_PENDING`     | JOURNEY      | OPPORTUNITY | 60         | commercialIntent     |
 | `ONBOARDING_INCOMPLETE`       | JOURNEY      | RISK        | 90         | —                    |
 | `RECENT_COMPLAINT`            | RISK         | RISK        | 45         | relationshipStrength |
 | `UNRESOLVED_SERVICE`          | RELATIONSHIP | RISK        | 30         | relationshipStrength |

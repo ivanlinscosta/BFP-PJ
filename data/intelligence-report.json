@@ -1,15 +1,16 @@
 {
   "asOf": "2026-10-09T12:00:00.000Z",
+  "profiles": 22447,
   "customers": 5004,
   "volumes": {
     "transactionWeeks": 258622,
-    "sessions": 304869,
-    "digitalEvents": 849947,
-    "interactions": 59351,
+    "sessions": 341097,
+    "digitalEvents": 886175,
+    "interactions": 61288,
     "serviceCases": 609,
     "products": 21380,
-    "signals": 16083,
-    "recommendations": 24888
+    "signals": 37220,
+    "recommendations": 58558
   },
   "dnaDistribution": {
     "relationshipStrength": {
@@ -231,7 +232,24 @@
   "noActionRate": 0.188,
   "maxActionShare": 0.188,
   "concentrationOk": true,
+  "prospects": {
+    "customers": 17443,
+    "nbaDistribution": [
+      {
+        "actionId": "NO_ACTION",
+        "actionName": "Não abordar agora",
+        "customers": 16644,
+        "share": 0.954
+      },
+      {
+        "actionId": "COMPLETE_ACCOUNT_OPENING",
+        "actionName": "Concluir abertura de conta",
+        "customers": 799,
+        "share": 0.046
+      }
+    ]
+  },
   "durationsMs": {
-    "features_dna_signals_nba": 3966
+    "features_dna_signals_nba": 49167
   }
 }

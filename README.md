@@ -58,7 +58,7 @@ Firebase abandonado — não há nenhuma dependência Firebase no código).
 ```bash
 npm install
 npm run seed          # gera data/dataset.json (determinístico, ~19 mil empresas sintéticas)
-npm run intelligence:rebuild  # DNA, sinais e próxima melhor ação dos 5.004 clientes (~6 s)
+npm run intelligence:rebuild  # DNA, sinais e próxima melhor ação das 22.447 empresas (~50 s)
 npm run dev           # web :5173 + api :3001 (proxy /api)
 ```
 

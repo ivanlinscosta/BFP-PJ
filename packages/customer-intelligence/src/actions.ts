@@ -115,6 +115,25 @@ export const ACTION_CATALOG: ActionDefinition[] = [
     commercial: true,
   },
   {
+    id: 'COMPLETE_ACCOUNT_OPENING',
+    name: 'Concluir abertura de conta',
+    description: 'Apoiar o lead ou a abertura em andamento até a conta ser aberta.',
+    category: 'ENGAGEMENT',
+    objective: 'ACTIVATION',
+    supportedChannels: ['WHATSAPP', 'EMAIL', 'PHONE'],
+    eligibilityRules: [
+      { id: 'customerStatus' },
+      { id: 'consent' },
+      { id: 'journeyState' },
+      { id: 'cooldown' },
+      { id: 'actionEnabled' },
+    ],
+    relevantSignals: ['ACCOUNT_OPENING_PENDING'],
+    cooldownDays: 14,
+    active: true,
+    commercial: false,
+  },
+  {
     id: 'COMPLETE_ONBOARDING',
     name: 'Concluir onboarding',
     description: 'Ajudar a empresa a terminar a configuração da conta.',
@@ -303,6 +322,10 @@ export const ACTION_SCORING: Record<
     ],
     impact: 0.55,
     product: 'INVESTIMENTOS',
+  },
+  COMPLETE_ACCOUNT_OPENING: {
+    affinity: [{ dimension: 'commercialIntent', weight: 1 }],
+    impact: 0.8,
   },
   COMPLETE_ONBOARDING: {
     affinity: [{ dimension: 'productDepth', weight: 1, invert: true }],

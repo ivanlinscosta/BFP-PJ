@@ -866,6 +866,7 @@ export const DIMENSION_CATALOG = defineDimensions([
       PROMOTE_BOLETO: 'Apresentar cobrança por boletos',
       PROMOTE_INSURANCE: 'Oferecer seguro empresarial',
       PROMOTE_INVESTMENTS: 'Apresentar investimentos PJ',
+      COMPLETE_ACCOUNT_OPENING: 'Concluir abertura de conta',
       COMPLETE_ONBOARDING: 'Concluir onboarding',
       REENGAGE_DIGITAL: 'Reengajar nos canais digitais',
       CONTACT_RELATIONSHIP_MANAGER: 'Contato consultivo do gerente',

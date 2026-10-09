@@ -83,6 +83,12 @@ function relevanceOf(action: ActionDefinition, input: NbaInput, signals: Custome
   }, 0);
   const f = input.features;
   switch (action.id) {
+    case 'COMPLETE_ACCOUNT_OPENING':
+      // Relevant while the journey is fresh (the pending-opening signal carries the recency).
+      relevance = input.raw.identity.accountOpenedAt
+        ? 0
+        : Math.max(0.2, ...signals.map((signal) => signal.strength));
+      break;
     case 'COMPLETE_ONBOARDING':
       relevance = f.onboarding_completed ? 0 : 0.95;
       break;

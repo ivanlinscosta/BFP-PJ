@@ -14,6 +14,7 @@ import { buildCustomerProfile, explainDeterministically } from '@bfp/customer-in
 import {
   AS_OF,
   creditIntentRaw,
+  daysAgo,
 } from '../../../../packages/customer-intelligence/src/__fixtures__/raw';
 import { CATALOG_ROUTES, CONVERSION_BY_CHANNEL } from './fixtures';
 import { mockApi, renderRoute, signIn } from './utils';
@@ -519,7 +520,7 @@ describe('CustomerDetailPage', () => {
         name: new RegExp(`Intenção comercial: ${profile.dna.commercialIntent.score} de 100`),
       })[0],
     ).toBeInTheDocument();
-    expect(screen.getByText(top.actionName)).toBeInTheDocument();
+    expect(screen.getAllByText(top.actionName).length).toBeGreaterThan(0);
     expect(screen.getByText('Por que agora?')).toBeInTheDocument();
     expect(screen.getByText('O que mudou neste cliente?')).toBeInTheDocument();
     expect(screen.getByText(/não é nota de crédito/)).toBeInTheDocument();
@@ -566,6 +567,61 @@ describe('CustomerDetailPage', () => {
     fireEvent.click(within(sections).getByRole('tab', { name: 'Próximas ações' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Comparar recomendações' }));
     expect(screen.getByRole('columnheader', { name: 'Relevância' })).toBeInTheDocument();
+  });
+
+  it('opens prospects (no account yet) with their journey and readable overview', async () => {
+    const raw = creditIntentRaw('lead-1');
+    const prospect = buildCustomerProfile(
+      {
+        ...raw,
+        identity: {
+          ...raw.identity,
+          tradeName: 'Lead Teste Ltda.',
+          status: 'PROSPECT',
+          relationshipStartDate: daysAgo(12),
+          accountOpenedAt: null,
+          onboardingCompletedAt: null,
+        },
+        products: [],
+        transactions: [],
+        milestones: [
+          { date: daysAgo(5), title: 'Início da abertura', source: 'Abertura', kind: 'OPENING' },
+        ],
+      },
+      AS_OF,
+    );
+    signIn();
+    mockApi([
+      ...CATALOG_ROUTES,
+      {
+        path: '/customers/lead-1/intelligence',
+        respond: {
+          ...response,
+          customer: prospect.identity,
+          tenureMonths: prospect.tenureMonths,
+          dna: prospect.dna,
+          changes: prospect.changes,
+          signals: prospect.signals,
+          recommendations: prospect.recommendations,
+          readingShift: prospect.readingShift,
+          tabs: prospect.tabs,
+          similar: prospect.similar,
+        },
+      },
+    ]);
+    renderRoute(<CustomerDetailPage />, { path: '/clientes/:companyId', url: '/clientes/lead-1' });
+    expect(await screen.findByRole('heading', { name: 'Lead Teste Ltda.' })).toBeInTheDocument();
+    expect(screen.getByText('Em prospecção')).toBeInTheDocument();
+    expect(screen.getAllByText('Concluir abertura de conta').length).toBeGreaterThan(0);
+    expect(screen.getByText(/ainda sem conta aberta/)).toBeInTheDocument();
+    expect(screen.getByText('Pontos fortes')).toBeInTheDocument();
+  });
+
+  it('shows a friendly state when the profile was not calculated yet', async () => {
+    signIn();
+    mockApi([...CATALOG_ROUTES]);
+    renderRoute(<CustomerDetailPage />, { path: '/clientes/:companyId', url: '/clientes/nova' });
+    expect(await screen.findByText('Inteligência ainda não disponível')).toBeInTheDocument();
   });
 
   it('asks Inteligência PJ with the customer as context', async () => {

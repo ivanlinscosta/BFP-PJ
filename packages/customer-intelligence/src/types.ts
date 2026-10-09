@@ -23,7 +23,8 @@ export interface CustomerIdentity {
   state: string;
   city: string;
   region: string;
-  status: 'ACTIVE' | 'ONBOARDING' | 'INACTIVE' | 'CHURNED';
+  /** PROSPECT: lead or account opening in progress (no account yet). */
+  status: 'PROSPECT' | 'ACTIVE' | 'ONBOARDING' | 'INACTIVE' | 'CHURNED';
   relationshipStartDate: string;
   accountOpenedAt: string | null;
   onboardingCompletedAt: string | null;

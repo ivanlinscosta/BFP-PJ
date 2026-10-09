@@ -305,6 +305,37 @@ export const SIGNAL_RULES: SignalRule[] = [
     },
   },
   {
+    type: 'ACCOUNT_OPENING_PENDING',
+    category: 'JOURNEY',
+    kind: 'OPPORTUNITY',
+    ttlDays: 60,
+    dnaDimension: 'commercialIntent',
+    detect({ raw, asOf }) {
+      if (raw.identity.accountOpenedAt) return null;
+      const opening = raw.milestones.find((item) => item.kind === 'OPENING' && item.date <= asOf);
+      const since = opening?.date ?? raw.identity.relationshipStartDate;
+      const days = Math.max(0, Math.round((Date.parse(asOf) - Date.parse(since)) / DAY_MS));
+      return {
+        strength: opening ? 0.9 : 0.7,
+        title: opening ? 'Abertura de conta iniciada' : 'Lead sem abertura de conta',
+        description: opening
+          ? `Abertura iniciada há ${days} dias e ainda não concluída.`
+          : `Lead criado há ${days} dias, sem início de abertura de conta.`,
+        value: days,
+        detectedAt: since,
+        source: opening ? 'Abertura de contas' : 'CRM',
+        evidence: [
+          ev(
+            opening ? 'account_opening_started' : 'lead_created',
+            true,
+            opening ? 'Abertura' : 'CRM',
+          ),
+          ev('days_in_journey', days, 'Cadastro PJ'),
+        ],
+      };
+    },
+  },
+  {
     type: 'ONBOARDING_INCOMPLETE',
     category: 'JOURNEY',
     kind: 'RISK',

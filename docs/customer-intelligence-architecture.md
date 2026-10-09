@@ -9,11 +9,11 @@ página: o cabeçalho e as abas de 360 ganharam o DNA, os sinais, o que mudou e 
 ```mermaid
 flowchart LR
   RAW[Dados brutos<br/>produtos · transações semanais · sessões · eventos digitais · CRM · atendimentos] --> F[FeatureCalculator<br/>CustomerFeatureSet]
-  F --> S[CustomerSignalEngine<br/>18 regras + decaimento]
+  F --> S[CustomerSignalEngine<br/>19 regras + decaimento]
   F --> D[DnaEngine<br/>6 dimensões 0-100]
   D --> S
   F --> C[CustomerChangeDetector<br/>30d vs 30d anteriores]
-  S --> G[CandidateGenerator<br/>13 ações]
+  S --> G[CandidateGenerator<br/>14 ações]
   D --> G
   G --> E[EligibilityEngine<br/>regras de negócio]
   E --> R[NextBestActionEngine<br/>score ponderado − penalidades]
@@ -36,9 +36,9 @@ O cálculo inteiro é **determinístico** e vive em `packages/customer-intellige
 | ---------------- | ----------------------------------------------------------------------------------------------------- |
 | `features.ts`    | `computeFeatures(raw, asOf)`: janelas de 14 a 90 dias; ignora dados posteriores ao as-of              |
 | `dna.ts`         | `computeDna`: 6 dimensões com drivers, nível e tendência (vs. 30 dias atrás) — `DnaScoringConfig`     |
-| `signals.ts`     | `detectSignals`: 18 regras com `detectedAt`, `expiresAt`, evidências e decaimento (meia-vida 21 dias) |
+| `signals.ts`     | `detectSignals`: 19 regras com `detectedAt`, `expiresAt`, evidências e decaimento (meia-vida 21 dias) |
 | `changes.ts`     | `detectChanges`: variações relevantes (volume, acessos, conteúdo de crédito, cartão, pagamentos, CRM) |
-| `actions.ts`     | catálogo de 13 ações (inclui `NO_ACTION`), afinidade com o DNA e impacto esperado                     |
+| `actions.ts`     | catálogo de 14 ações (inclui `NO_ACTION`), afinidade com o DNA e impacto esperado                     |
 | `eligibility.ts` | `checkEligibility`: produto já contratado, status, consentimento, cooldown, reclamação, jornada…      |
 | `nba.ts`         | candidatos → elegibilidade → score → ranking; `NO_ACTION`; gate `INSUFFICIENT_DATA`                   |
 | `explanation.ts` | explicação estruturada (usada localmente e como fallback da IA)                                       |

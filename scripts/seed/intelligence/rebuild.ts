@@ -79,7 +79,9 @@ export async function writeLocalReadModel(
 export function printReport(report: IntelligenceReport) {
   const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
   console.log(`Customer Intelligence · as-of ${report.asOf}`);
-  console.log(`Clientes: ${report.customers}`);
+  console.log(
+    `Perfis: ${report.profiles} (clientes com conta: ${report.customers} · prospects: ${report.prospects.customers})`,
+  );
   console.log(
     `Volumes: ${report.volumes.transactionWeeks} semanas de transações · ${report.volumes.sessions} sessões · ${report.volumes.digitalEvents} eventos digitais · ${report.volumes.interactions} interações · ${report.volumes.products} produtos · ${report.volumes.signals} sinais · ${report.volumes.recommendations} recomendações`,
   );
@@ -91,6 +93,9 @@ export function printReport(report: IntelligenceReport) {
   }
   console.log('NBA #1:');
   for (const item of report.nbaDistribution)
+    console.log(`  ${item.actionName}: ${pct(item.share)} (${item.customers})`);
+  console.log('Prospects · ação #1:');
+  for (const item of report.prospects.nbaDistribution)
     console.log(`  ${item.actionName}: ${pct(item.share)} (${item.customers})`);
   console.log(
     `NO_ACTION: ${pct(report.noActionRate)} · maior concentração: ${pct(report.maxActionShare)} · ${report.concentrationOk ? 'OK' : 'CONCENTRAÇÃO ACIMA DO LIMITE'}`,

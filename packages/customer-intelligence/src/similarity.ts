@@ -74,13 +74,14 @@ export function findSimilar(
   threshold = SIMILARITY_THRESHOLD,
   limit = 50,
 ) {
-  const matches = population
-    .filter((candidate) => candidate.customerId !== target.customerId)
-    .map((candidate) => ({
-      customerId: candidate.customerId,
-      distance: Math.round(distance(target, candidate) * 1000) / 1000,
-    }))
-    .filter((candidate) => candidate.distance <= threshold)
-    .sort((left, right) => left.distance - right.distance);
+  // Plain loop: the batch rebuild compares every customer with every other one.
+  const matches: Array<{ customerId: string; distance: number }> = [];
+  for (const candidate of population) {
+    if (candidate.customerId === target.customerId) continue;
+    const value = distance(target, candidate);
+    if (value <= threshold)
+      matches.push({ customerId: candidate.customerId, distance: Math.round(value * 1000) / 1000 });
+  }
+  matches.sort((left, right) => left.distance - right.distance);
   return { count: matches.length, nearest: matches.slice(0, limit) };
 }

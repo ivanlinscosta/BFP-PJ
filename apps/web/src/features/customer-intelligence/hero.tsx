@@ -50,6 +50,24 @@ const SIZE_LABELS: Record<string, string> = {
   Grande: 'Grande empresa',
 };
 
+/** "12 dias" under a month, "3 meses" after that. */
+function leadAge(since: string, months: number) {
+  if (months >= 1) return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+  const days = Math.max(0, Math.round((Date.now() - Date.parse(since)) / 86_400_000));
+  return `${days} ${days === 1 ? 'dia' : 'dias'}`;
+}
+
+const STATUS_BADGES: Record<
+  CustomerIntelligenceResponse['customer']['status'],
+  { label: string; tone: 'success' | 'tint' | 'neutral' }
+> = {
+  ACTIVE: { label: 'Ativo', tone: 'success' },
+  ONBOARDING: { label: 'Onboarding', tone: 'tint' },
+  PROSPECT: { label: 'Em prospecção', tone: 'tint' },
+  INACTIVE: { label: 'Inativo', tone: 'neutral' },
+  CHURNED: { label: 'Encerrado', tone: 'neutral' },
+};
+
 export function CustomerHeader({ data }: { data: CustomerIntelligenceResponse }) {
   const { customer } = data;
   const preAccount =
@@ -74,7 +92,9 @@ export function CustomerHeader({ data }: { data: CustomerIntelligenceResponse })
       <div className="flex items-center gap-6">
         <div className="text-right text-xs">
           <p className="m-0 font-semibold text-ink">
-            {data.tenureMonths} meses de relacionamento comercial
+            {customer.status === 'PROSPECT'
+              ? `Lead há ${leadAge(customer.relationshipStartDate, data.tenureMonths)} · sem conta aberta`
+              : `${data.tenureMonths} meses de relacionamento comercial`}
           </p>
           <p className="m-0 mt-0.5 text-ink-soft">
             {customer.relationshipManager
@@ -85,12 +105,8 @@ export function CustomerHeader({ data }: { data: CustomerIntelligenceResponse })
             <p className="m-0 mt-0.5 text-ink-soft">Inclui pré-conta · hipótese demonstrativa</p>
           ) : null}
         </div>
-        <Badge tone={customer.status === 'ACTIVE' ? 'success' : 'neutral'} uppercase>
-          {customer.status === 'ACTIVE'
-            ? 'Ativo'
-            : customer.status === 'ONBOARDING'
-              ? 'Onboarding'
-              : 'Inativo'}
+        <Badge tone={STATUS_BADGES[customer.status].tone} uppercase>
+          {STATUS_BADGES[customer.status].label}
         </Badge>
       </div>
     </Card>

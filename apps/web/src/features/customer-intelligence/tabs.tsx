@@ -87,39 +87,163 @@ function Bar({ value, tone = 'navy' }: { value: number; tone?: 'navy' | 'orange'
 
 /* ---------------------------------- Visão geral ---------------------------------- */
 
+const SIZE_NOUNS: Record<string, string> = {
+  MEI: 'MEI',
+  Micro: 'microempresa',
+  Pequena: 'pequena empresa',
+  Média: 'média empresa',
+  Grande: 'grande empresa',
+};
+
+function InfoCard({ title, rows }: { title: string; rows: Array<[string, string]> }) {
+  return (
+    <Card className="px-5 py-4">
+      <h3 className="m-0 text-sm font-semibold text-brand-navy">{title}</h3>
+      <dl className="m-0 mt-3 flex flex-col divide-y divide-line">
+        {rows.map(([label, value]) => (
+          <div className="flex items-baseline justify-between gap-4 py-2" key={label}>
+            <dt className="shrink-0 text-[13px] text-ink-soft">{label}</dt>
+            <dd className="m-0 text-right text-[13px] font-semibold text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+function ReadingGroup({
+  title,
+  items,
+  empty,
+}: {
+  title: string;
+  items: Array<{ key: string; label: string }>;
+  empty: string;
+}) {
+  return (
+    <div>
+      <p className="m-0 text-xs font-semibold text-ink-soft">{title}</p>
+      {items.length === 0 ? (
+        <p className="m-0 mt-2 text-[13px] text-ink-faint">{empty}</p>
+      ) : (
+        <ul className="m-0 mt-2 flex list-none flex-wrap gap-1.5 p-0">
+          {items.map((item) => (
+            <li
+              className="rounded bg-tint px-2 py-1 text-xs font-semibold text-brand-navy"
+              key={item.key}
+            >
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function OverviewTab({ data, onOpenTab }: { data: Data; onOpenTab(tab: TabValue): void }) {
   const labels = useSpecLabels();
-  const { customer, tabs } = data;
-  const onboarding = customer.onboardingCompletedAt
-    ? `Concluído em ${formatDate(customer.onboardingCompletedAt)}`
-    : 'Em andamento';
+  const { customer, tabs, dna } = data;
+  const prospect = customer.status === 'PROSPECT';
+  const dimensions = (Object.keys(DNA_LABELS) as Array<keyof typeof DNA_LABELS>).map((id) => ({
+    id,
+    ...dna[id],
+  }));
+  const strengths = dimensions
+    .filter((item) => item.level === 'HIGH' || item.level === 'VERY_HIGH')
+    .sort((left, right) => right.score - left.score)
+    .map((item) => ({ key: item.id, label: `${DNA_LABELS[item.id].title} · ${item.score}` }));
+  const weakest = [...dimensions].sort((left, right) => left.score - right.score);
+  // Low dimensions; when there is none, the weakest one still deserves attention below 60.
+  const attention = (
+    weakest.some((item) => item.level === 'LOW')
+      ? weakest.filter((item) => item.level === 'LOW')
+      : weakest.slice(0, 1).filter((item) => item.score < 60)
+  ).map((item) => ({ key: item.id, label: `${DNA_LABELS[item.id].title} · ${item.score}` }));
+  const moving = dimensions
+    .filter((item) => item.trend !== 'STABLE')
+    .map((item) => ({
+      key: item.id,
+      label: `${item.trend === 'UP' ? '↑' : '↓'} ${DNA_LABELS[item.id].title}`,
+    }));
   const lastInteraction = tabs.interactions[0]?.timestamp ?? null;
-  const rows: Array<[string, string]> = [
-    ['Razão social', customer.legalName],
-    ['Segmento', `${customer.industry} · ${customer.segment}`],
-    ['Localização', `${customer.city} · ${customer.state} · ${customer.region}`],
-    ['Início do relacionamento', formatDate(customer.relationshipStartDate)],
-    ['Abertura da conta', formatDate(customer.accountOpenedAt)],
-    ['Onboarding', onboarding],
-    ['Canal de aquisição', labels.value('acquisition_channel', customer.acquisitionChannel)],
+  const volume4w = tabs.transactions.weekly.reduce((sum, week) => sum + week.volume, 0);
+  const top = data.recommendations[0];
+  const where = `${customer.city}/${customer.state}`;
+  const sentence = prospect
+    ? `${customer.tradeName} é uma ${SIZE_NOUNS[customer.companySize] ?? customer.companySize} de ${customer.segment} em ${where}, lead desde ${formatDate(customer.relationshipStartDate)} e ainda sem conta aberta.`
+    : `${customer.tradeName} é uma ${SIZE_NOUNS[customer.companySize] ?? customer.companySize} de ${customer.segment} em ${where}, com ${data.tenureMonths} meses de relacionamento e ${tabs.products.length} ${tabs.products.length === 1 ? 'produto ativo' : 'produtos ativos'}.`;
+  const kpis: Array<[string, string]> = [
     ['Produtos ativos', String(tabs.products.length)],
+    ['Acessos digitais (30 dias)', String(tabs.digital.sessions30d)],
+    ['Volume transacionado (4 semanas)', volume4w > 0 ? currency(volume4w) : '—'],
     ['Última interação', formatDate(lastInteraction)],
+  ];
+  const company: Array<[string, string]> = [
+    ['Razão social', customer.legalName],
+    ['Atividade', customer.industry],
+    ['Segmento', customer.segment],
+    ['Porte', customer.companySize],
+    ['Localização', `${customer.city} · ${customer.state} · ${customer.region}`],
+  ];
+  const relationship: Array<[string, string]> = [
+    ['Início do relacionamento', formatDate(customer.relationshipStartDate)],
+    [
+      'Abertura da conta',
+      customer.accountOpenedAt ? formatDate(customer.accountOpenedAt) : 'Não aberta',
+    ],
+    [
+      'Onboarding',
+      customer.onboardingCompletedAt
+        ? `Concluído em ${formatDate(customer.onboardingCompletedAt)}`
+        : prospect
+          ? 'Após a abertura da conta'
+          : 'Em andamento',
+    ],
+    ['Gerente', customer.relationshipManager ?? 'Sem gerente atribuído'],
+    ['Canal de aquisição', labels.value('acquisition_channel', customer.acquisitionChannel)],
   ];
   const opportunities = data.signals.filter((signal) => signal.kind !== 'OBSERVATION').slice(0, 4);
   return (
-    <div className="flex flex-col gap-8">
-      <section>
+    <div className="flex flex-col gap-6">
+      <Card className="px-5 py-5">
         <SectionTitle>Resumo do cliente</SectionTitle>
-        <p className="m-0 mb-4 text-sm text-ink">{data.dna.overallSummary}</p>
-        <dl className="m-0 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map(([label, value]) => (
+        <p className="m-0 text-sm leading-relaxed text-ink">{sentence}</p>
+        {top ? (
+          <p className="m-0 mt-1 text-sm text-ink-soft">
+            Próxima melhor ação:{' '}
+            <span className="font-semibold text-brand-navy">{top.actionName}</span> (score{' '}
+            {top.score}).
+          </p>
+        ) : null}
+        <div className="mt-5 grid gap-5 md:grid-cols-3">
+          <ReadingGroup empty="Nenhuma dimensão alta." items={strengths} title="Pontos fortes" />
+          <ReadingGroup
+            empty="Nenhuma dimensão abaixo de 60."
+            items={attention}
+            title="Pontos de atenção"
+          />
+          <ReadingGroup
+            empty="Estável nos últimos 30 dias."
+            items={moving}
+            title="Em movimento (30 dias)"
+          />
+        </div>
+        <dl className="m-0 mt-5 grid grid-cols-2 gap-3 border-t border-line pt-4 lg:grid-cols-4">
+          {kpis.map(([label, value]) => (
             <div key={label}>
-              <dt className="text-[13px] text-ink-soft">{label}</dt>
-              <dd className="m-0 mt-1 text-sm font-semibold text-ink">{value}</dd>
+              <dt className="text-xs text-ink-soft">{label}</dt>
+              <dd className="m-0 mt-1 text-base font-semibold text-brand-navy">{value}</dd>
             </div>
           ))}
         </dl>
-      </section>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <InfoCard rows={company} title="Empresa" />
+        <InfoCard rows={relationship} title="Relacionamento" />
+      </div>
+
       <section>
         <SectionTitle hint="Clique para ver todos os sinais">Principais sinais</SectionTitle>
         {opportunities.length === 0 ? (
@@ -144,14 +268,12 @@ export function OverviewTab({ data, onOpenTab }: { data: Data; onOpenTab(tab: Ta
           </ul>
         )}
       </section>
-      <section>
-        <SectionTitle>Qualidade e governança</SectionTitle>
-        <p className="m-0 text-xs text-ink-soft">
-          Qualidade dos dados {Math.round(data.dataQuality.score * 100)}% · atualização{' '}
-          {formatDate(data.dataQuality.freshness)} · DNA {data.dnaVersion} · modelo{' '}
-          {data.modelVersion}. Dados fictícios; nenhum atributo pessoal sensível é usado.
-        </p>
-      </section>
+
+      <p className="m-0 text-xs text-ink-faint">
+        Qualidade dos dados {Math.round(data.dataQuality.score * 100)}% · cálculo de{' '}
+        {formatDate(data.dataQuality.freshness)} · DNA {data.dnaVersion} · modelo{' '}
+        {data.modelVersion}. Dados fictícios; nenhum atributo pessoal sensível é usado.
+      </p>
     </div>
   );
 }

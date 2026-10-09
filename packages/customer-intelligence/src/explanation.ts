@@ -37,6 +37,7 @@ const REASON_TEXT: Record<string, string> = {
   RELATIONSHIP_ACTIVE: 'mantém relacionamento ativo',
   SERVICE_RISK_PENALTY: 'tem atendimento pendente, o que reduz a prioridade comercial',
   CONTACT_FATIGUE_PENALTY: 'recebeu várias abordagens comerciais recentes',
+  ACCOUNT_OPENING_PENDING: 'iniciou o relacionamento e ainda não concluiu a abertura da conta',
   INSUFFICIENT_DATA: 'não tem dados suficientes para uma recomendação confiável',
 };
 

@@ -7,7 +7,8 @@ livre real; nenhum atributo pessoal sensível ou protegido.
 
 - `npm run seed` gera `data/dataset.json`: a calibração de aquisição (leads de 2026) e **3.000
   clientes estabelecidos** (contas abertas entre abril e setembro de 2025, `company-NNNNN`), para
-  um total de **5.004 empresas com conta**.
+  um total de **5.004 empresas com conta**. Os demais **17.443 leads e aberturas em andamento**
+  também recebem perfil (prospects), então toda empresa da lista de Clientes PJ abre com dados.
 - `npm run intelligence:rebuild` gera o comportamento de **18 meses (78 semanas)** de cada
   cliente (`scripts/seed/intelligence/generator.ts`), roda o pipeline e grava:
   - `data/customer-intelligence.json`: read model local (perfis completos);
@@ -53,7 +54,9 @@ tolerância de ±5 pontos. O frontend não tem nenhum caso especial para a Atlas
 
 | Volume                            |   Total |
 | --------------------------------- | ------: |
-| Clientes                          |   5.004 |
+| Perfis (todas as empresas)        |  22.447 |
+| Clientes com conta                |   5.004 |
+| Prospects (leads e aberturas)     |  17.443 |
 | Semanas de transações             | 258.622 |
 | Sessões digitais                  | 304.869 |
 | Eventos digitais                  | 849.947 |
@@ -63,7 +66,7 @@ tolerância de ±5 pontos. O frontend não tem nenhum caso especial para a Atlas
 | Sinais ativos                     |  16.083 |
 | Recomendações (top 5 + NO_ACTION) |  24.888 |
 
-Ação #1 por cliente:
+Ação #1 por cliente com conta (os prospects são reportados à parte):
 
 | Ação                            | Clientes | Participação |
 | ------------------------------- | -------: | -----------: |
@@ -87,6 +90,15 @@ comercial 15 (a maioria das empresas não demonstra intenção comercial no per�
 Sinais mais frequentes: alto engajamento digital (52%), interesse recente em produto (33%), gap de
 Pix Cobrança (30%), relacionamento esfriando (27%), gap de Capital de Giro (27%), crescimento
 transacional (22%), alta intenção em crédito (18%).
+
+## Prospects
+
+Leads e aberturas em andamento (sem conta) recebem um perfil com o que existe para eles: visitas
+ao site em torno do lead, a jornada de abertura quando iniciada, interesse recente quando o lead é
+novo e o histórico de CRM do dataset. Não têm produtos nem transações. Ação #1 dos prospects:
+**Concluir abertura de conta** (799, sinal `ACCOUNT_OPENING_PENDING` com até 60 dias) e **Não
+abordar agora** (16.644, leads cuja jornada esfriou). Prospects só são elegíveis às ações da
+jornada de abertura; nenhuma oferta de produto é sugerida antes de a conta existir.
 
 ## Comandos
 

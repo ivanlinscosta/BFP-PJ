@@ -49,6 +49,8 @@ function evaluate(
         : pass(`${PRODUCT_CATALOG[product].name} ainda não contratado.`);
     }
     case 'customerStatus':
+      if (raw.identity.status === 'PROSPECT' && action.id !== 'COMPLETE_ACCOUNT_OPENING')
+        return fail('Empresa ainda sem conta: só ações da jornada de abertura.');
       return raw.identity.status === 'INACTIVE' || raw.identity.status === 'CHURNED'
         ? fail('Cliente inativo ou encerrado.')
         : pass('Cliente ativo.');
@@ -79,6 +81,11 @@ function evaluate(
         ? fail('Reclamação crítica em aberto: ofertas comerciais suspensas.')
         : pass('Sem reclamação crítica em aberto.');
     case 'journeyState':
+      if (action.id === 'COMPLETE_ACCOUNT_OPENING') {
+        return raw.identity.accountOpenedAt
+          ? fail('Conta já aberta.')
+          : pass('Abertura de conta ainda não concluída.');
+      }
       if (action.id === 'COMPLETE_ONBOARDING') {
         return features.onboarding_completed || !raw.identity.accountOpenedAt
           ? fail('Onboarding já concluído.')

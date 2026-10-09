@@ -20,6 +20,7 @@ console.log(
   JSON.stringify({
     level: 'info',
     message: 'DNA_CALCULATED',
+    profiles: report.profiles,
     customers: report.customers,
     signals: report.volumes.signals,
     recommendations: report.volumes.recommendations,
