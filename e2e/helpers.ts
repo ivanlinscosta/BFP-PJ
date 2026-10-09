@@ -8,7 +8,7 @@ export async function login(page: Page, email = 'analyst@example.local') {
   await page.goto('/login');
   await page.getByLabel('E-mail corporativo').fill(email);
   await page.getByLabel('Senha').fill(DEMO_PASSWORD);
-  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page).toHaveURL(/\/explorar/);
   await page.evaluate(() => window.sessionStorage.clear());
 }

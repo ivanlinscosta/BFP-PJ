@@ -7,6 +7,7 @@ import { DashboardEditorPage } from '@/pages/dashboard-editor-page';
 import { DashboardsPage } from '@/pages/dashboards-page';
 import { GovernancePage } from '@/pages/governance-page';
 import { IntelligencePage } from '@/pages/intelligence-page';
+import { LoginPage } from '@/pages/login-page';
 import { MetricDetailPage } from '@/pages/metric-detail-page';
 import { useAnalysisStore } from '@/features/explorer/store';
 import { buildCustomerProfile, explainDeterministically } from '@bfp/customer-intelligence';
@@ -179,6 +180,22 @@ describe('IntelligencePage', () => {
       prompt: 'Qual é a principal oportunidade?',
       customerId: 'company-1',
     });
+  });
+});
+
+describe('LoginPage', () => {
+  it('shows the access panel, SSO and help without inventing an SSO flow', async () => {
+    window.localStorage.clear();
+    mockApi([]);
+    renderRoute(<LoginPage />, { path: '/login', url: '/login' });
+    expect(await screen.findByRole('heading', { name: 'Acesse a BFP - PJ' })).toBeInTheDocument();
+    expect(screen.getByText('Dados que aproximam.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('nome@empresa.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar com SSO' }));
+    expect(
+      await screen.findByText(/SSO corporativo ainda não está habilitado/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Precisa de acesso?')).toBeInTheDocument();
   });
 });
 
@@ -496,10 +513,11 @@ describe('CustomerDetailPage', () => {
       await screen.findByRole('heading', { name: 'Atlas Tecnologia Ltda.' }),
     ).toBeInTheDocument();
     expect(screen.getByText('DNA do cliente')).toBeInTheDocument();
+    // Desktop and phone layouts are both in the DOM (CSS picks one); check the first.
     expect(
-      screen.getByRole('button', {
+      screen.getAllByRole('button', {
         name: new RegExp(`Intenção comercial: ${profile.dna.commercialIntent.score} de 100`),
-      }),
+      })[0],
     ).toBeInTheDocument();
     expect(screen.getByText(top.actionName)).toBeInTheDocument();
     expect(screen.getByText('Por que agora?')).toBeInTheDocument();
@@ -513,7 +531,7 @@ describe('CustomerDetailPage', () => {
 
   it('opens the DNA drivers and the recommendation explanation drawers', async () => {
     const { calls } = renderCustomer();
-    fireEvent.click(await screen.findByRole('button', { name: /Intenção comercial: / }));
+    fireEvent.click((await screen.findAllByRole('button', { name: /Intenção comercial: / }))[0]!);
     expect(await screen.findByRole('dialog', { name: 'Intenção comercial' })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
 

@@ -7,7 +7,7 @@ import {
   MoreHorizontal,
   Plus,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type {
   CustomerDNA,
   DnaDimensionId,
@@ -29,12 +29,13 @@ import {
   useRecordOutcome,
   type CustomerIntelligenceResponse,
 } from './api';
-import { DnaTree } from './dna-tree';
+import dnaTreeUrl from '@/assets/dna-tree.jpg';
 import {
   CHANGE_ORDER,
   CHANNEL_LABELS,
   DNA_LABELS,
   LEVEL_LABELS,
+  TREND_LABELS,
   changeValue,
   priorityOf,
   whyNowBullets,
@@ -96,49 +97,125 @@ export function CustomerHeader({ data }: { data: CustomerIntelligenceResponse })
   );
 }
 
-const LEFT: DnaDimensionId[] = ['digitalEngagement', 'productDepth', 'relationshipStrength'];
-const RIGHT: DnaDimensionId[] = ['commercialIntent', 'businessMomentum', 'transactionActivity'];
+/** Layout of the DNA figure (coordinates in a 578×510 box, as in the design). */
+const DNA_LAYOUT: Array<{
+  id: DnaDimensionId;
+  side: 'left' | 'right';
+  top: number;
+  /** Connector from the annotation to the tree. */
+  path: string;
+  dot: [number, number];
+}> = [
+  {
+    id: 'digitalEngagement',
+    side: 'left',
+    top: 25,
+    path: 'M158 107 H184 L202 166',
+    dot: [202, 166],
+  },
+  { id: 'productDepth', side: 'left', top: 201, path: 'M158 299 H184 L190 262', dot: [190, 262] },
+  {
+    id: 'relationshipStrength',
+    side: 'left',
+    top: 407,
+    path: 'M158 400 H222 L248 422',
+    dot: [248, 422],
+  },
+  {
+    id: 'commercialIntent',
+    side: 'right',
+    top: 25,
+    path: 'M444 105 H430 L403 168',
+    dot: [403, 168],
+  },
+  {
+    id: 'businessMomentum',
+    side: 'right',
+    top: 201,
+    path: 'M444 190 H434 L408 176',
+    dot: [408, 176],
+  },
+  {
+    id: 'transactionActivity',
+    side: 'right',
+    top: 387,
+    path: 'M444 398 H420 L332 345',
+    dot: [332, 345],
+  },
+];
+const BOX = { width: 578, height: 510 };
+/** Fades the edges of the illustration into the panel background. */
+const TREE_MASK: CSSProperties = {
+  maskImage: 'radial-gradient(closest-side, #000 78%, transparent 100%)',
+  WebkitMaskImage: 'radial-gradient(closest-side, #000 78%, transparent 100%)',
+};
 
-function DnaDimensionRow({
+/** Donut with the 0–100 score of a dimension. */
+function ScoreRing({ score }: { score: number }) {
+  const radius = 9;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <svg aria-hidden className="h-[26px] w-[26px] shrink-0 -rotate-90" viewBox="0 0 26 26">
+      <circle cx="13" cy="13" fill="none" r={radius} stroke="var(--color-line)" strokeWidth="3.5" />
+      <circle
+        cx="13"
+        cy="13"
+        fill="none"
+        r={radius}
+        stroke="var(--color-brand-navy)"
+        strokeDasharray={`${(Math.max(0, Math.min(100, score)) / 100) * circumference} ${circumference}`}
+        strokeLinecap="round"
+        strokeWidth="3.5"
+      />
+    </svg>
+  );
+}
+
+function levelLabelOf(dna: CustomerDNA, id: DnaDimensionId) {
+  const dimension = dna[id];
+  return id === 'businessMomentum' && dimension.trend === 'UP'
+    ? 'Crescimento'
+    : DNA_LABELS[id].levels[dimension.level];
+}
+
+function DnaAnnotation({
   dna,
   id,
-  align,
   onOpen,
+  className,
+  style,
 }: {
   dna: CustomerDNA;
   id: DnaDimensionId;
-  align: 'left' | 'right';
   onOpen(id: DnaDimensionId): void;
+  className?: string;
+  style?: CSSProperties;
 }) {
   const dimension = dna[id];
   const label = DNA_LABELS[id];
-  const levelLabel =
-    id === 'businessMomentum' && dimension.trend === 'UP'
-      ? 'Crescimento'
-      : label.levels[dimension.level];
+  const levelLabel = levelLabelOf(dna, id);
+  const trend = TREND_LABELS[dimension.trend];
   return (
     <button
-      aria-label={`${label.title}: ${dimension.score} de 100, ${levelLabel}. Ver drivers`}
+      aria-label={`${label.title}: ${dimension.score} de 100, ${levelLabel}, ${trend}. Ver drivers`}
       className={cn(
-        'group block w-full max-w-[150px] rounded px-1 py-1 text-left transition-colors hover:bg-card/70',
-        align === 'right' && 'ml-auto',
+        'group block rounded px-1 py-1 text-left transition-colors hover:bg-card/70',
+        className,
       )}
       onClick={() => onOpen(id)}
+      style={style}
+      title={`Tendência: ${trend} vs. 30 dias atrás`}
       type="button"
     >
-      <span className="block text-[13px] leading-tight font-medium text-ink">{label.title}</span>
-      <span className="mt-1 block text-lg leading-none font-semibold text-brand-navy group-hover:underline">
-        {dimension.score}/100
+      <span className="block text-[13px] leading-snug font-medium text-ink">{label.title}</span>
+      <span className="mt-1.5 flex items-center gap-2">
+        <ScoreRing score={dimension.score} />
+        <span className="text-lg leading-none font-semibold text-brand-navy group-hover:underline">
+          {dimension.score}/100
+        </span>
       </span>
-      <span className="mt-1 block text-[11px] font-semibold text-brand-navy">
-        {levelLabel}
-        {dimension.trend !== 'STABLE' ? (
-          <span className="ml-1 font-normal text-ink-soft">
-            {dimension.trend === 'UP' ? '↑' : '↓'}
-          </span>
-        ) : null}
-      </span>
-      <span className="mt-1 block text-[11px] text-ink-faint">{label.metaphor}</span>
+      <span className="mt-1.5 block text-xs font-semibold text-brand-navy">{levelLabel}</span>
+      <span className="mt-1.5 block text-xs leading-snug text-ink-soft">{label.metaphor}</span>
     </button>
   );
 }
@@ -207,6 +284,7 @@ function DnaDriverDrawer({
 export function CustomerDnaPanel({ data }: { data: CustomerIntelligenceResponse }) {
   const [open, setOpen] = useState<DnaDimensionId | null>(null);
   const { dna } = data;
+  const pct = (value: number, total: number) => `${(value / total) * 100}%`;
   return (
     <Card className="px-5 pt-5 pb-4">
       <div className="flex items-start justify-between gap-3">
@@ -214,29 +292,67 @@ export function CustomerDnaPanel({ data }: { data: CustomerIntelligenceResponse 
           <h2 className="m-0 text-lg font-semibold text-brand-navy">DNA do cliente</h2>
           <p className="m-0 mt-0.5 text-xs text-ink-soft">Mapa vivo da empresa</p>
         </div>
-        <span className="mt-4 text-xs font-semibold text-brand-navy">
+        <span className="mt-1 text-sm font-semibold text-brand-navy">
           {data.customer.tradeName.replace(/ Ltda\.?$/, '')}
         </span>
       </div>
-      <div className="mt-4 grid grid-cols-2 items-stretch gap-x-2 rounded-[var(--radius-card)] bg-tint px-3 py-3 sm:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,150px)] sm:gap-x-0">
-        <div className="flex flex-col justify-between gap-6 py-1">
-          {LEFT.map((id) => (
-            <DnaDimensionRow align="left" dna={dna} id={id} key={id} onOpen={setOpen} />
+
+      {/* Desktop: annotated tree (annotations positioned like the design). */}
+      <div
+        className="relative mt-4 hidden rounded-[var(--radius-card)] bg-tint sm:block"
+        style={{ aspectRatio: `${BOX.width} / ${BOX.height}` }}
+      >
+        <img
+          alt=""
+          className="pointer-events-none absolute mix-blend-multiply select-none"
+          src={dnaTreeUrl}
+          style={{ left: '14.7%', top: '11.6%', width: '77%', ...TREE_MASK }}
+        />
+        <svg
+          aria-hidden
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          viewBox={`0 0 ${BOX.width} ${BOX.height}`}
+        >
+          {DNA_LAYOUT.map((item) => (
+            <g key={item.id}>
+              <path d={item.path} fill="none" stroke="var(--color-line-strong)" strokeWidth="1" />
+              <circle cx={item.dot[0]} cy={item.dot[1]} fill="var(--color-line-strong)" r="2" />
+            </g>
           ))}
-        </div>
-        <div className="order-first col-span-2 h-[220px] px-1 sm:order-none sm:col-span-1 sm:h-auto sm:min-h-[300px]">
-          <DnaTree highlightIntent={dna.commercialIntent.level !== 'LOW'} />
-        </div>
-        <div className="flex flex-col justify-between gap-6 py-1">
-          {RIGHT.map((id) => (
-            <DnaDimensionRow align="right" dna={dna} id={id} key={id} onOpen={setOpen} />
+        </svg>
+        {DNA_LAYOUT.map((item) => (
+          <DnaAnnotation
+            className="absolute w-[25%]"
+            dna={dna}
+            id={item.id}
+            key={item.id}
+            onOpen={setOpen}
+            style={{
+              top: pct(item.top, BOX.height),
+              left: item.side === 'left' ? pct(18, BOX.width) : pct(446, BOX.width),
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Phone: tree on top, annotations in two columns. */}
+      <div className="mt-4 rounded-[var(--radius-card)] bg-tint px-3 pb-3 sm:hidden">
+        <img
+          alt=""
+          className="mx-auto block w-[240px] mix-blend-multiply"
+          src={dnaTreeUrl}
+          style={TREE_MASK}
+        />
+        <div className="grid grid-cols-2 gap-x-2 gap-y-4">
+          {DNA_LAYOUT.map((item) => (
+            <DnaAnnotation dna={dna} id={item.id} key={item.id} onOpen={setOpen} />
           ))}
         </div>
       </div>
-      <p className="m-0 mt-3 text-[11px] text-ink-soft">{dna.overallSummary}</p>
-      <p className="m-0 mt-1 text-[11px] text-ink-faint">
-        Leitura comportamental, não é nota de crédito. O desenho é uma metáfora; os valores estão
-        nas anotações.
+
+      <p className="m-0 mt-3 text-xs leading-relaxed text-ink-soft">
+        Leitura comportamental, não é nota de crédito.
+        <br />O desenho é uma metáfora; os valores estão nas anotações.
       </p>
       <DnaDriverDrawer dimension={open} dna={dna} onClose={() => setOpen(null)} />
     </Card>
