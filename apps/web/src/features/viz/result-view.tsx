@@ -1,10 +1,11 @@
 import type { VisualizationType } from '@bfp/domain';
 import type { AnalyticsResponse } from '@/features/explorer/api';
 import { AnalyticsBarChart, type BarSort } from './bar-chart';
-import { AnalyticsGroupedBarChart, AnalyticsLineChart, AnalyticsScatterChart } from './charts';
+import { AnalyticsScatterChart } from './charts';
 import { AnalyticsKpis, AnalyticsTable } from './data-table';
 import { AnalyticsHeatmap } from './heatmap';
 import { compareCategory, dimensionColumns, labelOf, metricColumns, numeric } from './model';
+import { SeriesChart } from './series-chart';
 
 /** Pivots a 2-dimension result into the generic heatmap matrix. */
 export function toHeatmapMatrix(result: AnalyticsResponse, totalsResult?: AnalyticsResponse) {
@@ -76,31 +77,48 @@ export function ResultView({
   showLegend?: boolean;
   totalsResult?: AnalyticsResponse;
 }) {
-  if (type === 'KPI') return <AnalyticsKpis result={result} />;
-  if (type === 'TABLE') return <AnalyticsTable result={result} />;
-  if (type === 'LINE' || type === 'AREA')
-    return <AnalyticsLineChart result={result} showLegend={showLegend} />;
-  if (type === 'SCATTER') return <AnalyticsScatterChart result={result} />;
-  if (type === 'GROUPED_BAR' || (type === 'BAR' && metricColumns(result).length > 1)) {
-    return <AnalyticsGroupedBarChart result={result} showLegend={showLegend} />;
-  }
-  if (type === 'HEATMAP' || type === 'STACKED_BAR') {
+  const dims = dimensionColumns(result).length;
+  const metrics = metricColumns(result).length;
+  if (type === 'KPI' || (dims === 0 && type !== 'TABLE')) return <AnalyticsKpis result={result} />;
+  if (type === 'TABLE' || dims > 2) return <AnalyticsTable result={result} />;
+  if (type === 'SCATTER' && metrics >= 2) return <AnalyticsScatterChart result={result} />;
+  if (type === 'HEATMAP' && dims === 2) {
     const matrix = toHeatmapMatrix(result, totalsResult);
-    return matrix ? (
-      <AnalyticsHeatmap
-        columns={matrix.columns}
-        format={matrix.format}
-        rowHeader={matrix.rowHeader}
-        rows={matrix.rows}
-        totals={matrix.totals}
-        values={matrix.values}
-      />
-    ) : (
-      <AnalyticsTable result={result} />
-    );
+    if (matrix) {
+      return (
+        <AnalyticsHeatmap
+          columns={matrix.columns}
+          format={matrix.format}
+          rowHeader={matrix.rowHeader}
+          rows={matrix.rows}
+          totals={matrix.totals}
+          values={matrix.values}
+        />
+      );
+    }
   }
-  if (dimensionColumns(result).length === 1) {
+  // Single series horizontal bars keep the compact ranked layout.
+  if (type === 'BAR' && dims === 1 && metrics === 1) {
     return <AnalyticsBarChart result={result} showValues={showValues} sort={sort} />;
   }
-  return <AnalyticsTable result={result} />;
+  if (
+    type === 'BAR' ||
+    type === 'GROUPED_BAR' ||
+    type === 'STACKED_BAR' ||
+    type === 'LINE' ||
+    type === 'AREA' ||
+    type === 'DONUT'
+  ) {
+    return (
+      <SeriesChart result={result} showLegend={showLegend} showValues={showValues} type={type} />
+    );
+  }
+  return (
+    <SeriesChart
+      result={result}
+      showLegend={showLegend}
+      showValues={showValues}
+      type="GROUPED_BAR"
+    />
+  );
 }

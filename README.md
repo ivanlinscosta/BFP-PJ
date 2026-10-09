@@ -14,14 +14,35 @@ CLIENTE PJ: DADOS → FEATURES → SINAIS → DNA → AÇÕES CANDIDATAS → ELE
 
 ## Sumário
 
+1. [Funcionalidades](#funcionalidades)
 1. [Mapa de dados](#mapa-de-dados)
-2. [Arquitetura](#arquitetura)
-3. [Documentação do código](#documentação-do-código)
-4. [Execução local](#execução-local)
-5. [Testes](#testes)
-6. [Deploy na AWS](#deploy-na-aws)
-7. [Variáveis de ambiente](#variáveis-de-ambiente-api)
-8. [Documentação detalhada](#documentação-detalhada)
+1. [Dados reais: o que trocar](#dados-reais-o-que-trocar)
+1. [Arquitetura](#arquitetura)
+1. [Documentação do código](#documentação-do-código)
+1. [Execução local](#execução-local)
+1. [Testes](#testes)
+1. [Deploy na AWS](#deploy-na-aws)
+1. [Variáveis de ambiente](#variáveis-de-ambiente-api)
+1. [Documentação detalhada](#documentação-detalhada)
+
+---
+
+## Funcionalidades
+
+| Página (rota)                               | O que faz                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Acesso (`/login`)                           | E-mail e senha (Cognito na nuvem, JWT local em dev). "Esqueci minha senha" e SSO orientam a falar com o administrador.                                                                                                                                                                                                                                                                                                                                                                                 |
+| Explorar (`/explorar`)                      | Playground governado: escolha das bases do mesh, métricas, dimensões, filtros e período. **10 tipos de gráfico escolhidos pelo usuário**: Tabela, Indicador, Barras, Colunas, Colunas empilhadas, Linha, Área, Rosca, Dispersão e Mapa de calor. Tipos que a seleção não comporta mostram o que precisam; duas métricas de escalas diferentes ganham eixo à direita; carregamento com indicador "Processando os dados". Insights automáticos, salvar, compartilhar, exportar e adicionar ao dashboard. |
+| Adicionar análise (`/explorar/adicionar`)   | Assistente passo a passo para montar uma análise.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Inteligência PJ (`/inteligencia`)           | Chat em tela cheia que vira análises governadas (OpenAI, Bedrock ou motor local), estudos completos em PDF e perguntas sobre um cliente (`?cliente=`).                                                                                                                                                                                                                                                                                                                                                 |
+| Minhas análises (`/analises`)               | Abrir, duplicar, renomear, excluir e ver o compartilhamento das análises.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Dashboards (`/dashboards`)                  | Painéis com cartões de análises, favoritos, visibilidade e editor em grade (os cartões usam os mesmos 10 tipos de gráfico).                                                                                                                                                                                                                                                                                                                                                                            |
+| Audiências (`/audiencias`)                  | Regras E/OU, prévia agregada, DNA do público e envio ao CRM (simulado).                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Clientes PJ (`/clientes`)                   | Busca e Cliente PJ 360 para as 22.447 empresas: DNA, próxima melhor ação, o que mudou, sinais, abas de jornada, produtos, transações, digital e interações, semelhantes e perguntas à Inteligência PJ.                                                                                                                                                                                                                                                                                                 |
+| Catálogo (`/catalogo`)                      | Bases de dados (tabelas do mesh) com **prévia de até 100 linhas** em `/catalogo/bases/:id`; produtos de dados com dono, SLO, qualidade e métricas; métricas, dimensões e glossário.                                                                                                                                                                                                                                                                                                                    |
+| Governança (`/governanca`)                  | Frescor, metas de atualização (SLO), qualidade e incidentes por produto de dados.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Busca (`/busca`) e Administração (`/admin`) | Busca global; integrações, usuários, papéis, domínios, superfície semântica e feature flags (somente administradores).                                                                                                                                                                                                                                                                                                                                                                                 |
+| Documentação (`/docs/inicio.html`)          | Guia de negócio e documentação técnica publicados no próprio site.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ---
 
@@ -197,6 +218,21 @@ andamento). Detalhes em [docs/synthetic-data.md](docs/synthetic-data.md).
 - **Catálogo oficial**: Atlan (certificação, owners, glossário); DataZone opcional.
 - **Versionamento** da inteligência: `dnaVersion` e `modelVersion` em cada perfil e tabela.
 - **Privacidade**: nenhum atributo pessoal sensível entra em features, DNA ou NBA.
+
+## Dados reais: o que trocar
+
+Tudo o que é sintético nasce em `scripts/seed`; as telas leem contratos estáveis. O passo a passo
+completo (arquivos, comandos e formatos) está em
+[docs/real-data-integration.md](docs/real-data-integration.md):
+
+| Fonte real                     | Onde ligar                                                                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Data mesh (Glue/Athena)**    | Domínios publicam as tabelas gold no contrato de `packages/semantic-layer/src/mesh.ts`; `MESH_CATALOG=glue`, `ANALYTICS_ENGINE=athena`; parar `seed:lake` |
+| **Atlan**                      | Segredo `bfp-pj-<env>/atlan` (`baseUrl`, `apiToken`, `glossaryGuid`); leitura em `apps/api/src/services/integrations/atlan.ts`                            |
+| **FullStory**                  | Segredo `bfp-pj-<env>/fullstory` (`apiKey`, `segmentId`), `FS.identify(company_id)` e `npm run fullstory:export` agendado                                 |
+| Dataset operacional (DynamoDB) | Carga incremental no formato de `scripts/seed/aws.ts` (`ENTITY#<tipo>`, `COMPANY#<id>`)                                                                   |
+| Customer Intelligence          | Montar `CustomerRawData` a partir do mesh e gravar em `s3://<lake>/intelligence/raw/customers.json.gz`                                                    |
+| Ativações (CRM, Iniciar ação)  | Trocar a simulação de `apps/api/src/http/routes/audiences.ts` e `recordOutcome` por uma fila para o destino                                               |
 
 ---
 
@@ -473,6 +509,7 @@ Ambientes independentes: `bfp-pj-dev`, `bfp-pj-homol`, `bfp-pj-prod`. Pipelines 
 - [docs/security.md](docs/security.md)
 - [docs/deployment.md](docs/deployment.md)
 - [docs/demo-script.md](docs/demo-script.md)
+- [Dados reais: onde trocar o que é sintético](docs/real-data-integration.md)
 - Clientes PJ: [arquitetura da Customer Intelligence](docs/customer-intelligence-architecture.md),
   [Customer DNA](docs/customer-dna.md), [sinais](docs/signals.md),
   [próxima melhor ação](docs/next-best-action.md), [score da NBA](docs/nba-scoring.md) e

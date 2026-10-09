@@ -9,20 +9,17 @@ function SidebarLink({ item }: { item: NavigationItem }) {
       {({ isActive }) => (
         <span
           className={cn(
-            // Icon and label share the same color and weight in every state.
-            'relative flex h-11 items-center gap-3 rounded-[var(--radius-control)] px-4 text-sm transition-colors',
+            'flex h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors',
             isActive
-              ? 'bg-cream font-semibold text-brand-navy'
+              ? 'bg-peach-soft font-semibold text-brand-navy'
               : 'text-ink-soft hover:bg-muted hover:text-brand-navy',
           )}
         >
-          {isActive ? (
-            <span
-              aria-hidden
-              className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-brand-orange"
-            />
-          ) : null}
-          <Icon aria-hidden className="h-5 w-5 shrink-0" strokeWidth={isActive ? 2.1 : 1.9} />
+          <Icon
+            aria-hidden
+            className={cn('h-5 w-5 shrink-0', isActive ? 'text-brand-orange' : 'text-ink-soft')}
+            strokeWidth={1.75}
+          />
           <span className="leading-none">{item.label}</span>
         </span>
       )}
@@ -30,20 +27,16 @@ function SidebarLink({ item }: { item: NavigationItem }) {
   );
 }
 
-/** Fixed white sidebar with the Itaú mark, product name and navigation. */
+/** Fixed white sidebar: Itaú mark, product name, navigation (as in the approved design). */
 export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-[var(--spacing-sidebar)] flex-col border-r border-line bg-card lg:flex">
-      <div className="px-6 pt-11">
+      <div className="mx-4 border-b border-line px-2 pt-6 pb-4">
         <img alt="Itaú" className="h-[60px] w-[60px]" height={60} src="/itau-logo.png" width={60} />
-        <p className="mt-8 font-display text-[30px] leading-none font-extrabold tracking-[-0.005em] text-brand-navy">
-          BFP - PJ
-        </p>
-        <p className="mt-3 text-[13px] whitespace-nowrap text-ink-soft">
-          Business Friendly Platform
-        </p>
+        <p className="mt-6 text-lg leading-tight font-bold text-brand-navy">BFP - PJ</p>
+        <p className="mt-1.5 text-[13px] text-ink-soft">Plataforma analítica</p>
       </div>
-      <nav aria-label="Navegação principal" className="mt-6 flex flex-1 flex-col px-4">
+      <nav aria-label="Navegação principal" className="mx-4 mt-6 border-b border-line pb-4">
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {PRIMARY_NAVIGATION.map((item) => (
             <li key={item.path}>
@@ -68,7 +61,7 @@ export function MobileNavigation() {
           className={({ isActive }) =>
             cn(
               'rounded px-3 py-1.5 text-[13px] whitespace-nowrap',
-              isActive ? 'bg-cream font-semibold text-brand-navy' : 'text-ink-soft',
+              isActive ? 'bg-peach-soft font-semibold text-brand-navy' : 'text-ink-soft',
             )
           }
           key={item.path}

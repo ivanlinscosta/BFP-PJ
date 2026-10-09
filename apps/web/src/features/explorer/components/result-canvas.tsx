@@ -1,4 +1,12 @@
-import { ArrowRight, Download, LayoutGrid, Save, Share2, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  Download,
+  LayoutGrid,
+  LoaderCircle,
+  Save,
+  Share2,
+  Sparkles,
+} from 'lucide-react';
 import { Link } from 'react-router';
 import type { AnalysisSpec, VisualizationType } from '@bfp/domain';
 import { describeAnalysisSpec, type SpecLabelResolver } from '@bfp/shared';
@@ -7,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Card, Eyebrow } from '@/components/ui/card';
 import { ActionChip } from '@/components/ui/chip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs } from '@/components/ui/tabs';
 import { EmptyState, ErrorState } from '@/components/states/states';
 import type { MetricDetail } from '@/features/catalog/api';
 import { AnalyticsTable } from '@/features/viz/data-table';
@@ -18,19 +25,18 @@ import { pluralizeLabel } from '@/lib/text';
 import { cn } from '@/lib/utils';
 import type { AnalyticsResponse } from '../api';
 import type { NextExploration } from '../explorations';
+import type { VisualizationOption } from '../spec';
+import { ChartPicker } from './chart-picker';
 import type { VisualizationSettings } from './side-panel';
 
 interface ResultCanvasProps {
   spec: AnalysisSpec;
   labels: SpecLabelResolver;
   type: VisualizationType | 'KPI';
-  options: Array<{
-    type: VisualizationType;
-    label: string;
-    enabled: boolean;
-    requirement?: string;
-  }>;
+  options: VisualizationOption[];
   onTypeChange(type: VisualizationType): void;
+  /** The chosen chart could not be drawn for this selection (we show the automatic one). */
+  fallbackFrom?: string;
   result: AnalyticsResponse | undefined;
   totalsResult?: AnalyticsResponse;
   loading: boolean;
@@ -64,11 +70,6 @@ function chartTitle(spec: AnalysisSpec, labels: SpecLabelResolver) {
 export function ResultCanvas(props: ResultCanvasProps) {
   const { spec, labels, result, metricDetail } = props;
   const description = describeAnalysisSpec(spec, labels);
-  const disabledHints = props.options
-    .filter((option) => spec.dimensions.length >= 2 || option.type !== 'HEATMAP')
-    .filter((option) => !option.enabled && option.requirement && option.type !== 'TABLE')
-    .map((option) => `${option.label}: ${option.requirement}`)
-    .join(' · ');
   const product = metricDetail?.dataProduct;
   const certified =
     spec.metrics.length > 0 && metricDetail?.metric.certificationStatus === 'CERTIFIED';
@@ -106,39 +107,18 @@ export function ResultCanvas(props: ResultCanvasProps) {
       : `Base: ${plan.datasets.map((dataset) => dataset.name).join(', ')}`
     : null;
   const insights = result?.insights ?? [];
-  const visibleTabs = props.options.filter((option) =>
-    spec.dimensions.length >= 2 ? option.type !== 'SCATTER' : option.type !== 'HEATMAP',
-  );
-  const activeTab = props.type === 'GROUPED_BAR' ? 'BAR' : props.type;
-
   return (
     <div className="flex min-w-0 flex-col gap-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <Tabs
-          items={visibleTabs.map((option) => ({
-            value: option.type,
-            label: option.label,
-            disabled: !option.enabled,
-          }))}
-          label="Tipo de visualização"
-          onChange={(value) => props.onTypeChange(value)}
-          value={(activeTab === 'KPI' ? 'TABLE' : activeTab) as VisualizationType}
-          variant="segmented"
-        />
-        {disabledHints ? (
-          <p className="ml-auto shrink rounded bg-muted px-2 py-1 text-right text-[11px] text-ink-soft">
-            {disabledHints}
+      <div className="flex flex-col gap-1.5">
+        <ChartPicker onChange={props.onTypeChange} options={props.options} value={props.type} />
+        {props.fallbackFrom ? (
+          <p className="m-0 text-[11px] text-ink-soft">
+            {props.fallbackFrom} não se aplica a esta seleção; mostrando o gráfico recomendado.
           </p>
         ) : null}
       </div>
 
-      <Card
-        aria-busy={props.fetching}
-        className={cn(
-          'px-3 pt-3 pb-2.5 transition-opacity',
-          props.fetching && !props.loading && 'opacity-70',
-        )}
-      >
+      <Card aria-busy={props.fetching} className="relative px-3 pt-3 pb-2.5">
         <div className="flex items-start justify-between gap-4 px-1">
           <div className="min-w-0">
             <h2 className="m-0 text-lg leading-tight font-semibold text-brand-navy">
@@ -148,16 +128,30 @@ export function ResultCanvas(props: ResultCanvasProps) {
           </div>
           {certified ? <CertificationBadge className="mt-1" status="CERTIFIED" /> : null}
         </div>
-        <div className="mt-4 px-1">
+        <div className="relative mt-4 min-h-[220px] px-1">
+          {props.fetching && !props.loading ? (
+            <div
+              aria-label="Atualizando o gráfico"
+              className="absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-control)] bg-card/70 backdrop-blur-[1px]"
+              role="status"
+            >
+              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1.5 text-xs font-semibold text-brand-navy shadow-sm">
+                <LoaderCircle aria-hidden className="h-4 w-4 animate-spin text-brand-orange" />
+                Processando os dados…
+              </span>
+            </div>
+          ) : null}
           {props.loading ? (
             <div aria-label="Carregando visualização" className="flex flex-col gap-3" role="status">
-              {Array.from({ length: 6 }, (_, index) => (
-                <Skeleton
-                  className="h-[22px]"
-                  key={index}
-                  style={{ width: `${90 - index * 9}%` }}
-                />
-              ))}
+              <p className="m-0 flex items-center gap-2 text-xs font-semibold text-brand-navy">
+                <LoaderCircle aria-hidden className="h-4 w-4 animate-spin text-brand-orange" />
+                Processando os dados para montar o gráfico…
+              </p>
+              <div className="flex h-[220px] items-end gap-3 px-2">
+                {[55, 80, 40, 95, 65, 30, 75].map((height, index) => (
+                  <Skeleton className="flex-1" key={index} style={{ height: `${height}%` }} />
+                ))}
+              </div>
             </div>
           ) : props.error ? (
             <ErrorState compact error={props.error} onRetry={props.onRetry} />

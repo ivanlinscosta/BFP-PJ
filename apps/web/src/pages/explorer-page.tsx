@@ -68,7 +68,7 @@ export function ExplorerPage() {
     sort: 'DESC',
     showValues: true,
     showTable: false,
-    showLegend: false,
+    showLegend: true,
   });
 
   // Deep links: ?spec=<AnalysisSpec JSON> (catalog, customer 360, AI) or ?analysis=<saved id>.
@@ -120,7 +120,12 @@ export function ExplorerPage() {
   const totals = useAnalysisResult(totalsSpec, { enabled: engineReady && type === 'HEATMAP' });
   const metricDetail = useMetricDetail(spec.metrics[0]?.id);
   const explorations = buildNextExplorations(spec, metrics, dimensions);
-  const options = visualizationAvailability(spec, dimensions);
+  const options = visualizationAvailability(spec);
+  const requested = spec.visualization.type;
+  const fallbackFrom =
+    requested !== 'AUTO' && requested !== type
+      ? options.find((option) => option.type === requested)?.label
+      : undefined;
   const hasAnalysis = spec.metrics.length > 0;
   const allCertified =
     activeMetrics.length > 0 &&
@@ -302,6 +307,7 @@ export function ExplorerPage() {
                   onSave={() => setDialog('save')}
                   onShare={() => setDialog('share')}
                   onTypeChange={(value: VisualizationType) => store.setVisualization(value)}
+                  fallbackFrom={fallbackFrom}
                   options={options}
                   result={result.data}
                   saveStatus={saveStatus}

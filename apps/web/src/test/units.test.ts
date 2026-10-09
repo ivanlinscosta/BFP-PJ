@@ -93,18 +93,35 @@ describe('spec helpers', () => {
         DIMENSIONS,
       ),
     ).toBe('HEATMAP');
-    const options = visualizationAvailability(
-      { ...base, dimensions: [{ id: 'acquisition_channel' }] },
-      DIMENSIONS,
-    );
-    expect(options.find((option) => option.type === 'LINE')).toMatchObject({
-      enabled: false,
-      requirement: 'Mês',
+    const options = visualizationAvailability({
+      ...base,
+      dimensions: [{ id: 'acquisition_channel' }],
     });
+    // The user decides: every chart compatible with 1 metric × 1 dimension is available.
+    for (const type of ['TABLE', 'BAR', 'GROUPED_BAR', 'LINE', 'AREA', 'DONUT'] as const) {
+      expect(options.find((option) => option.type === type)?.enabled).toBe(true);
+    }
     expect(options.find((option) => option.type === 'SCATTER')).toMatchObject({
       enabled: false,
-      requirement: '2 métricas',
+      requirement: '2 métricas e 1 dimensão',
     });
+    // An explicit choice is kept when the selection supports it, otherwise the automatic one.
+    expect(
+      resolveVisualization(
+        { ...base, dimensions: [{ id: 'acquisition_channel' }], visualization: { type: 'DONUT' } },
+        DIMENSIONS,
+      ),
+    ).toBe('DONUT');
+    expect(
+      resolveVisualization(
+        {
+          ...base,
+          dimensions: [{ id: 'acquisition_channel' }],
+          visualization: { type: 'HEATMAP' },
+        },
+        DIMENSIONS,
+      ),
+    ).toBe('BAR');
   });
 
   it('keeps operations immutable for the shared contract', () => {

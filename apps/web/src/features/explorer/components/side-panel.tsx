@@ -99,17 +99,6 @@ export interface VisualizationSettings {
   showLegend: boolean;
 }
 
-const TYPE_LABELS: Partial<Record<VisualizationType | 'KPI', string>> = {
-  TABLE: 'Tabela',
-  BAR: 'Barras',
-  GROUPED_BAR: 'Barras agrupadas',
-  LINE: 'Linha',
-  HEATMAP: 'Mapa de calor',
-  SCATTER: 'Dispersão',
-  KPI: 'Indicadores',
-  STACKED_BAR: 'Barras empilhadas',
-};
-
 /** Right panel with visualization settings, data tab and next explorations. */
 export function ResultSidePanel({
   type,
@@ -122,7 +111,12 @@ export function ResultSidePanel({
   result,
 }: {
   type: VisualizationType | 'KPI';
-  options: Array<{ type: VisualizationType; label: string; enabled: boolean }>;
+  options: Array<{
+    type: VisualizationType;
+    label: string;
+    enabled: boolean;
+    requirement?: string;
+  }>;
   onTypeChange(type: VisualizationType): void;
   settings: VisualizationSettings;
   onSettingsChange(settings: VisualizationSettings): void;
@@ -152,14 +146,15 @@ export function ResultSidePanel({
             id="viz-type"
             leadingChevron
             onChange={(event) => onTypeChange(event.target.value as VisualizationType)}
-            value={type === 'GROUPED_BAR' ? 'BAR' : type}
+            value={type}
           >
             {options.map((option) => (
               <option disabled={!option.enabled} key={option.type} value={option.type}>
-                {option.label}
+                {option.enabled
+                  ? option.label
+                  : `${option.label} (precisa de ${option.requirement})`}
               </option>
             ))}
-            {type === 'KPI' ? <option value="KPI">{TYPE_LABELS.KPI}</option> : null}
           </Select>
           <label className="mt-4 text-sm font-semibold text-ink" htmlFor="viz-sort">
             Ordenação
