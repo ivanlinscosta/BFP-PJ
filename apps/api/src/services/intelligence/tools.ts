@@ -14,15 +14,20 @@ import {
   listMetricDefinitions,
   resolveLineage,
   withRequiredDatasets,
+  datasetForDimension,
+  datasetsForMetric,
+  MESH_DATASET_BY_ID,
+  type MeshDatasetId,
 } from '@bfp/semantic-layer';
 import { getAllowedDomains } from '@api/auth/rbac';
 import type { AuthenticatedUser } from '@api/auth/types';
-import { NotFoundError, ValidationError } from '@api/common/errors';
+import { ApiError, NotFoundError, ValidationError } from '@api/common/errors';
 import type { ApiContext } from '@api/http/context';
 import { buildCustomer360 } from '@api/http/customer360';
 import { buildDataProductQualityCatalog } from '@api/http/qualitySummary';
 import { matchesSearchQuery } from '@api/http/textSearch';
 import { executeGovernedQuery, type GovernedQueryResult } from '@api/services/analyticsService';
+import { previewMeshDataset } from '@api/services/mesh/preview';
 
 /** Maximum rows returned to a model; numbers beyond this are summarized by insights. */
 export const MAX_TOOL_ROWS = 50;
@@ -34,6 +39,47 @@ export interface ToolContext {
   correlationId?: string;
   /** Every governed query executed in the turn, used to ground the final answer. */
   queries: Array<{ spec: AnalysisSpec; result: GovernedQueryResult }>;
+  /**
+   * Bases the user selected for the conversation. When present, every tool only sees and queries
+   * these bases (the model cannot answer from data the user did not choose).
+   */
+  datasets?: MeshDatasetId[];
+  /** Row samples read in the turn (they also ground the answer). */
+  samples?: number;
+}
+
+/** A question needs a base the user did not select. */
+export class DatasetScopeError extends ApiError {
+  constructor(message: string) {
+    super(422, 'dataset_scope', message);
+  }
+}
+
+function datasetName(id: string) {
+  return MESH_DATASET_BY_ID.get(id as MeshDatasetId)?.name ?? id;
+}
+
+/** True when the metric can be computed only with the selected bases. */
+function metricInScope(metricId: string, scope?: MeshDatasetId[]) {
+  return !scope || datasetsForMetric(metricId).every((dataset) => scope.includes(dataset));
+}
+
+function dimensionInScope(dimensionId: string, scope?: MeshDatasetId[]) {
+  if (!scope) return true;
+  const owner = datasetForDimension(dimensionId);
+  return !owner || scope.includes(owner);
+}
+
+/** Rejects specs that need bases outside the selection, naming what is missing. */
+export function assertSpecInScope(spec: AnalysisSpec, scope?: MeshDatasetId[]) {
+  if (!scope) return;
+  const needed = withRequiredDatasets(spec).datasets ?? [];
+  const missing = needed.filter((dataset) => !scope.includes(dataset as MeshDatasetId));
+  if (missing.length > 0) {
+    throw new DatasetScopeError(
+      `Para responder, seria preciso usar ${missing.map(datasetName).join(', ')}, que não está entre as bases selecionadas (${scope.map(datasetName).join(', ')}). Selecione essa base ou reformule a pergunta.`,
+    );
+  }
 }
 
 /** Governed tool exposed to AI providers. */
@@ -81,12 +127,86 @@ const emptyInput = z.object({}).default({});
 
 export const GOVERNED_TOOLS: GovernedTool[] = [
   {
+    name: 'describeSelectedBases',
+    description:
+      'Descreve as bases de dados selecionadas pelo usuário: o que contêm, colunas, métricas certificadas e dimensões que podem ser usadas em runAnalyticsQuery. Chame primeiro.',
+    inputSchema: emptyInput,
+    async execute(_input, { auth, datasets }) {
+      const scope = datasets ?? [];
+      return scope
+        .map((id) => MESH_DATASET_BY_ID.get(id))
+        .filter((dataset) => dataset && domainAllowed(auth, dataset.domain))
+        .map((dataset) => ({
+          id: dataset!.id,
+          name: dataset!.name,
+          description: dataset!.description,
+          grain: dataset!.grain,
+          columns: dataset!.columns.map((column) => ({
+            name: column.name,
+            type: column.type,
+            description: column.description,
+          })),
+          metrics: listMetricDefinitions()
+            .filter((metric) => datasetsForMetric(metric.id).includes(dataset!.id))
+            .filter((metric) => metricInScope(metric.id, datasets))
+            .map((metric) => ({
+              id: metric.id,
+              name: metric.shortName,
+              definition: metric.businessDefinition,
+              format: metric.format,
+            })),
+          dimensions: listDimensionDefinitions()
+            .filter((dimension) => datasetForDimension(dimension.id) === dataset!.id)
+            .filter((dimension) => dimension.sensitivity !== 'PII')
+            .map((dimension) => ({
+              id: dimension.id,
+              name: dimension.label,
+              type: dimension.type,
+            })),
+        }));
+    },
+  },
+  {
+    name: 'previewDatasetRows',
+    description:
+      'Lê uma amostra de até 20 linhas de uma base selecionada (colunas governadas, sem dados pessoais). Use para entender valores e exemplos; para totais e comparações use runAnalyticsQuery.',
+    inputSchema: z.object({
+      datasetId: z.string().trim().min(1),
+      limit: z.number().int().min(1).max(20).default(10),
+    }),
+    async execute(input, toolContext) {
+      const { datasetId, limit } = z
+        .object({ datasetId: z.string(), limit: z.number().int().min(1).max(20).default(10) })
+        .parse(input);
+      const dataset = MESH_DATASET_BY_ID.get(datasetId as MeshDatasetId);
+      if (!dataset || !domainAllowed(toolContext.auth, dataset.domain)) {
+        throw new NotFoundError('Base de dados não encontrada.');
+      }
+      if (toolContext.datasets && !toolContext.datasets.includes(dataset.id)) {
+        throw new DatasetScopeError(`A base ${dataset.name} não está entre as bases selecionadas.`);
+      }
+      const preview = await previewMeshDataset(
+        toolContext.context,
+        toolContext.auth,
+        dataset.id,
+        limit,
+      );
+      toolContext.samples = (toolContext.samples ?? 0) + preview.rows.length;
+      return {
+        dataset: dataset.name,
+        columns: preview.columns.map((column) => column.name),
+        rows: preview.rows,
+      };
+    },
+  },
+  {
     name: 'getAvailableMetrics',
     description: 'Lista as métricas governadas disponíveis para o perfil do usuário.',
     inputSchema: emptyInput,
-    async execute(_input, { auth }) {
+    async execute(_input, { auth, datasets }) {
       return listMetricDefinitions()
         .filter((metric) => domainAllowed(auth, metric.domain))
+        .filter((metric) => metricInScope(metric.id, datasets))
         .map((metric) => ({
           id: metric.id,
           name: metric.shortName,
@@ -99,9 +219,10 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
     name: 'getAvailableDimensions',
     description: 'Lista as dimensões governadas disponíveis para o perfil do usuário.',
     inputSchema: emptyInput,
-    async execute(_input, { auth }) {
+    async execute(_input, { auth, datasets }) {
       return listDimensionDefinitions()
         .filter((dimension) => domainAllowed(auth, dimension.domain))
+        .filter((dimension) => dimensionInScope(dimension.id, datasets))
         .filter((dimension) => dimension.sensitivity !== 'PII')
         .map((dimension) => ({ id: dimension.id, name: dimension.label, type: dimension.type }));
     },
@@ -139,6 +260,7 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
       }
       // The assistant selects the mesh bases it needs and reports them in the answer basis.
       const spec = withRequiredDatasets(parsed.data.analysisSpec);
+      assertSpecInScope(spec, toolContext.datasets);
       const result = await executeGovernedQuery(
         toolContext.context,
         toolContext.auth,

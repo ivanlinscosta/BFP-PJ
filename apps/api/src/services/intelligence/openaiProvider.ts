@@ -97,7 +97,7 @@ export async function runOpenAIProvider(input: {
   client: OpenAIChatClient;
 }): Promise<ProviderResult> {
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt(input.analysisSpec) },
+    { role: 'system', content: systemPrompt(input.analysisSpec, input.toolContext.datasets) },
     ...input.history
       .slice(-8)
       .map((turn): ChatMessage => ({ role: turn.role, content: turn.content })),
@@ -111,9 +111,11 @@ export async function runOpenAIProvider(input: {
         model: input.model,
         messages,
         tools,
-        tool_choice: 'auto',
+        // With bases selected, the first turn must consult them (no answer from memory).
+        tool_choice: iteration === 0 && input.toolContext.datasets?.length ? 'required' : 'auto',
+        response_format: { type: 'json_object' },
         temperature: 0,
-        max_tokens: 1_200,
+        max_tokens: 1_500,
       }),
     );
     const choice = completion.choices[0];
@@ -152,6 +154,12 @@ export async function runOpenAIProvider(input: {
     }
   }
 
+  // No grounded answer from the model: be explicit instead of improvising.
+  if (input.toolContext.datasets?.length) {
+    const message =
+      'Não consegui montar uma resposta confiável com as bases selecionadas. Tente reformular a pergunta citando uma métrica (por exemplo, contas abertas, volume transacionado, NPS) ou selecione outras bases.';
+    return { action: 'NONE', operations: [], message, answer: message, suggestions: [] };
+  }
   return runLocalProvider({
     prompt: input.prompt,
     analysisSpec: input.analysisSpec,

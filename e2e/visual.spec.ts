@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login } from './helpers';
+import { login, selectAllChatBases } from './helpers';
 
 const CHANNEL_SPEC = {
   datasets: ['customer_360'],
@@ -52,6 +52,7 @@ test('visual: telas de referência em 1440 × 1024', async ({ page }) => {
   await page.goto(`/explorar?spec=${encodeURIComponent(JSON.stringify(CHANNEL_SPEC))}`);
   await expect(page.getByText('Insights da análise')).toBeVisible();
   await page.goto('/inteligencia');
+  await selectAllChatBases(page);
   const input = page.getByLabel('Pergunte aos seus dados');
   await input.fill('Qual canal combina melhor conversão com menor CAC?');
   await input.press('Enter');

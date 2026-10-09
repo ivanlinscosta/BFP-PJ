@@ -160,3 +160,144 @@ describe('Inteligência PJ with OpenAI', () => {
     expect(reply.answer.length).toBeGreaterThan(0);
   });
 });
+
+describe('Inteligência PJ restricted to the selected bases', () => {
+  const auth: AuthenticatedUser = {
+    userId: 'usr-analyst',
+    email: 'analyst@example.local',
+    role: 'analyst',
+    groups: ['analyst'],
+    name: 'Mariana Souza',
+    team: 'Growth PJ',
+  };
+
+  function scriptedClient(calls: Array<{ name: string; args: unknown }>, answer: string) {
+    const bodies: Array<Record<string, unknown>> = [];
+    const toolResults: string[] = [];
+    let step = 0;
+    const client: OpenAIChatClient = {
+      async complete(body) {
+        bodies.push(body);
+        const messages = body.messages as Array<{ role: string; content: string | null }>;
+        for (const message of messages.slice(-calls.length - 1)) {
+          if (message.role === 'tool' && message.content) toolResults.push(message.content);
+        }
+        const call = calls[step];
+        step += 1;
+        if (call) {
+          return {
+            choices: [
+              {
+                finish_reason: 'tool_calls',
+                message: {
+                  role: 'assistant',
+                  content: null,
+                  tool_calls: [
+                    {
+                      id: `call-${step}`,
+                      type: 'function',
+                      function: { name: call.name, arguments: JSON.stringify(call.args) },
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+        }
+        return {
+          choices: [
+            {
+              finish_reason: 'stop',
+              message: {
+                role: 'assistant',
+                content: JSON.stringify({
+                  action: 'ANSWER_QUESTION',
+                  operations: [],
+                  answer,
+                  suggestions: [],
+                }),
+              },
+            },
+          ],
+        };
+      },
+    };
+    return { client, bodies, toolResults };
+  }
+
+  it('forces tool use, describes only the selected bases and grounds answers on row samples', async () => {
+    const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
+    const { client, bodies, toolResults } = scriptedClient(
+      [
+        { name: 'describeSelectedBases', args: {} },
+        { name: 'previewDatasetRows', args: { datasetId: 'customer_360', limit: 5 } },
+      ],
+      'Na amostra de 5 empresas, 3 vieram do Sudeste.',
+    );
+    const reply = await runIntelligence(
+      context,
+      auth,
+      { prompt: 'De onde vêm as empresas da amostra?', datasets: ['customer_360'] },
+      'corr-scope',
+      { openaiClient: client },
+    );
+    expect(reply.provider).toBe('openai');
+    expect(reply.answer).toContain('Sudeste');
+    expect(bodies[0]).toMatchObject({ tool_choice: 'required' });
+    expect(JSON.stringify(bodies[0])).toContain('customer_360');
+    const described = toolResults.find((content) => content.includes('"columns"')) ?? '';
+    expect(described).toContain('customer_360');
+    expect(described).not.toContain('transactions');
+  });
+
+  it('refuses queries outside the selected bases', async () => {
+    const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
+    const { client, toolResults } = scriptedClient(
+      [
+        {
+          name: 'runAnalyticsQuery',
+          args: {
+            analysisSpec: {
+              datasets: ['transactions'],
+              metrics: [{ id: 'transaction_volume' }],
+              dimensions: [],
+              filters: [],
+              dateRange: { type: 'LAST_N_DAYS', value: 90 },
+              visualization: { type: 'KPI' },
+            },
+          },
+        },
+        { name: 'previewDatasetRows', args: { datasetId: 'transactions', limit: 5 } },
+      ],
+      'Essa pergunta precisa da base Transações PJ, que não foi selecionada.',
+    );
+    const reply = await runIntelligence(
+      context,
+      auth,
+      { prompt: 'Qual o volume transacionado?', datasets: ['customer_360'] },
+      'corr-out',
+      { openaiClient: client },
+    );
+    expect(toolResults.join(' ')).toMatch(/não está entre as bases selecionadas/);
+    expect(reply.analysisSpec).toBeUndefined();
+  });
+
+  it('local engine explains the missing base instead of answering', async () => {
+    const { context } = createHarness();
+    const reply = await runIntelligence(context, auth, {
+      prompt: 'Qual o volume de Pix por segmento?',
+      datasets: ['customer_360'],
+    });
+    expect(reply.action).toBe('NONE');
+    expect(reply.answer).toMatch(/não está entre as bases selecionadas/);
+  });
+
+  it('rejects a selection without any readable base', async () => {
+    const { app } = createHarness();
+    const response = await request(app)
+      .post('/api/ai/chat')
+      .set('Authorization', await login(app))
+      .send({ prompt: 'Quantos cliques?', datasets: ['base_inexistente'] });
+    expect(response.status).toBe(422);
+  });
+});

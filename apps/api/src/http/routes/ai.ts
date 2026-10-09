@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { Router } from 'express';
 import { analysisSpecSchema } from '@bfp/schemas';
-import { validateAnalysisSpec } from '@bfp/semantic-layer';
-import { requireRoles } from '@api/auth/rbac';
+import { MESH_DATASET_BY_ID, validateAnalysisSpec, type MeshDatasetId } from '@bfp/semantic-layer';
+import { getAllowedDomains, requireRoles } from '@api/auth/rbac';
 import { createVerifyJwtMiddleware } from '@api/auth/verifyJwt';
 import { createRateLimitMiddleware } from '@api/common/rateLimit';
 import { parseWithZod, throwSemanticValidationError } from '@api/common/validation';
@@ -189,6 +189,8 @@ export function createAiRouter(context: ApiContext) {
       .trim()
       .regex(/^[\w-]{1,64}$/)
       .optional(),
+    /** Bases chosen by the user; the answer may only use them. */
+    datasets: z.array(z.string().trim().min(1)).max(10).optional(),
   });
 
   router.post('/chat', async (req, res, next) => {
@@ -203,12 +205,31 @@ export function createAiRouter(context: ApiContext) {
       const payload = parseWithZod(chatRequestSchema, req.body, {
         message: 'Pergunta inválida para a Inteligência PJ.',
       });
+      const allowed = getAllowedDomains(req.auth!.role);
+      const datasets = (payload.datasets ?? []).filter((id) => {
+        const dataset = MESH_DATASET_BY_ID.get(id as MeshDatasetId);
+        return (
+          dataset && (allowed[0] === '*' || (allowed as readonly string[]).includes(dataset.domain))
+        );
+      }) as MeshDatasetId[];
+      if (payload.datasets?.length && datasets.length === 0) {
+        throw new ApiError(
+          422,
+          'dataset_scope',
+          'Nenhuma das bases selecionadas está disponível para o seu perfil.',
+        );
+      }
       const analysisSpec =
         payload.analysisSpec && payload.analysisSpec.metrics.length > 0
           ? payload.analysisSpec
           : undefined;
       res.json(
-        await runIntelligence(context, req.auth!, { ...payload, analysisSpec }, req.correlationId),
+        await runIntelligence(
+          context,
+          req.auth!,
+          { ...payload, analysisSpec, datasets: datasets.length ? datasets : undefined },
+          req.correlationId,
+        ),
       );
     } catch (error) {
       next(error);

@@ -39,11 +39,30 @@ Ferramentas governadas: `getAvailableMetrics`, `getAvailableDimensions`, `getMet
 
 - Recusa de prompt injection e pedidos de PII antes de qualquer chamada.
 - Operações do modelo são validadas uma a uma pela camada semântica; ids inventados são descartados.
-- Resposta com números sem `runAnalyticsQuery` no turno é descartada e substituída pela narrativa
+- Resposta com números sem `runAnalyticsQuery` (ou `previewDatasetRows`) no turno é descartada e substituída pela narrativa
   determinística.
 - RBAC por domínio aplicado em toda ferramenta; resultados limitados a 50 linhas agregadas.
 - CAC só é comparado entre canais pagos (`acquisition_source = PAID`).
 - Conversas persistidas (`aiConversation`) e logs `AI_REQUEST` / `AI_TOOL_CALL` sem o texto do prompt (hash).
+
+## Bases selecionadas (anti-alucinação)
+
+Antes da primeira pergunta o usuário escolhe as **bases de dados da conversa** (barra acima do campo,
+ou "Selecionar bases de dados" na tela inicial). A seleção vai em `POST /ai/chat` como `datasets` e
+restringe tudo o que a IA pode ler:
+
+- O prompt de sistema lista só essas bases e proíbe conhecimento externo.
+- Ferramentas exclusivas do modo: `describeSelectedBases` (colunas, granularidade, métricas e
+  dimensões das bases) e `previewDatasetRows` (até 20 linhas, sem PII). `getAvailableMetrics` e
+  `getAvailableDimensions` só listam o que pertence às bases selecionadas.
+- `runAnalyticsQuery` recusa qualquer spec que precise de outra base (`DatasetScopeError`), e a
+  recusa volta ao modelo para ele explicar qual base faltou.
+- No OpenAI, o primeiro passo é obrigatoriamente uma ferramenta (`tool_choice: required`) e a
+  resposta final é JSON. Sem consulta ou amostra no turno, a resposta é descartada e a IA diz que
+  não conseguiu responder com as bases escolhidas, sem cair no roteiro pré-definido.
+- No motor local, uma pergunta fora das bases vira resposta explicando qual base seria necessária.
+- Bases fora do perfil (RBAC por domínio) são ignoradas; se nenhuma sobrar, a API responde 422.
+- Com um cliente em contexto (`?cliente=`), a conversa usa o resumo do cliente e não pede bases.
 
 ## Experiência conversacional
 

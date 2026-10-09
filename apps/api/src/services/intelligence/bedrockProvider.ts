@@ -52,8 +52,16 @@ export interface BedrockConverseClient {
   }>;
 }
 
-export function systemPrompt(spec: AnalysisSpec | undefined) {
+export function systemPrompt(spec: AnalysisSpec | undefined, datasets?: readonly string[]) {
+  const scope = datasets?.length
+    ? [
+        `Bases de dados selecionadas pelo usuário: ${datasets.join(', ')}. Responda SOMENTE com dados dessas bases.`,
+        'Antes de responder, chame describeSelectedBases para saber as colunas, métricas e dimensões disponíveis, e depois runAnalyticsQuery (totais, comparações, rankings, evolução) ou previewDatasetRows (exemplos de linhas).',
+        'Se a pergunta não puder ser respondida com essas bases, diga isso claramente e indique qual base seria necessária. Não use conhecimento externo.',
+      ]
+    : [];
   return [
+    ...scope,
     'Você é a Inteligência PJ, interface conversacional do mesmo AnalysisSpec do playground analítico.',
     'Responda sempre em português do Brasil, de forma curta e executiva.',
     'Use SOMENTE as ferramentas para obter definições e números. Todo número da resposta deve vir de runAnalyticsQuery.',
@@ -163,8 +171,9 @@ export function finalizeModelAnswer(
   const { accepted, spec } = sanitizeOperations(context, parsed.data.operations);
   const lastQuery = input.toolContext.queries[input.toolContext.queries.length - 1];
   const hasNumbers = /\d/.test(parsed.data.answer);
+  const grounded = Boolean(lastQuery) || (input.toolContext.samples ?? 0) > 0;
   const groundedAnswer =
-    hasNumbers && !lastQuery
+    hasNumbers && !grounded
       ? ''
       : parsed.data.answer || (lastQuery ? composeAnswer(lastQuery.result) : '');
 

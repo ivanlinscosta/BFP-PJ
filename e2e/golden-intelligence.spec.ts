@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, trackConsoleErrors } from './helpers';
+import { login, selectAllChatBases, trackConsoleErrors } from './helpers';
 
 const SPEC = {
   datasets: ['customer_360'],
@@ -19,6 +19,9 @@ test('Golden path 2: Inteligência PJ consulta dados e altera o AnalysisSpec', a
   ).toBeVisible();
 
   await page.goto('/inteligencia');
+  await page.evaluate(() => window.sessionStorage.removeItem('bfp-intelligence-chat'));
+  await page.reload();
+  await selectAllChatBases(page);
   const input = page.getByLabel('Pergunte aos seus dados');
   await input.fill('Qual canal combina melhor conversão com menor CAC?');
   await input.press('Enter');
@@ -54,6 +57,7 @@ test('Inteligência PJ: estudo completo, salvar análise e exportar PDF', async 
   await page.goto('/inteligencia');
   await page.evaluate(() => window.sessionStorage.removeItem('bfp-intelligence-chat'));
   await page.reload();
+  await selectAllChatBases(page);
 
   await page.getByRole('button', { name: /Faça um estudo completo da jornada PJ/ }).click();
   const study = page.getByRole('region', { name: 'Estudo completo da jornada PJ' });

@@ -24,3 +24,19 @@ export function trackConsoleErrors(page: Page) {
   page.on('pageerror', (error) => errors.push(error.message));
   return errors;
 }
+
+/** Inteligência PJ: selects every base the profile can read as the conversation scope. */
+export async function selectAllChatBases(page: Page) {
+  await page
+    .getByRole('button', { name: /Selecionar bases/ })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog');
+  const boxes = dialog.getByRole('checkbox');
+  for (let index = 0; index < (await boxes.count()); index += 1) {
+    const box = boxes.nth(index);
+    if (await box.isEnabled()) await box.check();
+  }
+  await dialog.getByRole('button', { name: /^Usar \d+ bases?$/ }).click();
+  await expect(dialog).toBeHidden();
+}

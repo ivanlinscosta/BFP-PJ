@@ -119,6 +119,11 @@ describe('IntelligencePage', () => {
     fireEvent.change(input, {
       target: { value: 'Qual canal combina melhor conversão com menor CAC?' },
     });
+    // Without bases selected, sending opens the picker and keeps the question in the composer.
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pergunta' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Customer 360/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Usar 1 base/ }));
+    expect(calls.some((call) => call.url.pathname === '/api/ai/chat')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Enviar pergunta' }));
     expect(
       await screen.findByText(
@@ -140,6 +145,7 @@ describe('IntelligencePage', () => {
     const aiCall = calls.find((call) => call.url.pathname === '/api/ai/chat');
     expect(aiCall?.body).toMatchObject({
       analysisSpec: { filters: [{ field: 'state', value: 'SP' }] },
+      datasets: ['customer_360'],
     });
   });
 

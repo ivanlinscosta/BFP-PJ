@@ -1,5 +1,13 @@
 import { useMutation } from '@tanstack/react-query';
-import { Building2, FileDown, MessageSquarePlus, RotateCcw, Sparkles, X } from 'lucide-react';
+import {
+  Building2,
+  Database,
+  FileDown,
+  MessageSquarePlus,
+  RotateCcw,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import type { AnalysisSpec } from '@bfp/domain';
@@ -13,6 +21,8 @@ import {
   SaveAnalysisDialog,
 } from '@/features/explorer/components/action-dialogs';
 import { useAnalysisStore } from '@/features/explorer/store';
+import { useMeshDatasets } from '@/features/mesh/api';
+import { DatasetPicker } from '@/features/mesh/dataset-picker';
 import { AnalysisCard } from '@/features/intelligence/analysis-card';
 import {
   askIntelligence,
@@ -36,12 +46,16 @@ interface ChatEntry {
   reply?: IntelligenceReply;
   /** Prompt to resend when the entry is an error. */
   retry?: string;
+  /** Bases the question was answered with. */
+  datasets?: string[];
 }
 
 interface ChatState {
   conversationId?: string;
   /** Cliente PJ in context (opened from the customer page). */
   customer?: { customerId: string; tradeName?: string };
+  /** Bases selected for the conversation (the answers only use them). */
+  datasets?: string[];
   entries: ChatEntry[];
 }
 
@@ -109,6 +123,10 @@ export function IntelligencePage() {
     return customerId ? { customer: { customerId }, entries: [] } : loadChat();
   });
   const [prompt, setPrompt] = useState('');
+  const [picking, setPicking] = useState(false);
+  const meshDatasets = useMeshDatasets();
+  const datasetName = (id: string) =>
+    meshDatasets.data?.items.find((dataset) => dataset.id === id)?.name ?? id;
   const [saveTarget, setSaveTarget] = useState<{ spec: AnalysisSpec; name: string } | null>(null);
   const [dashboardTarget, setDashboardTarget] = useState<{
     spec: AnalysisSpec;
@@ -142,6 +160,7 @@ export function IntelligencePage() {
       setChat((current) => ({
         conversationId: conversationId ?? current.conversationId,
         customer: customer ?? current.customer,
+        datasets: current.datasets,
         entries: [...current.entries, ...entries],
       }));
     },
@@ -155,6 +174,7 @@ export function IntelligencePage() {
         analysisSpec: hasContext && !chat.customer ? spec : undefined,
         conversationId: chat.conversationId,
         customerId: chat.customer?.customerId,
+        datasets: chat.customer ? undefined : chat.datasets,
       }),
     onSuccess: (reply) => {
       // The analysis of the answer becomes the context of the next question.
@@ -172,6 +192,7 @@ export function IntelligencePage() {
             // An adjustment already shows its message as a tag above the answer.
             text: reply.answer || (reply.action === 'UPDATE_ANALYSIS' ? '' : reply.message),
             reply,
+            datasets: chat.customer ? undefined : chat.datasets,
           },
         ],
         reply.conversationId,
@@ -190,9 +211,17 @@ export function IntelligencePage() {
     },
   });
 
+  const needsDatasets = !chat.customer && (chat.datasets ?? []).length === 0;
+
   function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || mutation.isPending || !flags.aiCopilot) return;
+    if (needsDatasets) {
+      // Keeps the question in the composer while the user picks the bases.
+      setPrompt(trimmed);
+      setPicking(true);
+      return;
+    }
     append([{ id: ++sequence.current, role: 'user', text: trimmed }]);
     setPrompt('');
     mutation.mutate(trimmed);
@@ -253,8 +282,12 @@ export function IntelligencePage() {
     }
   }
 
+  const selectDatasets = useCallback((datasetIds: string[]) => {
+    setChat((current) => ({ ...current, datasets: datasetIds }));
+  }, []);
+
   function newConversation() {
-    setChat({ entries: [] });
+    setChat((current) => ({ datasets: current.datasets, entries: [] }));
     clearAnalysis();
     setExportError(null);
   }
@@ -295,7 +328,12 @@ export function IntelligencePage() {
         ref={listRef}
       >
         {chat.entries.length === 0 ? (
-          <ChatEmptyState firstName={user?.name?.split(' ')[0]} onPick={send} />
+          <ChatEmptyState
+            firstName={user?.name?.split(' ')[0]}
+            onPick={send}
+            onSelectBases={chat.customer ? undefined : () => setPicking(true)}
+            selectedBases={(chat.datasets ?? []).length}
+          />
         ) : (
           <ol className="m-0 flex list-none flex-col gap-6 p-0">
             {chat.entries.map((entry) => {
@@ -365,6 +403,12 @@ export function IntelligencePage() {
                       </p>
                     ) : null}
 
+                    {entry.datasets?.length ? (
+                      <p className="m-0 mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-faint">
+                        <Database aria-hidden className="h-3 w-3" />
+                        Respondido com: {entry.datasets.map(datasetName).join(', ')}
+                      </p>
+                    ) : null}
                     {reply?.customer && reply.basis ? (
                       <p className="m-0 mt-2 text-[11px] text-ink-faint">
                         {reply.basis.title} · {reply.basis.items.join(' · ')}
@@ -465,6 +509,31 @@ export function IntelligencePage() {
             A Inteligência PJ foi desativada pela administração. Continue a análise no Explorar.
           </Notice>
         ) : null}
+        {!chat.customer ? (
+          <div className="mb-2 flex flex-wrap items-center gap-2 px-1 text-xs text-ink-soft">
+            <Database aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-navy" />
+            <span className="font-semibold text-ink">Bases da conversa:</span>
+            {(chat.datasets ?? []).length === 0 ? (
+              <span className="text-warning">nenhuma selecionada — escolha antes de perguntar</span>
+            ) : (
+              (chat.datasets ?? []).map((id) => (
+                <span
+                  className="inline-flex items-center rounded bg-tint px-2 py-0.5 font-semibold text-brand-navy"
+                  key={id}
+                >
+                  {datasetName(id)}
+                </span>
+              ))
+            )}
+            <button
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold text-brand-navy hover:bg-muted"
+              onClick={() => setPicking(true)}
+              type="button"
+            >
+              {(chat.datasets ?? []).length === 0 ? 'Selecionar bases' : 'Alterar bases'}
+            </button>
+          </div>
+        ) : null}
         {chat.customer ? (
           <div className="mb-2 flex items-center gap-2 px-1 text-xs text-ink-soft">
             <Building2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-navy" />
@@ -515,6 +584,13 @@ export function IntelligencePage() {
         />
       </div>
 
+      <DatasetPicker
+        key={picking ? 'open' : 'closed'}
+        onApply={selectDatasets}
+        onClose={() => setPicking(false)}
+        open={picking}
+        selected={chat.datasets ?? []}
+      />
       {saveTarget ? (
         <SaveAnalysisDialog
           defaultName={saveTarget.name}

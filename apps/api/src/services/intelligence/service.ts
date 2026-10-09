@@ -3,6 +3,7 @@ import { isStudyRequest } from '@api/services/intelligence/study';
 import { startStudyJob } from '@api/services/intelligence/studyJobs';
 import { randomUUID } from 'node:crypto';
 import type { AnalysisSpec } from '@bfp/domain';
+import type { MeshDatasetId } from '@bfp/semantic-layer';
 import type { AuthenticatedUser } from '@api/auth/types';
 import { ApiError } from '@api/common/errors';
 import type { ApiContext } from '@api/http/context';
@@ -21,7 +22,7 @@ import {
   runOpenAIProvider,
   type OpenAIChatClient,
 } from '@api/services/intelligence/openaiProvider';
-import type { ToolContext } from '@api/services/intelligence/tools';
+import { DatasetScopeError, type ToolContext } from '@api/services/intelligence/tools';
 import type {
   IntelligenceResponse,
   ProviderResult,
@@ -36,6 +37,8 @@ export interface IntelligenceRequest {
   conversationId?: string;
   /** Cliente PJ in context: questions are answered from its DNA, signals and NBA. */
   customerId?: string;
+  /** Mesh bases the user selected: the answer may only use these. */
+  datasets?: MeshDatasetId[];
 }
 
 export interface IntelligenceDependencies {
@@ -69,7 +72,13 @@ export async function runIntelligence(
   const startedAt = performance.now();
   const conversation = await loadConversation(context, auth, request.conversationId);
   const conversationId = conversation?.id ?? request.conversationId ?? randomUUID();
-  const toolContext: ToolContext = { context, auth, correlationId, queries: [] };
+  const toolContext: ToolContext = {
+    context,
+    auth,
+    correlationId,
+    queries: [],
+    datasets: request.datasets?.length ? request.datasets : undefined,
+  };
   let provider: 'bedrock' | 'openai' | 'local' =
     context.config.aiProvider === 'bedrock' || context.config.aiProvider === 'openai'
       ? context.config.aiProvider
@@ -180,34 +189,52 @@ export async function runIntelligence(
         errorName: error instanceof Error ? error.name : 'unknown',
         errorMessage: error instanceof Error ? error.message.slice(0, 300) : String(error),
       });
-      if (error instanceof ApiError && error.statusCode < 500) {
-        throw error;
-      }
-      if (provider === 'local') {
-        throw new ApiError(
-          503,
-          'ai_unavailable',
-          'A Inteligência PJ está indisponível no momento. Continue a análise no playground.',
-        );
-      }
+      const scopeAnswer = (scope: DatasetScopeError): ProviderResult => ({
+        action: 'NONE',
+        operations: [],
+        message: scope.message,
+        answer: scope.message,
+        suggestions: [],
+      });
+      if (error instanceof DatasetScopeError) {
+        // Outside the selected bases: an answer (not an error) that says what is missing.
+        result = scopeAnswer(error);
+      } else {
+        if (error instanceof ApiError && error.statusCode < 500) {
+          throw error;
+        }
+        if (provider === 'local') {
+          throw new ApiError(
+            503,
+            'ai_unavailable',
+            'A Inteligência PJ está indisponível no momento. Continue a análise no playground.',
+          );
+        }
 
-      // Generative provider unavailable (key, model access, quota): answer with the deterministic
-      // provider over the same governed tools instead of leaving the user without a reply.
-      context.logger.warn('ai_provider_fallback', {
-        correlationId,
-        userId: auth.userId,
-        operation: 'AI_REQUEST',
-        from: provider,
-        to: 'local',
-      });
-      toolContext.queries.splice(0);
-      provider = 'local';
-      model = 'deterministic-insights';
-      result = await runLocalProvider({
-        prompt: request.prompt,
-        analysisSpec: request.analysisSpec,
-        toolContext,
-      });
+        // Generative provider unavailable (key, model access, quota): answer with the
+        // deterministic provider over the same governed tools instead of leaving the user without
+        // a reply.
+        context.logger.warn('ai_provider_fallback', {
+          correlationId,
+          userId: auth.userId,
+          operation: 'AI_REQUEST',
+          from: provider,
+          to: 'local',
+        });
+        toolContext.queries.splice(0);
+        provider = 'local';
+        model = 'deterministic-insights';
+        try {
+          result = await runLocalProvider({
+            prompt: request.prompt,
+            analysisSpec: request.analysisSpec,
+            toolContext,
+          });
+        } catch (fallbackError) {
+          if (!(fallbackError instanceof DatasetScopeError)) throw fallbackError;
+          result = scopeAnswer(fallbackError);
+        }
+      }
     }
   }
 

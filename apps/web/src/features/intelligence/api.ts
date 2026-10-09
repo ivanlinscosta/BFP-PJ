@@ -69,16 +69,24 @@ export async function askIntelligence(input: {
   analysisSpec?: AnalysisSpec;
   conversationId?: string;
   customerId?: string;
+  datasets?: string[];
 }) {
   return apiRequest<
     IntelligenceReply,
-    { prompt: string; analysisSpec?: AnalysisSpec; conversationId?: string; customerId?: string }
+    {
+      prompt: string;
+      analysisSpec?: AnalysisSpec;
+      conversationId?: string;
+      customerId?: string;
+      datasets?: string[];
+    }
   >('/ai/chat', {
     method: 'POST',
     body: {
       prompt: input.prompt,
       conversationId: input.conversationId,
       customerId: input.customerId,
+      datasets: input.datasets?.length ? input.datasets : undefined,
       analysisSpec:
         input.analysisSpec && input.analysisSpec.metrics.length > 0
           ? toQueryBody(input.analysisSpec)

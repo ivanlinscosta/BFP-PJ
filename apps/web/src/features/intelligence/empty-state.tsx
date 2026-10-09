@@ -1,5 +1,6 @@
 import {
   CreditCard,
+  Database,
   Gauge,
   Megaphone,
   Smartphone,
@@ -32,9 +33,14 @@ export const SUGGESTIONS: Array<{ icon: LucideIcon; theme: string; prompt: strin
 export function ChatEmptyState({
   firstName,
   onPick,
+  selectedBases = 0,
+  onSelectBases,
 }: {
   firstName?: string;
   onPick(prompt: string): void;
+  /** Bases selected for the conversation; the assistant answers only with them. */
+  selectedBases?: number;
+  onSelectBases?(): void;
 }) {
   const mesh = useMeshDatasets();
   const bases = (mesh.data?.items ?? []).filter((item) => item.available);
@@ -51,6 +57,33 @@ export function ChatEmptyState({
         Pergunte em linguagem natural. A Inteligência PJ consulta as bases que você acessa, responde
         com gráficos e números verificáveis e continua a análise com você.
       </p>
+
+      {onSelectBases ? (
+        <div className="mt-5 flex w-full flex-col items-center gap-2 rounded-[var(--radius-card)] border border-dashed border-brand-navy/40 bg-tint px-4 py-4">
+          <p className="m-0 text-sm text-ink">
+            {selectedBases === 0 ? (
+              <>
+                <strong>Passo 1:</strong> escolha as bases de dados que a Inteligência PJ pode usar.
+                Ela responde somente com os dados dessas bases — sem inventar números.
+              </>
+            ) : (
+              <>
+                <strong>{selectedBases}</strong>{' '}
+                {selectedBases === 1 ? 'base selecionada' : 'bases selecionadas'}. Agora faça sua
+                pergunta.
+              </>
+            )}
+          </p>
+          <button
+            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-navy px-3 text-[13px] font-semibold text-white hover:opacity-90"
+            onClick={onSelectBases}
+            type="button"
+          >
+            <Database aria-hidden className="h-4 w-4" />
+            {selectedBases === 0 ? 'Selecionar bases de dados' : 'Alterar bases'}
+          </button>
+        </div>
+      ) : null}
 
       <ul className="m-0 mt-6 grid w-full list-none grid-cols-1 gap-3 p-0 text-left sm:grid-cols-2 lg:grid-cols-3">
         {SUGGESTIONS.map(({ icon: Icon, theme, prompt }) => (
