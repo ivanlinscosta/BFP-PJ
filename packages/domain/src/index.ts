@@ -228,8 +228,24 @@ export const DIGITAL_EVENT_TYPES = [
 /** Product-usage events captured in the digital journey. */
 export type DigitalEventType = (typeof DIGITAL_EVENT_TYPES)[number];
 
-/** Channels used by digital product events. */
-export const DIGITAL_CHANNELS = ['WEB', 'MOBILE', 'API'] as const;
+/**
+ * Access channels of the customer (how the company reaches the bank): App Itaú Empresas, Bankline
+ * (internet banking), Agência/gerente or API. One vocabulary for navigation, product contracting
+ * and transactions. Media channels (Google, Meta…) are a different concept: AcquisitionChannel.
+ */
+export const ACCESS_CHANNELS = ['APP', 'BANKLINE', 'AGENCIA', 'API'] as const;
+
+/** Access channel of the customer (see ACCESS_CHANNELS). */
+export type AccessChannel = (typeof ACCESS_CHANNELS)[number];
+
+/** Digital access channels where navigation happens (App and Bankline). */
+export const DIGITAL_ACCESS_CHANNELS = ['APP', 'BANKLINE'] as const;
+
+/** Digital access channel where navigation happens. */
+export type DigitalAccessChannel = (typeof DIGITAL_ACCESS_CHANNELS)[number];
+
+/** Channels used by digital product events (FullStory): Bankline/site, App or API. */
+export const DIGITAL_CHANNELS = ['BANKLINE', 'APP', 'API'] as const;
 
 /** Channels used by digital product events. */
 export type DigitalChannel = (typeof DIGITAL_CHANNELS)[number];
@@ -257,10 +273,10 @@ export const APP_ACTIONS = ['VIEW', 'CLICK', 'COMPLETE', 'ABANDON', 'ERROR'] as 
 /** Interaction recorded on an app screen. */
 export type AppAction = (typeof APP_ACTIONS)[number];
 
-/** Mobile platform of the Itaú Empresas app. */
-export const APP_PLATFORMS = ['IOS', 'ANDROID'] as const;
+/** Device platform of a navigation event: the app on iOS/Android or Bankline on the web. */
+export const APP_PLATFORMS = ['IOS', 'ANDROID', 'WEB'] as const;
 
-/** Mobile platform of the Itaú Empresas app. */
+/** Device platform of a navigation event. */
 export type AppPlatform = (typeof APP_PLATFORMS)[number];
 
 /** Business transaction types moved by PJ customers. */
@@ -276,8 +292,8 @@ export const TRANSACTION_TYPES = [
 /** Business transaction types moved by PJ customers. */
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
-/** Channel where a transaction was initiated. */
-export const TRANSACTION_CHANNELS = ['APP', 'INTERNET_BANKING', 'API', 'AGENCY'] as const;
+/** Access channel where a transaction was initiated (same vocabulary as ACCESS_CHANNELS). */
+export const TRANSACTION_CHANNELS = ACCESS_CHANNELS;
 
 /** Channel where a transaction was initiated. */
 export type TransactionChannel = (typeof TRANSACTION_CHANNELS)[number];
@@ -586,6 +602,11 @@ export interface Company {
   annualRevenueRange: AnnualRevenueRange;
   acquisitionSource: AcquisitionSource;
   acquisitionChannel: AcquisitionChannel;
+  /**
+   * Access channel the company uses most to navigate (App or Bankline), derived from the
+   * navigation telemetry; null when the company has no digital navigation.
+   */
+  primaryAccessChannel?: DigitalAccessChannel | null;
   acquisitionCampaignId: string | null;
   leadCreatedAt: string;
   accountOpeningStartedAt: string | null;
@@ -643,6 +664,8 @@ export interface CompanyProduct {
   companyId: string;
   productId: string;
   status: CompanyProductStatus;
+  /** Access channel where the product was contracted (App, Bankline, Agência or API). */
+  contractChannel: AccessChannel;
   contractedAt: string;
   activatedAt: string | null;
   cancelledAt: string | null;
@@ -723,11 +746,13 @@ export interface DigitalEvent {
   value: number | null;
 }
 
-/** Navigation event of a company user inside the Itaú Empresas app (app telemetry). */
+/** Navigation event of a company user in the digital channels (App Itaú Empresas or Bankline). */
 export interface AppNavigationEvent {
   id: string;
   companyId: string;
   sessionId: string;
+  /** Digital access channel of the session: App Itaú Empresas or Bankline. */
+  accessChannel: DigitalAccessChannel;
   screen: AppScreen;
   action: AppAction;
   platform: AppPlatform;

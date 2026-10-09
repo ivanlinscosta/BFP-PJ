@@ -1109,10 +1109,13 @@ function computeNonRatioMetricValue(
     case 'crm_interactions_total':
     case 'conversations_total':
     case 'conversations_resolved':
+    case 'contracted_products':
+    case 'digital_contracted_products':
       return documents.length;
     case 'app_sessions':
     case 'digital_sessions':
     case 'app_active_companies':
+    case 'bankline_active_companies':
     case 'transacting_companies':
     case 'crm_contacted_companies':
     case 'digital_active_companies': {

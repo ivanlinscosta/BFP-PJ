@@ -85,6 +85,7 @@ const datasetBundle: DatasetBundle = {
       activatedAt: '2026-01-06T12:00:00.000Z',
       cancelledAt: null,
       monthlyRevenueProxy: 120,
+      contractChannel: 'APP',
     },
   ],
   mediaCampaigns: [
@@ -154,7 +155,7 @@ const datasetBundle: DatasetBundle = {
       id: 'digital-1',
       companyId: 'company-1',
       eventType: 'LOGIN',
-      channel: 'WEB',
+      channel: 'BANKLINE',
       productId: 'product-1',
       occurredAt: '2026-01-10T08:00:00.000Z',
       sessionId: 'session-1',

@@ -76,7 +76,8 @@ export interface TransactionAggregate {
   balanceBand: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
-export type DigitalChannelKind = 'APP' | 'WEB';
+/** Digital access channel of a session: App Itaú Empresas or Bankline (web). */
+export type DigitalChannelKind = 'APP' | 'BANKLINE';
 
 export interface DigitalSession {
   customerId: string;

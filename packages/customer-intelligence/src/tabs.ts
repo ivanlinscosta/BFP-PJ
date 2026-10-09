@@ -213,8 +213,8 @@ export function buildProfileTabs(
           : appSessions / sessions30.length >= 0.65
             ? 'App'
             : appSessions / sessions30.length <= 0.35
-              ? 'Internet Banking'
-              : 'App / Internet Banking',
+              ? 'Bankline'
+              : 'App / Bankline',
       topics: topics.slice(0, 5),
       features: [...featureCounts.entries()]
         .map(([feature, count]) => ({ feature, count }))

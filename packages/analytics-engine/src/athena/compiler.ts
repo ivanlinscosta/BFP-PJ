@@ -28,6 +28,7 @@ export const DIMENSION_COLUMNS: Record<MeshDatasetId, Record<string, string>> = 
     region: 'region',
     acquisition_source: 'acquisition_source',
     acquisition_channel: 'acquisition_channel',
+    primary_access_channel: 'primary_access_channel',
     acquisition_campaign: 'acquisition_campaign_id',
     company_status: 'company_status',
     lead_date: 'lead_created_at',
@@ -43,12 +44,14 @@ export const DIMENSION_COLUMNS: Record<MeshDatasetId, Record<string, string>> = 
   company_products: {
     product: 'product_name',
     product_category: 'product_category',
+    product_contract_channel: 'contract_channel',
     contracted_date: 'contracted_at',
   },
   conversations: { conversation_status: 'status', conversation_channel: 'channel' },
   crm_interactions: { crm_interaction_type: 'interaction_type', crm_outcome: 'outcome' },
-  digital_journey: {},
+  digital_journey: { digital_access_channel: 'access_channel' },
   app_navigation: {
+    access_channel: 'access_channel',
     app_screen: 'screen',
     app_action: 'action',
     app_platform: 'platform',
@@ -56,7 +59,7 @@ export const DIMENSION_COLUMNS: Record<MeshDatasetId, Record<string, string>> = 
   },
   transactions: {
     transaction_type: 'transaction_type',
-    transaction_channel: 'channel',
+    transaction_channel: 'access_channel',
     transaction_date: 'occurred_at',
   },
   nps_responses: { nps_touchpoint: 'touchpoint', nps_date: 'responded_at' },
@@ -184,6 +187,17 @@ export const BASE_METRIC_SQL: Record<string, BaseMetricSql> = {
     expression: 'SUM(f.monthly_revenue_proxy)',
     where: 'f.product_name IS NOT NULL',
   },
+  contracted_products: {
+    dataset: 'company_products',
+    time: 'contracted_at',
+    expression: 'COUNT(*)',
+  },
+  digital_contracted_products: {
+    dataset: 'company_products',
+    time: 'contracted_at',
+    expression: 'COUNT(*)',
+    where: "f.contract_channel IN ('APP', 'BANKLINE')",
+  },
   app_interactions: { dataset: 'app_navigation', time: 'occurred_at', expression: 'COUNT(*)' },
   app_sessions: {
     dataset: 'app_navigation',
@@ -194,6 +208,13 @@ export const BASE_METRIC_SQL: Record<string, BaseMetricSql> = {
     dataset: 'app_navigation',
     time: 'occurred_at',
     expression: 'COUNT(DISTINCT f.company_id)',
+    where: "f.access_channel = 'APP'",
+  },
+  bankline_active_companies: {
+    dataset: 'app_navigation',
+    time: 'occurred_at',
+    expression: 'COUNT(DISTINCT f.company_id)',
+    where: "f.access_channel = 'BANKLINE'",
   },
   app_avg_screen_time: {
     dataset: 'app_navigation',

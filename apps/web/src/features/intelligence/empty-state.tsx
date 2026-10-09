@@ -24,7 +24,11 @@ export const SUGGESTIONS: Array<{ icon: LucideIcon; theme: string; prompt: strin
     prompt: 'Qual canal combina melhor conversão com menor CAC?',
   },
   { icon: Gauge, theme: 'Ativação', prompt: 'Como está a ativação D30 por porte da empresa?' },
-  { icon: Smartphone, theme: 'App Itaú Empresas', prompt: 'Qual a taxa de erro no app por tela?' },
+  {
+    icon: Smartphone,
+    theme: 'Canais de acesso',
+    prompt: 'Qual a taxa de contratação digital por canal de acesso principal?',
+  },
   { icon: CreditCard, theme: 'Transações', prompt: 'Volume em Pix por segmento' },
   { icon: ThumbsUp, theme: 'Satisfação', prompt: 'Qual o NPS por momento da relação?' },
 ];

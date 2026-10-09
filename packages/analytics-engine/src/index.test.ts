@@ -140,6 +140,7 @@ function createFixtureBundle(): DatasetBundle {
         activatedAt: '2026-01-21T12:00:00.000Z',
         cancelledAt: null,
         monthlyRevenueProxy: 100,
+        contractChannel: 'APP',
       },
       {
         id: 'cp-2',
@@ -150,6 +151,7 @@ function createFixtureBundle(): DatasetBundle {
         activatedAt: null,
         cancelledAt: null,
         monthlyRevenueProxy: 50,
+        contractChannel: 'APP',
       },
       {
         id: 'cp-3',
@@ -160,6 +162,7 @@ function createFixtureBundle(): DatasetBundle {
         activatedAt: '2026-01-25T12:00:00.000Z',
         cancelledAt: null,
         monthlyRevenueProxy: 100,
+        contractChannel: 'APP',
       },
       {
         id: 'cp-4',
@@ -170,6 +173,7 @@ function createFixtureBundle(): DatasetBundle {
         activatedAt: null,
         cancelledAt: '2026-01-29T12:00:00.000Z',
         monthlyRevenueProxy: 50,
+        contractChannel: 'APP',
       },
     ],
     mediaCampaigns: [

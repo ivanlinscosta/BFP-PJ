@@ -4,7 +4,7 @@ import type { MeshDatasetId } from '@bfp/semantic-layer';
 /** One row of a mesh data product (the physical columns published in the lake). */
 export type MeshRow = Record<string, string | number | boolean | null>;
 
-/** FullStory-style page names used to label digital journey events. */
+/** FullStory-style page names used to label digital journey events (Bankline/site and App). */
 const FULLSTORY_PAGES: Record<
   DigitalEvent['eventType'],
   { type: string; name: string; path: string }
@@ -30,7 +30,7 @@ export function toFullStoryRow(event: DigitalEvent): MeshRow {
     event_type: page.type,
     event_name: page.name,
     page_url: `https://www.itau.com.br${page.path}`,
-    channel: event.channel === 'MOBILE' ? 'app' : 'web',
+    access_channel: event.channel,
     occurred_at: event.occurredAt,
   };
 }
@@ -55,6 +55,7 @@ export function buildMeshRows(bundle: DatasetBundle, dataset: MeshDatasetId): Me
         region: company.region,
         acquisition_source: company.acquisitionSource,
         acquisition_channel: company.acquisitionChannel,
+        primary_access_channel: company.primaryAccessChannel ?? null,
         acquisition_campaign_id: company.acquisitionCampaignId,
         company_status: company.status,
         lead_created_at: company.leadCreatedAt,
@@ -88,6 +89,7 @@ export function buildMeshRows(bundle: DatasetBundle, dataset: MeshDatasetId): Me
         product_name: productById.get(item.productId)?.name ?? null,
         product_category: productById.get(item.productId)?.category ?? null,
         status: item.status,
+        contract_channel: item.contractChannel,
         contracted_at: item.contractedAt,
         monthly_revenue_proxy: item.monthlyRevenueProxy,
       })),
@@ -115,6 +117,7 @@ export function buildMeshRows(bundle: DatasetBundle, dataset: MeshDatasetId): Me
         event_id: event.id,
         company_id: event.companyId,
         session_id: event.sessionId,
+        access_channel: event.accessChannel,
         screen: event.screen,
         action: event.action,
         platform: event.platform,
@@ -127,7 +130,7 @@ export function buildMeshRows(bundle: DatasetBundle, dataset: MeshDatasetId): Me
         transaction_id: transaction.id,
         company_id: transaction.companyId,
         transaction_type: transaction.transactionType,
-        channel: transaction.channel,
+        access_channel: transaction.channel,
         amount: transaction.amount,
         occurred_at: transaction.occurredAt,
       })),

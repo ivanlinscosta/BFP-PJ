@@ -3,7 +3,6 @@ import type {
   AppAction,
   AppScreen,
   NpsTouchpoint,
-  TransactionChannel,
   TransactionType,
   AcquisitionSource,
   AgeRange,
@@ -581,8 +580,8 @@ export const DIGITAL_EVENT_TYPE_WEIGHTS: readonly (readonly [DigitalEventType, n
 ];
 
 export const DIGITAL_CHANNEL_WEIGHTS: readonly (readonly [DigitalChannel, number])[] = [
-  ['WEB', 58],
-  ['MOBILE', 31],
+  ['BANKLINE', 58],
+  ['APP', 31],
   ['API', 11],
 ];
 
@@ -643,12 +642,21 @@ export const TRANSACTION_TICKET: Record<TransactionType, number> = {
   CARD_PURCHASE: 380,
 };
 
-export const TRANSACTION_CHANNEL_WEIGHTS: readonly (readonly [TransactionChannel, number])[] = [
-  ['APP', 58],
-  ['INTERNET_BANKING', 29],
-  ['API', 9],
-  ['AGENCY', 4],
-];
+/**
+ * Access profile by company size: share of App in digital navigation (the rest is Bankline) and
+ * how often products are contracted through the Agência/gerente and transactions go through
+ * Agência or API. Smaller companies live in the App; larger ones use Bankline, gerente and API.
+ */
+export const ACCESS_PROFILE_BY_SIZE: Record<
+  CompanySize,
+  { appShare: number; agencyContract: number; agencyTransaction: number; apiTransaction: number }
+> = {
+  MEI: { appShare: 0.8, agencyContract: 0.05, agencyTransaction: 0.02, apiTransaction: 0.0 },
+  Micro: { appShare: 0.7, agencyContract: 0.08, agencyTransaction: 0.03, apiTransaction: 0.01 },
+  Pequena: { appShare: 0.55, agencyContract: 0.15, agencyTransaction: 0.04, apiTransaction: 0.04 },
+  Média: { appShare: 0.4, agencyContract: 0.25, agencyTransaction: 0.05, apiTransaction: 0.1 },
+  Grande: { appShare: 0.25, agencyContract: 0.35, agencyTransaction: 0.06, apiTransaction: 0.18 },
+};
 
 export const NPS_TOUCHPOINT_WEIGHTS: readonly (readonly [NpsTouchpoint, number])[] = [
   ['APP', 38],

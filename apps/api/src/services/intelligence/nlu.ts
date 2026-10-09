@@ -63,6 +63,10 @@ const CURATED_METRIC_LEXICON: LexiconEntry[] = [
   },
   { id: 'onboarding_completion_rate', phrases: ['conclusao de onboarding'] },
   { id: 'leads', phrases: ['leads'] },
+  { id: 'digital_contract_rate', phrases: ['contratacao digital', 'taxa de contratacao digital'] },
+  { id: 'digital_contracted_products', phrases: ['contratacoes digitais'] },
+  { id: 'contracted_products', phrases: ['produtos contratados', 'contratacoes'] },
+  { id: 'bankline_active_companies', phrases: ['ativas no bankline', 'usam o bankline'] },
 ];
 
 /**
@@ -90,7 +94,24 @@ const CURATED_DIMENSION_LEXICON: LexiconEntry[] = [
   { id: 'crm_outcome', phrases: ['resultado'] },
   { id: 'crm_interaction_type', phrases: ['tipo de interacao'] },
   { id: 'conversation_channel', phrases: ['canal da conversa', 'canal de atendimento'] },
-  { id: 'acquisition_channel', phrases: ['canais', 'canal'] },
+  // Access channels (App, Bankline, Agência, API) before the generic "canal" (media channel).
+  { id: 'product_contract_channel', phrases: ['canal de contratacao', 'canais de contratacao'] },
+  { id: 'access_channel', phrases: ['canal de navegacao'] },
+  {
+    id: 'primary_access_channel',
+    phrases: [
+      'canal de acesso principal',
+      'canais de acesso',
+      'canal de acesso',
+      'app ou bankline',
+      'app e bankline',
+      'app x bankline',
+    ],
+  },
+  {
+    id: 'acquisition_channel',
+    phrases: ['canal de aquisicao', 'canal de midia', 'canais', 'canal'],
+  },
   { id: 'company_size', phrases: ['portes', 'porte', 'tamanho da empresa'] },
   { id: 'state', phrases: ['estados', 'estado', 'uf'] },
   { id: 'segment', phrases: ['segmentos', 'segmento', 'setor'] },

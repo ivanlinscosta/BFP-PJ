@@ -9,18 +9,31 @@ exibidos com máscara adicional na UI; nomes vêm do faker em pt-BR.
 Volumes padrão: ~3.000 empresas que avançam no funil + ~16.000 leads que não convertem
 (calibração por canal), 12 meses de eventos, 40 campanhas, 9.000 sócios, 8.000 produtos
 contratados, 60.000 touchpoints de mídia, 50.000 eventos de funil, 12.000 interações de CRM,
-8.000 conversas, 80.000 eventos digitais (formato FullStory), 90.000 interações no app Itaú
-Empresas, 45.000 transações e 5.000 respostas NPS.
+8.000 conversas, 80.000 eventos digitais (formato FullStory), 90.000 interações de navegação
+(App Itaú Empresas e Bankline), 45.000 transações e 5.000 respostas NPS.
 
 Tipos adicionados para análises de uso e relacionamento (todos ligados por `company_id` e só para
 empresas com conta aberta):
 
-| Entidade               | Campos                                                                                              | Produto de dados (mesh) |
-| ---------------------- | --------------------------------------------------------------------------------------------------- | ----------------------- |
-| `appNavigation`        | sessão, tela (Início, Extrato, Pix, Boletos…), ação, plataforma, versão, tempo em tela              | `app_navigation`        |
-| `transaction`          | tipo (Pix recebido/enviado, boleto emitido/pago, TED, cartão), canal, valor                         | `transactions`          |
-| `npsResponse`          | momento (onboarding, app, atendimento, gerente) e nota 0–10, sem texto livre                        | `nps_responses`         |
-| `customerIntelligence` | snapshot por empresa: ação #1, score, confiança, sinal principal, 6 scores do DNA e níveis, versões | `customer_intelligence` |
+| Entidade               | Campos                                                                                                                                            | Produto de dados (mesh) |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `appNavigation`        | sessão, **canal de acesso (App ou Bankline)**, tela (Início, Extrato, Pix, Boletos…), ação, plataforma (iOS, Android, Web), versão, tempo em tela | `app_navigation`        |
+| `transaction`          | tipo (Pix recebido/enviado, boleto emitido/pago, TED, cartão), canal de acesso (App, Bankline, Agência, API), valor                               | `transactions`          |
+| `npsResponse`          | momento (onboarding, app, atendimento, gerente) e nota 0–10, sem texto livre                                                                      | `nps_responses`         |
+| `customerIntelligence` | snapshot por empresa: ação #1, score, confiança, sinal principal, 6 scores do DNA e níveis, versões                                               | `customer_intelligence` |
+
+Canal de acesso (um vocabulário para todo o modelo: `APP`, `BANKLINE`, `AGENCIA`, `API`):
+
+- `appNavigation.accessChannel`: cada sessão acontece no App (iOS/Android) ou no Bankline (Web).
+- `companyProduct.contractChannel`: canal de contratação do produto (App, Bankline ou Agência).
+- `transaction.channel`: canal de acesso em que a transação foi feita.
+- `company.primaryAccessChannel`: canal digital que a empresa mais usa (da navegação; para
+  clientes fora da amostra de navegação, do perfil de acesso; nulo para leads). As sessões do
+  Customer DNA seguem esse canal.
+- O canal de **aquisição** (`acquisitionChannel`: Google, Meta, LinkedIn…) continua separado.
+
+Perfil de acesso por porte (`ACCESS_PROFILE_BY_SIZE`): MEI e Micro usam mais o App; Média e
+Grande usam mais o Bankline, contratam mais com o gerente (Agência) e usam API nas transações.
 
 Padrões: empresas maiores e ativadas usam mais o app e transacionam mais; o ticket segue o porte;
 o NPS sobe com onboarding rápido e cai com conversas não resolvidas.

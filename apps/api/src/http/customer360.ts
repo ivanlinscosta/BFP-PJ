@@ -152,9 +152,11 @@ function buildJourney(input: {
       occurredAt: firstLogin.occurredAt,
       kind: 'site',
       title:
-        firstLogin.channel === 'MOBILE'
-          ? 'Primeiro acesso ao app'
-          : 'Primeiro acesso ao Itaú Empresas',
+        firstLogin.channel === 'APP'
+          ? 'Primeiro acesso ao App Itaú Empresas'
+          : firstLogin.channel === 'BANKLINE'
+            ? 'Primeiro acesso ao Bankline'
+            : 'Primeiro acesso via API',
       category: 'Jornada digital',
       source: 'FullStory',
     });

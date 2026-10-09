@@ -155,6 +155,7 @@ function createFixtureBundle(): DatasetBundle {
         activatedAt: '2026-01-06T08:00:00.000Z',
         cancelledAt: null,
         monthlyRevenueProxy: 100,
+        contractChannel: 'APP',
       },
       {
         id: 'company-product-002',
@@ -165,6 +166,7 @@ function createFixtureBundle(): DatasetBundle {
         activatedAt: '2026-01-11T08:00:00.000Z',
         cancelledAt: null,
         monthlyRevenueProxy: 140,
+        contractChannel: 'APP',
       },
     ],
     mediaCampaigns: [
@@ -253,7 +255,7 @@ function createFixtureBundle(): DatasetBundle {
         id: 'digital-001',
         companyId: 'company-0001',
         eventType: 'LOGIN',
-        channel: 'WEB',
+        channel: 'BANKLINE',
         productId: 'product-001',
         occurredAt: '2026-01-10T11:00:00.000Z',
         sessionId: 'session-001',
@@ -263,7 +265,7 @@ function createFixtureBundle(): DatasetBundle {
         id: 'digital-002',
         companyId: 'company-0002',
         eventType: 'FEATURE_USE',
-        channel: 'WEB',
+        channel: 'BANKLINE',
         productId: 'product-002',
         occurredAt: '2026-01-12T11:00:00.000Z',
         sessionId: 'session-002',

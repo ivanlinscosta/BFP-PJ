@@ -1,6 +1,8 @@
 import { Faker, base, pt_BR } from '@faker-js/faker';
 import type {
+  AccessChannel,
   AppNavigationEvent,
+  DigitalAccessChannel,
   NpsResponse,
   Transaction,
   AcquisitionChannel,
@@ -61,7 +63,7 @@ import {
   APP_SCREEN_WEIGHTS,
   APP_VERSIONS,
   NPS_TOUCHPOINT_WEIGHTS,
-  TRANSACTION_CHANNEL_WEIGHTS,
+  ACCESS_PROFILE_BY_SIZE,
   TRANSACTION_TICKET,
   TRANSACTION_TYPE_WEIGHTS,
 } from './constants';
@@ -279,7 +281,29 @@ export function generateDatasetBundle(options: GenerationOptions = {}): DatasetB
     seed,
     faker,
   });
-  const companies = sortById([...showcase.companies, ...prospects, ...established]);
+  // Canal de acesso principal: the digital channel with most navigation of each company.
+  const navigationByChannel = new Map<string, { APP: number; BANKLINE: number }>();
+  for (const event of appNavigationEvents) {
+    const current = navigationByChannel.get(event.companyId) ?? { APP: 0, BANKLINE: 0 };
+    current[event.accessChannel] += 1;
+    navigationByChannel.set(event.companyId, current);
+  }
+  const companies = sortById([...showcase.companies, ...prospects, ...established]).map(
+    (company) => {
+      const usage = navigationByChannel.get(company.id);
+      // Customers outside the navigation sample use their access profile; leads have no access.
+      const primaryAccessChannel: DigitalAccessChannel | null = usage
+        ? usage.APP >= usage.BANKLINE
+          ? 'APP'
+          : 'BANKLINE'
+        : company.accountOpenedAt
+          ? accessProfile(company, seed).appShare >= 0.5
+            ? 'APP'
+            : 'BANKLINE'
+          : null;
+      return { ...company, primaryAccessChannel };
+    },
+  );
 
   return {
     companies,
@@ -947,6 +971,33 @@ function generateAccounts(companyPlans: CompanyPlan[], seed: number): Account[] 
   return accounts;
 }
 
+/**
+ * Access profile of a company (App share of navigation, Agência/API shares), from its size with a
+ * deterministic per-company jitter, so navigation, contracting and transactions stay coherent.
+ */
+function accessProfile(company: Company, seed: number) {
+  const base = ACCESS_PROFILE_BY_SIZE[company.companySize];
+  const rand = createKeyedRandom(seed, `access-profile:${company.id}`);
+  const appShare = Math.min(0.95, Math.max(0.05, base.appShare + (rand() - 0.5) * 0.3));
+  return { ...base, appShare };
+}
+
+/** Access channel of a transaction: API, Agência or the company's digital channel. */
+function transactionChannel(
+  profile: ReturnType<typeof accessProfile>,
+  rand: () => number,
+): AccessChannel {
+  const draw = rand();
+  if (draw < profile.apiTransaction) return 'API';
+  if (draw < profile.apiTransaction + profile.agencyTransaction) return 'AGENCIA';
+  return digitalAccessChannel(profile.appShare, rand);
+}
+
+/** Digital channel (App or Bankline) drawn from the company's App share. */
+function digitalAccessChannel(appShare: number, rand: () => number): DigitalAccessChannel {
+  return rand() < appShare ? 'APP' : 'BANKLINE';
+}
+
 function generateCompanyProducts(
   companyPlans: CompanyPlan[],
   products: Product[],
@@ -961,6 +1012,8 @@ function generateCompanyProducts(
     }
 
     const rand = createKeyedRandom(seed, `company-products:${plan.company.id}`);
+    const channelRand = createKeyedRandom(seed, `contract-channel:${plan.company.id}`);
+    const profile = accessProfile(plan.company, seed);
     const productPool = [...products].sort((left, right) => left.id.localeCompare(right.id));
 
     for (let index = 0; index < plan.productCount; index += 1) {
@@ -982,6 +1035,11 @@ function generateCompanyProducts(
         companyId: plan.company.id,
         productId: product.id,
         status,
+        // Contracted with the gerente (Agência) or digitally in the channel the company uses.
+        contractChannel:
+          channelRand() < profile.agencyContract
+            ? 'AGENCIA'
+            : digitalAccessChannel(profile.appShare, channelRand),
         contractedAt: toIso(contractedAt),
         activatedAt: activatedAt ? toIso(activatedAt) : null,
         cancelledAt: cancelledAt ? toIso(cancelledAt) : null,
@@ -1288,15 +1346,20 @@ function generateAppNavigation(
     if (count === 0) continue;
 
     const rand = createKeyedRandom(seed, `app:${plan.company.id}`);
-    const platform = rand() < 0.57 ? 'ANDROID' : 'IOS';
+    const mobilePlatform = rand() < 0.57 ? 'ANDROID' : 'IOS';
+    const channelRand = createKeyedRandom(seed, `access-channel:${plan.company.id}`);
+    const { appShare } = accessProfile(plan.company, seed);
     let sessionIndex = 0;
     let sessionStart = usageDate(plan, rand);
+    let accessChannel = digitalAccessChannel(appShare, channelRand);
 
     for (let index = 0; index < count; index += 1) {
       // A session groups 3-8 consecutive screens a few seconds apart.
       if (index % (3 + (sessionIndex % 6)) === 0) {
         sessionIndex += 1;
         sessionStart = usageDate(plan, rand);
+        // Each session happens in one access channel: App Itaú Empresas or Bankline (web).
+        accessChannel = digitalAccessChannel(appShare, channelRand);
       }
       const screen = pickWeighted(
         APP_SCREEN_WEIGHTS.map(([value, weight]) => ({ value, weight })),
@@ -1310,14 +1373,16 @@ function generateAppNavigation(
         2,
         Math.round(APP_SCREEN_SECONDS[screen] * (0.4 + rand() * 1.4)),
       );
+      const appVersion = APP_VERSIONS[Math.floor(rand() * APP_VERSIONS.length)] ?? APP_VERSIONS[0];
       events.push({
         id: `app-${String(runningIndex).padStart(7, '0')}`,
         companyId: plan.company.id,
         sessionId: `${plan.company.id}-app-${String(sessionIndex).padStart(4, '0')}`,
+        accessChannel,
         screen,
         action,
-        platform,
-        appVersion: APP_VERSIONS[Math.floor(rand() * APP_VERSIONS.length)] ?? APP_VERSIONS[0],
+        platform: accessChannel === 'APP' ? mobilePlatform : 'WEB',
+        appVersion: accessChannel === 'APP' ? appVersion : 'bankline-web',
         durationSeconds,
         occurredAt: toIso(
           clampDate(
@@ -1349,6 +1414,8 @@ function generateTransactions(
     if (count === 0) continue;
 
     const rand = createKeyedRandom(seed, `transactions:${plan.company.id}`);
+    const channelRand = createKeyedRandom(seed, `transaction-channel:${plan.company.id}`);
+    const profile = accessProfile(plan.company, seed);
     for (let index = 0; index < count; index += 1) {
       const transactionType = pickWeighted(
         TRANSACTION_TYPE_WEIGHTS.map(([value, weight]) => ({ value, weight })),
@@ -1360,10 +1427,7 @@ function generateTransactions(
         id: `trx-${String(runningIndex).padStart(7, '0')}`,
         companyId: plan.company.id,
         transactionType,
-        channel: pickWeighted(
-          TRANSACTION_CHANNEL_WEIGHTS.map(([value, weight]) => ({ value, weight })),
-          rand,
-        ),
+        channel: transactionChannel(profile, channelRand),
         amount: roundNumber(
           TRANSACTION_TICKET[transactionType] * (0.6 + plan.revenueWeight * 0.5) * spread,
           2,

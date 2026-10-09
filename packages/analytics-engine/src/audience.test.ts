@@ -60,6 +60,7 @@ const companyProducts: CompanyProduct[] = [
     activatedAt: null,
     cancelledAt: null,
     monthlyRevenueProxy: 10,
+    contractChannel: 'APP',
   },
 ];
 const companies = [

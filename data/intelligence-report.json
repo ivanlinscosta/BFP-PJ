@@ -4,31 +4,31 @@
   "customers": 5004,
   "volumes": {
     "transactionWeeks": 258622,
-    "sessions": 341097,
-    "digitalEvents": 886175,
-    "interactions": 61288,
-    "serviceCases": 609,
+    "sessions": 341075,
+    "digitalEvents": 885714,
+    "interactions": 61275,
+    "serviceCases": 607,
     "products": 21380,
-    "signals": 37220,
-    "recommendations": 58558
+    "signals": 37234,
+    "recommendations": 58471
   },
   "dnaDistribution": {
     "relationshipStrength": {
       "mean": 69,
       "levels": {
-        "LOW": 16,
-        "MEDIUM": 2406,
-        "HIGH": 2303,
-        "VERY_HIGH": 279
+        "LOW": 15,
+        "MEDIUM": 2400,
+        "HIGH": 2288,
+        "VERY_HIGH": 301
       }
     },
     "digitalEngagement": {
       "mean": 67,
       "levels": {
-        "LOW": 1095,
-        "MEDIUM": 814,
-        "HIGH": 1397,
-        "VERY_HIGH": 1698
+        "LOW": 1111,
+        "MEDIUM": 807,
+        "HIGH": 1370,
+        "VERY_HIGH": 1716
       }
     },
     "productDepth": {
@@ -43,27 +43,27 @@
     "transactionActivity": {
       "mean": 54,
       "levels": {
-        "LOW": 1018,
-        "MEDIUM": 2908,
-        "HIGH": 1014,
-        "VERY_HIGH": 64
+        "LOW": 1020,
+        "MEDIUM": 2909,
+        "HIGH": 1024,
+        "VERY_HIGH": 51
       }
     },
     "businessMomentum": {
       "mean": 45,
       "levels": {
-        "LOW": 1690,
-        "MEDIUM": 2954,
-        "HIGH": 337,
+        "LOW": 1715,
+        "MEDIUM": 2940,
+        "HIGH": 326,
         "VERY_HIGH": 23
       }
     },
     "commercialIntent": {
       "mean": 15,
       "levels": {
-        "LOW": 4084,
-        "MEDIUM": 749,
-        "HIGH": 171,
+        "LOW": 4083,
+        "MEDIUM": 741,
+        "HIGH": 180,
         "VERY_HIGH": 0
       }
     }
@@ -72,67 +72,67 @@
     {
       "actionId": "NO_ACTION",
       "actionName": "Não abordar agora",
-      "customers": 942,
-      "share": 0.188
+      "customers": 964,
+      "share": 0.193
     },
     {
       "actionId": "REENGAGE_DIGITAL",
       "actionName": "Reengajar nos canais digitais",
-      "customers": 737,
-      "share": 0.147
+      "customers": 710,
+      "share": 0.142
     },
     {
       "actionId": "OFFER_WORKING_CAPITAL",
       "actionName": "Oferecer Capital de Giro",
-      "customers": 656,
+      "customers": 655,
       "share": 0.131
     },
     {
       "actionId": "PROMOTE_PIX_COLLECTION",
       "actionName": "Apresentar Pix Cobrança",
-      "customers": 591,
-      "share": 0.118
+      "customers": 599,
+      "share": 0.12
     },
     {
       "actionId": "PROMOTE_POS_MACHINE",
       "actionName": "Oferecer Maquininha",
-      "customers": 488,
-      "share": 0.098
+      "customers": 464,
+      "share": 0.093
     },
     {
       "actionId": "RESOLVE_SERVICE_ISSUE",
       "actionName": "Resolver atendimento pendente",
-      "customers": 427,
-      "share": 0.085
+      "customers": 422,
+      "share": 0.084
     },
     {
       "actionId": "COMPLETE_ONBOARDING",
       "actionName": "Concluir onboarding",
-      "customers": 371,
-      "share": 0.074
+      "customers": 373,
+      "share": 0.075
     },
     {
       "actionId": "CONTACT_RELATIONSHIP_MANAGER",
       "actionName": "Contato consultivo do gerente",
-      "customers": 358,
-      "share": 0.072
+      "customers": 370,
+      "share": 0.074
     },
     {
       "actionId": "PROMOTE_INVESTMENTS",
       "actionName": "Apresentar investimentos PJ",
-      "customers": 259,
-      "share": 0.052
+      "customers": 276,
+      "share": 0.055
     },
     {
       "actionId": "PROMOTE_INSURANCE",
       "actionName": "Oferecer seguro empresarial",
-      "customers": 160,
-      "share": 0.032
+      "customers": 154,
+      "share": 0.031
     },
     {
       "actionId": "PROMOTE_BUSINESS_CARD",
       "actionName": "Oferecer Cartão PJ",
-      "customers": 14,
+      "customers": 16,
       "share": 0.003
     },
     {
@@ -145,43 +145,43 @@
   "signalDistribution": [
     {
       "type": "HIGH_DIGITAL_ENGAGEMENT",
-      "customers": 2615,
+      "customers": 2619,
       "share": 0.523
     },
     {
       "type": "RECENT_PRODUCT_INTEREST",
-      "customers": 1650,
-      "share": 0.33
+      "customers": 1656,
+      "share": 0.331
     },
     {
       "type": "PRODUCT_GAP_PIX_COLLECTION",
-      "customers": 1491,
-      "share": 0.298
-    },
-    {
-      "type": "RELATIONSHIP_COOLDOWN",
-      "customers": 1359,
-      "share": 0.272
+      "customers": 1498,
+      "share": 0.299
     },
     {
       "type": "PRODUCT_GAP_WORKING_CAPITAL",
-      "customers": 1339,
-      "share": 0.268
+      "customers": 1337,
+      "share": 0.267
+    },
+    {
+      "type": "RELATIONSHIP_COOLDOWN",
+      "customers": 1336,
+      "share": 0.267
     },
     {
       "type": "TRANSACTION_GROWTH",
-      "customers": 1090,
-      "share": 0.218
+      "customers": 1110,
+      "share": 0.222
     },
     {
       "type": "LOW_DIGITAL_ENGAGEMENT",
-      "customers": 983,
-      "share": 0.196
+      "customers": 987,
+      "share": 0.197
     },
     {
       "type": "HIGH_PIX_USAGE",
-      "customers": 969,
-      "share": 0.194
+      "customers": 960,
+      "share": 0.192
     },
     {
       "type": "HIGH_CREDIT_INTENT",
@@ -190,18 +190,18 @@
     },
     {
       "type": "INCREASED_PAYMENT_VOLUME",
-      "customers": 803,
-      "share": 0.16
+      "customers": 832,
+      "share": 0.166
     },
     {
       "type": "PRODUCT_GAP_CARD",
-      "customers": 731,
-      "share": 0.146
+      "customers": 734,
+      "share": 0.147
     },
     {
       "type": "TRANSACTION_DECLINE",
-      "customers": 523,
-      "share": 0.105
+      "customers": 518,
+      "share": 0.104
     },
     {
       "type": "RECENT_COMPLAINT",
@@ -210,27 +210,27 @@
     },
     {
       "type": "ABANDONED_CREDIT_SIMULATION",
-      "customers": 373,
-      "share": 0.075
+      "customers": 370,
+      "share": 0.074
     },
     {
       "type": "UNRESOLVED_SERVICE",
-      "customers": 360,
-      "share": 0.072
+      "customers": 351,
+      "share": 0.07
     },
     {
       "type": "ONBOARDING_INCOMPLETE",
-      "customers": 264,
-      "share": 0.053
+      "customers": 262,
+      "share": 0.052
     },
     {
       "type": "HIGH_VALUE_RELATIONSHIP",
-      "customers": 180,
-      "share": 0.036
+      "customers": 174,
+      "share": 0.035
     }
   ],
-  "noActionRate": 0.188,
-  "maxActionShare": 0.188,
+  "noActionRate": 0.193,
+  "maxActionShare": 0.193,
   "concentrationOk": true,
   "prospects": {
     "customers": 17443,
@@ -250,6 +250,6 @@
     ]
   },
   "durationsMs": {
-    "features_dna_signals_nba": 49167
+    "features_dna_signals_nba": 47391
   }
 }

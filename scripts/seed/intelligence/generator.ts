@@ -449,7 +449,7 @@ function buildDigital(
     if (day === behavior.lastLoginDaysAgo && count === 0) count = 1;
     for (let index = 0; index < count; index += 1) {
       const timestamp = stamp(rand, day);
-      const channel = rand() < behavior.appShare ? 'APP' : 'WEB';
+      const channel = rand() < behavior.appShare ? 'APP' : 'BANKLINE';
       const used = [
         ...new Set(Array.from({ length: int(rand, 1, 3) }, () => pick(rand, ownedFeatures))),
       ];
@@ -480,7 +480,7 @@ function buildDigital(
         customerId,
         timestamp: stamp(rand, day),
         kind: rand() < 0.6 ? 'PAGE_VIEW' : 'PRODUCT_VIEW',
-        channel: rand() < behavior.appShare ? 'APP' : 'WEB',
+        channel: rand() < behavior.appShare ? 'APP' : 'BANKLINE',
         topic,
       });
     }
@@ -491,7 +491,7 @@ function buildDigital(
         customerId,
         timestamp: stamp(rand, int(rand, 1, 13)),
         kind: 'SEARCH',
-        channel: 'WEB',
+        channel: 'BANKLINE',
         topic: 'CAPITAL_DE_GIRO',
       });
     }
@@ -500,14 +500,14 @@ function buildDigital(
       customerId,
       timestamp: stamp(rand, day),
       kind: 'SIMULATION_STARTED',
-      channel: 'WEB',
+      channel: 'BANKLINE',
       topic: 'CAPITAL_DE_GIRO',
     });
     events.push({
       customerId,
       timestamp: stamp(rand, day),
       kind: rand() < 0.6 ? 'SIMULATION_COMPLETED' : 'SIMULATION_ABANDONED',
-      channel: 'WEB',
+      channel: 'BANKLINE',
       topic: 'CAPITAL_DE_GIRO',
     });
   }
@@ -769,7 +769,12 @@ function atlasRaw(company: Company): CustomerRawData {
 
   const sessions: DigitalSession[] = [];
   const events: DigitalEvent[] = [];
-  const session = (daysAgo: number, hour: number, channel: 'APP' | 'WEB', features: string[]) => {
+  const session = (
+    daysAgo: number,
+    hour: number,
+    channel: 'APP' | 'BANKLINE',
+    features: string[],
+  ) => {
     const base = addDays(INTELLIGENCE_AS_OF, -daysAgo);
     const timestamp = iso(
       new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), hour, 10)),
@@ -802,19 +807,19 @@ function atlasRaw(company: Company): CustomerRawData {
     session(
       day,
       8 + (index % 3),
-      index % 3 === 0 ? 'WEB' : 'APP',
+      index % 3 === 0 ? 'BANKLINE' : 'APP',
       featureCycle[index % featureCycle.length]!,
     ),
   );
   for (let index = 0; index < 15; index += 1)
-    session(31 + index * 2, 13, index % 2 ? 'APP' : 'WEB', ['pix', 'extrato']);
+    session(31 + index * 2, 13, index % 2 ? 'APP' : 'BANKLINE', ['pix', 'extrato']);
   for (let index = 0; index < 12; index += 1) session(62 + index * 4, 14, 'APP', ['pix']);
 
   const event = (
     daysAgo: number,
     kind: DigitalEvent['kind'],
     topic?: ContentTopic,
-    channel: 'APP' | 'WEB' = 'WEB',
+    channel: 'APP' | 'BANKLINE' = 'BANKLINE',
   ) => {
     const base = addDays(INTELLIGENCE_AS_OF, -daysAgo);
     events.push({
@@ -1066,14 +1071,20 @@ function prospectRaw(
     sessions.push({
       customerId: company.id,
       timestamp,
-      channel: 'WEB',
+      channel: 'BANKLINE',
       device: rand() < 0.6 ? 'DESKTOP' : 'ANDROID',
       durationSeconds: int(rand, 60, 600),
       pages: int(rand, 2, 9),
       featuresUsed: [],
       source,
     });
-    events.push({ customerId: company.id, timestamp, kind: 'PAGE_VIEW', channel: 'WEB', topic });
+    events.push({
+      customerId: company.id,
+      timestamp,
+      kind: 'PAGE_VIEW',
+      channel: 'BANKLINE',
+      topic,
+    });
   };
   const leadAgo = daysAgo(company.leadCreatedAt);
   for (let index = 0; index < int(rand, 1, 3); index += 1)
@@ -1193,7 +1204,18 @@ export function generateIntelligenceRaw(bundle: DatasetBundle, seed = DATASET_SE
     personas.set(company.id, persona);
     const codes = mainProducts ?? personaProducts(persona, rand);
     const products = buildProducts(company, codes, persona, rand);
-    const behavior = behaviorOf(persona, rand);
+    const personaBehavior = behaviorOf(persona, rand);
+    // Sessions follow the company's canal de acesso principal (Customer 360), so the DNA digital
+    // tab and the mesh agree on whether the company is an App or a Bankline customer.
+    const behavior = {
+      ...personaBehavior,
+      appShare:
+        company.primaryAccessChannel === 'APP'
+          ? Math.max(personaBehavior.appShare, 0.7)
+          : company.primaryAccessChannel === 'BANKLINE'
+            ? Math.min(personaBehavior.appShare, 0.3)
+            : personaBehavior.appShare,
+    };
     const manager = managerOf(company);
     const openedAt = company.accountOpenedAt ?? company.createdAt;
     const digital = buildDigital(

@@ -740,3 +740,57 @@ describe('Follow-up cut of the last study', () => {
     ).toBe(original.study.sections.length);
   });
 });
+
+describe('Access channels (canal de acesso)', () => {
+  const { app } = createHarness();
+  const query = async (datasets: string[], metric: string, dimension: string) => {
+    const response = await request(app)
+      .post('/api/analytics/query')
+      .set('Authorization', await login(app))
+      .send({
+        datasets,
+        metrics: [{ id: metric }],
+        dimensions: [{ id: dimension }],
+        filters: [],
+        dateRange: { type: 'LAST_N_DAYS', value: 365 },
+        visualization: { type: 'AUTO' },
+      });
+    expect(response.status).toBe(200);
+    return response.body.rows as Array<Record<string, unknown>>;
+  };
+
+  it('navigation has App and Bankline sessions', async () => {
+    const rows = await query(['app_navigation'], 'app_interactions', 'access_channel');
+    expect(rows.map((row) => row.access_channel).sort()).toEqual(['APP', 'BANKLINE']);
+  });
+
+  it('products are contracted in access channels and the digital rate is computed', async () => {
+    const byChannel = await query(
+      ['company_products', 'customer_360'],
+      'contracted_products',
+      'product_contract_channel',
+    );
+    expect(byChannel.length).toBeGreaterThan(1);
+    for (const row of byChannel) {
+      expect(['APP', 'BANKLINE', 'AGENCIA', 'API']).toContain(row.product_contract_channel);
+      expect(row.contracted_products).toBeGreaterThan(0);
+    }
+    const rate = await query(
+      ['company_products', 'customer_360'],
+      'digital_contract_rate',
+      'company_size',
+    );
+    for (const row of rate) expect(row.digital_contract_rate).toBeGreaterThan(0);
+  });
+
+  it('the main access channel of the customer crosses with other bases', async () => {
+    const rows = await query(
+      ['app_navigation', 'customer_360'],
+      'bankline_active_companies',
+      'primary_access_channel',
+    );
+    expect(rows.some((row) => (row.bankline_active_companies as number) > 0)).toBe(true);
+    const transactions = await query(['transactions'], 'transaction_volume', 'transaction_channel');
+    expect(transactions.map((row) => row.transaction_channel)).not.toContain('INTERNET_BANKING');
+  });
+});
