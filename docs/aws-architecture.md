@@ -1,5 +1,8 @@
 # Arquitetura AWS
 
+Diagrama editável com ícones oficiais da AWS: [`aws-architecture.drawio`](aws-architecture.drawio)
+(abra em [app.diagrams.net](https://app.diagrams.net) ou no draw.io desktop / extensão do VS Code).
+
 ```mermaid
 flowchart TB
   subgraph Edge

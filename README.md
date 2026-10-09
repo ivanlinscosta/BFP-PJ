@@ -501,7 +501,7 @@ Ambientes independentes: `bfp-pj-dev`, `bfp-pj-homol`, `bfp-pj-prod`. Pipelines 
 
 - [Data mesh AWS, Atlan e FullStory](docs/data-mesh-and-integrations.md)
 
-- [docs/aws-architecture.md](docs/aws-architecture.md)
+- [docs/aws-architecture.md](docs/aws-architecture.md) · diagrama editável [docs/aws-architecture.drawio](docs/aws-architecture.drawio)
 - [docs/data-model.md](docs/data-model.md)
 - [docs/semantic-layer.md](docs/semantic-layer.md)
 - [docs/analytics-engine.md](docs/analytics-engine.md)
