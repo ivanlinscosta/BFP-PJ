@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import type { VisualizationType } from '@bfp/domain';
 import { describeAnalysisSpec } from '@bfp/shared';
 import { Badge, CertificationBadge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
@@ -26,7 +25,6 @@ import {
   EmptySidePanel,
   MetricTrustCard,
   ResultSidePanel,
-  type VisualizationSettings,
 } from '@/features/explorer/components/side-panel';
 import type { DraggedItem } from '@/features/explorer/dnd';
 import { buildNextExplorations } from '@/features/explorer/explorations';
@@ -37,13 +35,12 @@ import {
   pruneToDatasets,
   requiredDatasetsFor,
   resolveMonthDimension,
-  resolveVisualization,
   SPEC_QUERY_PARAM,
-  visualizationAvailability,
 } from '@/features/explorer/spec';
 import { useAnalysisStore } from '@/features/explorer/store';
 import { useFeatureFlags } from '@/features/admin/hooks';
 import { downloadCsv } from '@/features/viz/csv';
+import { useVisualizationModel } from '@/features/viz/visualization-renderer';
 import { useMeshDatasets } from '@/features/mesh/api';
 import { DatasetPicker } from '@/features/mesh/dataset-picker';
 import { capitalize } from '@/lib/format';
@@ -64,12 +61,6 @@ export function ExplorerPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogName>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
-  const [settings, setSettings] = useState<VisualizationSettings>({
-    sort: 'DESC',
-    showValues: true,
-    showTable: false,
-    showLegend: true,
-  });
 
   // Deep links: ?spec=<AnalysisSpec JSON> (catalog, customer 360, AI) or ?analysis=<saved id>.
   const handledLink = useRef<string | null>(null);
@@ -107,7 +98,8 @@ export function ExplorerPage() {
   // The engine is only triggered over bases the user selected and that cover the analysis.
   const engineReady = selectedDatasets.length > 0 && missingDatasets.length === 0;
   const result = useAnalysisResult(spec, { enabled: engineReady });
-  const type = resolveVisualization(spec, dimensions);
+  const visualizationModel = useVisualizationModel(spec, result.data);
+  const type = visualizationModel.resolved.type;
   const totalsSpec = useMemo(
     () => ({
       ...spec,
@@ -120,12 +112,6 @@ export function ExplorerPage() {
   const totals = useAnalysisResult(totalsSpec, { enabled: engineReady && type === 'HEATMAP' });
   const metricDetail = useMetricDetail(spec.metrics[0]?.id);
   const explorations = buildNextExplorations(spec, metrics, dimensions);
-  const options = visualizationAvailability(spec);
-  const requested = spec.visualization.type;
-  const fallbackFrom =
-    requested !== 'AUTO' && requested !== type
-      ? options.find((option) => option.type === requested)?.label
-      : undefined;
   const hasAnalysis = spec.metrics.length > 0;
   const allCertified =
     activeMetrics.length > 0 &&
@@ -306,30 +292,25 @@ export function ExplorerPage() {
                   onRetry={() => void result.refetch()}
                   onSave={() => setDialog('save')}
                   onShare={() => setDialog('share')}
-                  onTypeChange={(value: VisualizationType) => store.setVisualization(value)}
-                  fallbackFrom={fallbackFrom}
-                  options={options}
+                  model={visualizationModel}
+                  onSelectVisualization={(value) => store.setVisualization(value)}
                   result={result.data}
                   saveStatus={saveStatus}
-                  settings={settings}
                   showInlineExplorations={type === 'HEATMAP'}
                   spec={spec}
                   totalsResult={totals.data}
-                  type={type}
                 />
                 {type !== 'HEATMAP' ? (
                   <div className="flex flex-col gap-3">
                     <ResultSidePanel
+                      chartType={type}
                       explorations={explorations}
                       onExplore={(exploration) =>
                         store.applyOperations(exploration.operations, exploration.message)
                       }
-                      onSettingsChange={setSettings}
-                      onTypeChange={(value) => store.setVisualization(value)}
-                      options={options}
+                      onSettingsChange={store.setVisualizationSettings}
                       result={result.data}
-                      settings={settings}
-                      type={type}
+                      settings={spec.visualization.settings ?? {}}
                     />
                     <MetricTrustCard detail={metricDetail.data} />
                   </div>

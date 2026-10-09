@@ -1,20 +1,15 @@
-import {
-  BarChart3,
-  ExternalLink,
-  FileDown,
-  LayoutGrid,
-  Lightbulb,
-  Save,
-  Table2,
-} from 'lucide-react';
+import { ExternalLink, FileDown, LayoutGrid, Lightbulb, Save } from 'lucide-react';
 import { useState } from 'react';
-import type { AnalysisSpec } from '@bfp/domain';
+import type { AnalysisSpec, VisualizationSpec } from '@bfp/domain';
 import { describeAnalysisSpec } from '@bfp/shared';
 import { LoadingRows } from '@/components/states/states';
-import { useDimensionCatalog, useSpecLabels } from '@/features/catalog/hooks';
+import { useSpecLabels } from '@/features/catalog/hooks';
 import { useAnalysisResult, useMissingDatasets } from '@/features/explorer/hooks';
-import { resolveVisualization } from '@/features/explorer/spec';
-import { ResultView } from '@/features/viz/result-view';
+import {
+  VisualizationRenderer,
+  useVisualizationModel,
+} from '@/features/viz/visualization-renderer';
+import { VisualizationSelector } from '@/features/viz/visualization-selector';
 import { capitalize } from '@/lib/format';
 import { describeError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
@@ -67,12 +62,12 @@ export function AnalysisCard({
   exporting: boolean;
 }) {
   const labels = useSpecLabels();
-  const dimensions = useDimensionCatalog();
   const result = useAnalysisResult(spec);
   const missing = useMissingDatasets(spec);
-  const [view, setView] = useState<'chart' | 'table'>('chart');
+  // The chart can be switched in the conversation without changing the answer's analysis.
+  const [visualization, setVisualization] = useState<VisualizationSpec>(spec.visualization);
+  const model = useVisualizationModel(spec, result.data, visualization);
   const description = describeAnalysisSpec(spec, labels);
-  const chartType = resolveVisualization(spec, dimensions.data ?? []);
   const insights = (result.data?.insights ?? []).slice(0, 3);
   const plan = result.data?.metadata.plan;
 
@@ -88,32 +83,19 @@ export function AnalysisCard({
             {[...description.filters, capitalize(description.period)].join(' · ')}
           </p>
         </div>
-        <div
-          {...ignore}
-          aria-label="Visualização"
-          className="flex rounded-[var(--radius-control)] bg-muted p-0.5"
-          role="group"
-        >
-          {(
-            [
-              ['chart', 'Gráfico', BarChart3],
-              ['table', 'Tabela', Table2],
-            ] as const
-          ).map(([value, label, Icon]) => (
-            <button
-              aria-pressed={view === value}
-              className={cn(
-                'inline-flex h-7 items-center gap-1 rounded px-2.5 text-xs font-semibold transition-colors',
-                view === value ? 'bg-card text-brand-navy shadow-sm' : 'text-ink-soft',
-              )}
-              key={value}
-              onClick={() => setView(value)}
-              type="button"
-            >
-              <Icon aria-hidden className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
+        <div {...ignore}>
+          <VisualizationSelector
+            compact
+            model={model}
+            onSelect={(type) =>
+              setVisualization({
+                ...visualization,
+                type,
+                mode: type === 'AUTO' ? 'AUTO' : 'MANUAL',
+              })
+            }
+            surface="chat"
+          />
         </div>
       </header>
 
@@ -128,10 +110,11 @@ export function AnalysisCard({
           <p className="text-sm text-ink-soft">{describeError(result.error).description}</p>
         ) : result.data && result.data.rows.length > 0 ? (
           <div className="max-h-[380px] overflow-auto" {...{ [PDF_EXPAND_ATTRIBUTE]: '' }}>
-            <ResultView
+            <VisualizationRenderer
+              onUseRecommended={() => setVisualization({ type: 'AUTO', mode: 'AUTO' })}
               result={result.data}
-              showLegend
-              type={view === 'table' ? 'TABLE' : chartType}
+              spec={spec}
+              visualization={visualization}
             />
           </div>
         ) : (

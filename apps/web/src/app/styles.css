@@ -58,6 +58,20 @@
 
 :root {
   color-scheme: light;
+
+  /* Charts: institutional palette (single series = orange; comparisons in this order). */
+  --color-chart-1: #ff6200;
+  --color-chart-2: #002663;
+  --color-chart-3: #4a7ab8;
+  --color-chart-4: #f2a36b;
+  --color-chart-5: #7f93ad;
+  --color-chart-6: #b8c4d3;
+  --color-chart-7: #c24f00;
+  --color-chart-8: #5f6670;
+  --color-chart-positive: #23634a;
+  --color-chart-negative: #b42318;
+  --color-chart-scale-low: #fff3eb;
+  --color-chart-scale-high: #ff6200;
 }
 
 * {

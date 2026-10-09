@@ -92,6 +92,7 @@ export async function runIntelligence(
     queries: [],
     datasets: request.datasets?.length ? request.datasets : undefined,
     prompt: request.prompt,
+    currentSpec: request.analysisSpec,
     // The question and earlier answers (grounded when given) may be quoted again.
     groundingValues: numbersIn(
       [

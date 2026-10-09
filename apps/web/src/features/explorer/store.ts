@@ -4,6 +4,7 @@ import type {
   DateRangeSpec,
   FilterCondition,
   SortSpec,
+  VisualizationSettings,
   VisualizationType,
 } from '@bfp/domain';
 import { applyAnalysisOperations, type AnalysisOperation } from '@bfp/shared';
@@ -38,6 +39,8 @@ interface AnalysisState {
   removeFilter(index: number): void;
   setDateRange(dateRange: DateRangeSpec): void;
   setVisualization(type: VisualizationType): void;
+  /** Merges chart options into the spec (saved with the analysis). */
+  setVisualizationSettings(settings: Partial<VisualizationSettings>): void;
   setSort(sort: SortSpec[] | undefined): void;
   setComparison(enabled: boolean): void;
   clearAnalysis(): void;
@@ -99,6 +102,17 @@ export const useAnalysisStore = create<AnalysisState>()(
       setDateRange: (dateRange) => update(set, [{ type: 'SET_DATE_RANGE', dateRange }]),
       setVisualization: (visualization) =>
         update(set, [{ type: 'SET_VISUALIZATION', visualization }]),
+      setVisualizationSettings: (settings) =>
+        set((state) => ({
+          spec: {
+            ...state.spec,
+            visualization: {
+              ...state.spec.visualization,
+              settings: { ...state.spec.visualization.settings, ...settings },
+            },
+          },
+          dirty: true,
+        })),
       setSort: (sorting) => set((state) => ({ spec: { ...state.spec, sorting }, dirty: true })),
       setComparison: (enabled) =>
         update(set, [{ type: 'SET_COMPARISON', comparison: enabled ? 'PREVIOUS_PERIOD' : 'NONE' }]),

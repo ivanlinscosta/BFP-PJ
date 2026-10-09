@@ -9,16 +9,11 @@ import {
   numeric,
 } from './model';
 
-export const SERIES_PALETTE = [
-  'var(--color-brand-orange)',
-  'var(--color-brand-navy)',
-  '#2f80c8',
-  '#16a394',
-  '#8b5cc8',
-  '#d4a017',
-  '#d0477a',
-  '#7a8794',
-];
+/** Institutional chart palette (design tokens in styles.css; no hex codes in charts). */
+export const SERIES_PALETTE = Array.from(
+  { length: 8 },
+  (_, index) => `var(--color-chart-${index + 1})`,
+);
 
 export interface ChartSeries {
   key: string;

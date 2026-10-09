@@ -8,13 +8,12 @@ import {
   createEmptySpec,
   parseSpecParam,
   resolveMonthDimension,
-  resolveVisualization,
-  visualizationAvailability,
 } from '@/features/explorer/spec';
 import { useAnalysisStore } from '@/features/explorer/store';
 import { buildCsv } from '@/features/viz/csv';
 import { niceScale } from '@/features/viz/model';
-import { toHeatmapMatrix } from '@/features/viz/result-view';
+import { buildAnalysisShape, evaluateVisualizations, resolveVisualization } from '@bfp/shared';
+import { toHeatmapMatrix } from '@/features/viz/heatmap';
 import { CONVERSION_BY_CHANNEL, DIMENSIONS, METRICS } from './fixtures';
 
 describe('AnalysisSpec store', () => {
@@ -82,46 +81,45 @@ describe('spec helpers', () => {
     });
   });
 
-  it('chooses visualizations like the engine and explains unavailable ones', () => {
-    const base = { ...createEmptySpec(), metrics: [{ id: 'account_conversion_rate' }] };
-    expect(
-      resolveVisualization({ ...base, dimensions: [{ id: 'acquisition_channel' }] }, DIMENSIONS),
-    ).toBe('BAR');
-    expect(
-      resolveVisualization(
-        { ...base, dimensions: [{ id: 'acquisition_channel' }, { id: 'company_size' }] },
-        DIMENSIONS,
-      ),
-    ).toBe('HEATMAP');
-    const options = visualizationAvailability({
-      ...base,
-      dimensions: [{ id: 'acquisition_channel' }],
-    });
-    // The user decides: every chart compatible with 1 metric × 1 dimension is available.
-    for (const type of ['TABLE', 'BAR', 'GROUPED_BAR', 'LINE', 'AREA', 'DONUT'] as const) {
-      expect(options.find((option) => option.type === type)?.enabled).toBe(true);
-    }
-    expect(options.find((option) => option.type === 'SCATTER')).toMatchObject({
-      enabled: false,
-      requirement: '2 métricas e 1 dimensão',
-    });
-    // An explicit choice is kept when the selection supports it, otherwise the automatic one.
-    expect(
-      resolveVisualization(
-        { ...base, dimensions: [{ id: 'acquisition_channel' }], visualization: { type: 'DONUT' } },
-        DIMENSIONS,
-      ),
-    ).toBe('DONUT');
-    expect(
-      resolveVisualization(
+  it('chooses visualizations with the shared engine and explains unavailable ones', () => {
+    const catalog = { metrics: [], dimensions: DIMENSIONS };
+    const shapeOf = (dimensions: Array<{ id: string }>) =>
+      buildAnalysisShape(
+        { metrics: [{ id: 'account_conversion_rate' }], dimensions },
         {
-          ...base,
-          dimensions: [{ id: 'acquisition_channel' }],
-          visualization: { type: 'HEATMAP' },
+          ...catalog,
+          metrics: [{ id: 'account_conversion_rate', format: 'percent', aggregation: 'RATIO' }],
         },
-        DIMENSIONS,
-      ),
-    ).toBe('BAR');
+      );
+    expect(
+      resolveVisualization({ type: 'AUTO' }, shapeOf([{ id: 'acquisition_channel' }])).type,
+    ).toMatch(/BAR_HORIZONTAL|COLUMN/);
+    expect(
+      resolveVisualization(
+        { type: 'AUTO' },
+        shapeOf([{ id: 'acquisition_channel' }, { id: 'company_size' }]),
+      ).type,
+    ).toBe('HEATMAP');
+    const scatter = evaluateVisualizations(shapeOf([{ id: 'acquisition_channel' }])).find(
+      (item) => item.type === 'SCATTER',
+    );
+    expect(scatter).toMatchObject({
+      compatible: false,
+      reason: 'Adicione duas métricas numéricas.',
+    });
+    // A pinned chart is kept when it fits; otherwise the recommended one is drawn and reported.
+    expect(
+      resolveVisualization(
+        { type: 'TABLE', mode: 'MANUAL' },
+        shapeOf([{ id: 'acquisition_channel' }]),
+      ).type,
+    ).toBe('TABLE');
+    expect(
+      resolveVisualization(
+        { type: 'HEATMAP', mode: 'MANUAL' },
+        shapeOf([{ id: 'acquisition_channel' }]),
+      ).incompatible?.requested,
+    ).toBe('HEATMAP');
   });
 
   it('keeps operations immutable for the shared contract', () => {

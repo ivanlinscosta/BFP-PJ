@@ -8,6 +8,7 @@ import { ApiError, NotFoundError, toErrorPayload } from '@api/common/errors';
 import { logger, type Logger } from '@api/common/logger';
 import { createRateLimitMiddleware } from '@api/common/rateLimit';
 import { createAdminRouter } from '@api/http/routes/admin';
+import { createTelemetryRouter } from '@api/http/routes/telemetry';
 import { createAiRouter } from '@api/http/routes/ai';
 import { createAnalysesRouter } from '@api/http/routes/analyses';
 import { createAnalyticsRouter } from '@api/http/routes/analytics';
@@ -123,6 +124,7 @@ export function createApp(overrides: Partial<AppDependencies> = {}) {
   app.use('/api/mesh', createMeshRouter(context));
   app.use('/api/integrations', createIntegrationsRouter(context));
   app.use('/api/ai', createAiRouter(context));
+  app.use('/api/telemetry', createTelemetryRouter(context));
   app.use('/api', createCustomerIntelligenceRouter(context));
 
   app.use((_req, _res, next) => {

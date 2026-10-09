@@ -71,7 +71,8 @@ describe('applyAnalysisOperations', () => {
       'acquisition_channel',
       'company_size',
     ]);
-    expect(next.visualization.type).toBe('AUTO');
+    // A pinned chart survives structural changes (MANUAL mode); AUTO would re-pick it.
+    expect(next.visualization.type).toBe('BAR');
     expect(next.filters).toHaveLength(1);
     expect(base.dimensions).toHaveLength(1);
     expect(applyAnalysisOperations(next, [{ type: 'CLEAR' }]).metrics).toEqual([]);

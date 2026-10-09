@@ -8,42 +8,39 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router';
-import type { AnalysisSpec, VisualizationType } from '@bfp/domain';
+import type { AnalysisSpec } from '@bfp/domain';
+import type { ChartType } from '@bfp/shared';
 import { describeAnalysisSpec, type SpecLabelResolver } from '@bfp/shared';
 import { Badge, CertificationBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, Eyebrow } from '@/components/ui/card';
 import { ActionChip } from '@/components/ui/chip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState, ErrorState } from '@/components/states/states';
+import { ErrorState } from '@/components/states/states';
 import type { MetricDetail } from '@/features/catalog/api';
-import { AnalyticsTable } from '@/features/viz/data-table';
-import { HeatmapLegend } from '@/features/viz/heatmap';
-import { ResultView } from '@/features/viz/result-view';
+import {
+  VisualizationRenderer,
+  type useVisualizationModel,
+} from '@/features/viz/visualization-renderer';
+import { VisualizationSelector } from '@/features/viz/visualization-selector';
 import { capitalize, formatMinutes, formatShare } from '@/lib/format';
 import { pluralizeLabel } from '@/lib/text';
 import { cn } from '@/lib/utils';
 import type { AnalyticsResponse } from '../api';
 import type { NextExploration } from '../explorations';
-import type { VisualizationOption } from '../spec';
-import { ChartPicker } from './chart-picker';
-import type { VisualizationSettings } from './side-panel';
 
 interface ResultCanvasProps {
   spec: AnalysisSpec;
   labels: SpecLabelResolver;
-  type: VisualizationType | 'KPI';
-  options: VisualizationOption[];
-  onTypeChange(type: VisualizationType): void;
-  /** The chosen chart could not be drawn for this selection (we show the automatic one). */
-  fallbackFrom?: string;
+  /** Visualization model (recommendations, compatibility and the chart drawn). */
+  model: ReturnType<typeof useVisualizationModel>;
+  onSelectVisualization(type: ChartType | 'AUTO'): void;
   result: AnalyticsResponse | undefined;
   totalsResult?: AnalyticsResponse;
   loading: boolean;
   fetching: boolean;
   error: unknown;
   onRetry(): void;
-  settings: VisualizationSettings;
   metricDetail: MetricDetail | undefined;
   explorations: NextExploration[];
   onExplore(exploration: NextExploration): void;
@@ -57,9 +54,16 @@ interface ResultCanvasProps {
 }
 
 function chartTitle(spec: AnalysisSpec, labels: SpecLabelResolver) {
-  const metric = spec.metrics.map((item) => labels.metric(item.id)).join(' e ');
+  const names = spec.metrics.map((item) => labels.metric(item.id));
+  const metric =
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names.at(-1)}` : (names[0] ?? '');
+  const months = spec.dimensions.filter((dimension) => dimension.granularity === 'month').length;
   const dimensions = spec.dimensions.map((dimension) =>
-    dimension.granularity === 'month' ? 'Mês' : labels.dimension(dimension.id),
+    dimension.granularity === 'month'
+      ? months > 1
+        ? `${labels.dimension(dimension.id)} (mês)`
+        : 'Mês'
+      : labels.dimension(dimension.id),
   );
   if (dimensions.length === 0) return metric;
   if (dimensions.length === 1) return `${metric} por ${dimensions[0]!.toLowerCase()}`;
@@ -109,24 +113,18 @@ export function ResultCanvas(props: ResultCanvasProps) {
   const insights = result?.insights ?? [];
   return (
     <div className="flex min-w-0 flex-col gap-3.5">
-      <div className="flex flex-col gap-1.5">
-        <ChartPicker onChange={props.onTypeChange} options={props.options} value={props.type} />
-        {props.fallbackFrom ? (
-          <p className="m-0 text-[11px] text-ink-soft">
-            {props.fallbackFrom} não se aplica a esta seleção; mostrando o gráfico recomendado.
-          </p>
-        ) : null}
-      </div>
-
       <Card aria-busy={props.fetching} className="relative px-3 pt-3 pb-2.5">
-        <div className="flex items-start justify-between gap-4 px-1">
-          <div className="min-w-0">
-            <h2 className="m-0 text-lg leading-tight font-semibold text-brand-navy">
+        <div className="flex flex-wrap items-start justify-between gap-4 px-1">
+          <div className="min-w-0 flex-1">
+            <h2 className="m-0 flex items-center gap-2 text-lg leading-tight font-semibold text-brand-navy">
               {chartTitle(spec, labels)}
+              {certified ? <CertificationBadge status="CERTIFIED" /> : null}
             </h2>
             <p className="mt-1.5 text-sm text-ink-soft">{capitalize(subtitle)}</p>
           </div>
-          {certified ? <CertificationBadge className="mt-1" status="CERTIFIED" /> : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line px-1 pb-3">
+          <VisualizationSelector model={props.model} onSelect={props.onSelectVisualization} />
         </div>
         <div className="relative mt-4 min-h-[220px] px-1">
           {props.fetching && !props.loading ? (
@@ -155,40 +153,16 @@ export function ResultCanvas(props: ResultCanvasProps) {
             </div>
           ) : props.error ? (
             <ErrorState compact error={props.error} onRetry={props.onRetry} />
-          ) : result && result.rows.length === 0 ? (
-            <EmptyState
-              className="py-8"
-              description="Amplie o período ou remova um filtro para ver dados."
-              title="Nenhum dado para este recorte"
-            />
           ) : result ? (
-            <>
-              <ResultView
-                result={result}
-                showLegend={props.settings.showLegend}
-                showValues={props.settings.showValues}
-                sort={props.settings.sort}
-                totalsResult={props.totalsResult}
-                type={props.type}
-              />
-              {props.type === 'HEATMAP' ? (
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                  <HeatmapLegend />
-                  <p className="text-[11px] text-ink-soft">
-                    Total = {labels.metric(spec.metrics[0]!.id).toLowerCase()} por{' '}
-                    {labels.dimension(spec.dimensions[0]!.id).toLowerCase()} sem a segunda quebra
-                  </p>
-                </div>
-              ) : null}
-              {props.settings.showTable && props.type !== 'TABLE' ? (
-                <div className="mt-4">
-                  <AnalyticsTable result={result} />
-                </div>
-              ) : null}
-            </>
+            <VisualizationRenderer
+              onUseRecommended={() => props.onSelectVisualization(props.model.resolved.recommended)}
+              result={result}
+              spec={spec}
+              totalsResult={props.totalsResult}
+            />
           ) : null}
         </div>
-        {metricDetail && props.type !== 'HEATMAP' ? (
+        {metricDetail ? (
           <p className="mt-4 border-t border-line px-1 pt-3 text-[11px] text-ink-soft">
             {[
               product?.goldDataset,

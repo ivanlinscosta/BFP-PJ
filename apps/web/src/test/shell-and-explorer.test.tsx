@@ -106,7 +106,13 @@ describe('ExplorerPage', () => {
       await screen.findByRole('heading', { name: 'Conversão de abertura por canal' }),
     ).toBeInTheDocument();
     expect(await screen.findByText('Google Search: 5,1 p.p. acima de Meta')).toBeInTheDocument();
-    expect(screen.getAllByText('14,8%').length).toBeGreaterThan(0);
+    // AUTO picks the chart; its accessible summary carries the leading value.
+    expect(
+      screen.getByRole('group', { name: /maior valor em Google Search \(14,8%\)/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Tipo de visualização/ })).toHaveTextContent(
+      /Automático/,
+    );
     const query = [...calls]
       .reverse()
       .find((call) => call.method === 'POST' && call.url.pathname === '/api/analytics/query');

@@ -2,9 +2,11 @@ import type {
   AggregationType,
   BusinessTerm,
   CertificationStatus,
+  DimensionSemanticType,
   DimensionValueType,
   LineageGraph,
   MetricFormat,
+  MetricSemanticType,
   QualityHealthState,
 } from '@bfp/domain';
 import { apiRequest } from '@/services/apiClient';
@@ -36,6 +38,12 @@ export interface CatalogMetric {
   libraryOrder?: number;
   /** Data mesh datasets the metric reads. */
   datasets?: string[];
+  additivity?: 'ADDITIVE' | 'NON_ADDITIVE';
+  unit?: string;
+  /** What the value represents (feeds chart recommendations). */
+  semanticType?: MetricSemanticType;
+  /** Stage of the acquisition-to-activation funnel (1 = top). */
+  funnelStage?: number;
 }
 
 export interface CatalogDimension {
@@ -55,6 +63,10 @@ export interface CatalogDimension {
   valueLabels?: Record<string, string>;
   /** Data mesh dataset that owns the dimension. */
   dataset?: string;
+  /** What the dimension represents: GEO, SOURCE, DESTINATION, TIME… */
+  semanticType?: DimensionSemanticType;
+  cohortRole?: 'START' | 'EVENT';
+  geoLevel?: 'UF' | 'REGION';
 }
 
 export interface DimensionValue {

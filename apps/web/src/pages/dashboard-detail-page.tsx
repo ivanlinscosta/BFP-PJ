@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { sharingLabel } from '@/components/ui/visibility-picker';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState, ErrorState } from '@/components/states/states';
-import { useDimensionCatalog } from '@/features/catalog/hooks';
 import {
   getDashboard,
   setDashboardFavorite,
@@ -16,9 +15,8 @@ import {
 } from '@/features/dashboards/api';
 import type { SavedAnalysis } from '@/features/explorer/api';
 import { useAnalysisResult, useMissingDatasets } from '@/features/explorer/hooks';
-import { resolveVisualization } from '@/features/explorer/spec';
 import { useAnalysisStore } from '@/features/explorer/store';
-import { ResultView } from '@/features/viz/result-view';
+import { VisualizationRenderer } from '@/features/viz/visualization-renderer';
 import { formatRelative } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +28,6 @@ function DashboardTile({
   analysis: SavedAnalysis | undefined;
 }) {
   const navigate = useNavigate();
-  const dimensions = useDimensionCatalog();
   const loadAnalysis = useAnalysisStore((state) => state.loadAnalysis);
   const result = useAnalysisResult(
     analysis ?? { metrics: [], dimensions: [], filters: [], visualization: { type: 'AUTO' } },
@@ -45,7 +42,6 @@ function DashboardTile({
     Boolean(analysis) &&
     missingDatasets !== null &&
     (missingDatasets.length > 0 || (analysis?.datasets ?? []).length === 0);
-  const type = analysis ? resolveVisualization(analysis, dimensions.data ?? []) : 'TABLE';
 
   return (
     <Card className="flex min-h-[320px] flex-col px-4 pt-4 pb-3">
@@ -97,7 +93,9 @@ function DashboardTile({
         ) : result.isError ? (
           <ErrorState compact error={result.error} onRetry={() => void result.refetch()} />
         ) : result.data && result.data.rows.length > 0 ? (
-          <ResultView result={result.data} showLegend type={type} />
+          analysis ? (
+            <VisualizationRenderer result={result.data} spec={analysis} />
+          ) : null
         ) : (
           <EmptyState className="py-8" title="Sem dados para este recorte" />
         )}

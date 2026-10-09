@@ -51,7 +51,7 @@ export function applyAnalysisOperations(
                   ? { id: operation.dimensionId, granularity: operation.granularity }
                   : { id: operation.dimensionId },
               ],
-              visualization: { type: 'AUTO' },
+              // The visualization is kept: AUTO re-picks the chart, MANUAL keeps the user's.
             };
       case 'REMOVE_DIMENSION':
         return {
@@ -60,7 +60,6 @@ export function applyAnalysisOperations(
             (dimension) => dimension.id !== operation.dimensionId,
           ),
           sorting: current.sorting?.filter((sort) => sort.field !== operation.dimensionId),
-          visualization: { type: 'AUTO' },
         };
       case 'ADD_FILTER':
         return {
@@ -78,7 +77,15 @@ export function applyAnalysisOperations(
       case 'SET_DATE_RANGE':
         return { ...current, dateRange: operation.dateRange };
       case 'SET_VISUALIZATION':
-        return { ...current, visualization: { type: operation.visualization } };
+        // Choosing a chart pins it (MANUAL); choosing AUTO hands the choice back to the platform.
+        return {
+          ...current,
+          visualization: {
+            ...current.visualization,
+            type: operation.visualization,
+            mode: operation.visualization === 'AUTO' ? 'AUTO' : 'MANUAL',
+          },
+        };
       case 'SORT':
         return {
           ...current,
@@ -102,7 +109,7 @@ export function applyAnalysisOperations(
           dimensions: [],
           filters: [],
           dateRange: current.dateRange,
-          visualization: { type: 'AUTO' },
+          visualization: { type: 'AUTO', mode: 'AUTO' },
         };
       default:
         return current;

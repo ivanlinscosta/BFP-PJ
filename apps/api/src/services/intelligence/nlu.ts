@@ -182,13 +182,60 @@ const VALUE_LEXICON: Array<{ field: string; value: string; phrases: string[] }> 
   { field: 'region', value: 'Sul', phrases: ['regiao sul'] },
 ];
 
+/** Chart names, most specific first (only used when phrased as a chart request). */
 const VISUALIZATION_LEXICON: Array<{ type: VisualizationType; phrases: string[] }> = [
   { type: 'HEATMAP', phrases: ['mapa de calor', 'heatmap'] },
-  { type: 'LINE', phrases: ['linha', 'tendencia'] },
-  { type: 'BAR', phrases: ['barras', 'barra'] },
+  { type: 'CALENDAR_HEATMAP', phrases: ['calendario'] },
+  { type: 'MAP', phrases: ['mapa'] },
+  { type: 'TIMELINE', phrases: ['linha do tempo', 'timeline'] },
+  { type: 'MULTI_LINE', phrases: ['multiplas linhas', 'varias linhas'] },
+  { type: 'LINE', phrases: ['linhas', 'linha', 'tendencia'] },
+  { type: 'AREA_STACKED', phrases: ['area empilhada', 'areas empilhadas'] },
+  { type: 'AREA', phrases: ['area'] },
+  { type: 'COLUMN_100_STACKED', phrases: ['100% empilhad', 'colunas 100%'] },
+  { type: 'BAR_STACKED', phrases: ['barras empilhadas'] },
+  { type: 'COLUMN_STACKED', phrases: ['colunas empilhadas', 'empilhad'] },
+  { type: 'BAR_GROUPED', phrases: ['barras agrupadas'] },
+  { type: 'COLUMN_GROUPED', phrases: ['colunas agrupadas'] },
+  { type: 'COLUMN', phrases: ['colunas', 'coluna'] },
+  { type: 'BAR_HORIZONTAL', phrases: ['barras horizontais', 'barras', 'barra'] },
   { type: 'TABLE', phrases: ['tabela'] },
+  { type: 'KPI', phrases: ['indicador', 'kpi'] },
+  { type: 'BUBBLE', phrases: ['bolhas', 'bolha'] },
+  { type: 'QUADRANT', phrases: ['quadrantes', 'quadrante'] },
   { type: 'SCATTER', phrases: ['dispersao'] },
+  { type: 'DONUT', phrases: ['rosca', 'pizza', 'donut'] },
+  { type: 'TREEMAP', phrases: ['treemap'] },
+  { type: 'FUNNEL', phrases: ['funil'] },
+  { type: 'SANKEY', phrases: ['sankey', 'fluxos', 'fluxo'] },
+  { type: 'WATERFALL', phrases: ['cascata', 'waterfall'] },
+  { type: 'HISTOGRAM', phrases: ['histograma'] },
+  { type: 'BOX_PLOT', phrases: ['box plot', 'boxplot'] },
+  { type: 'COHORT', phrases: ['cohort', 'coorte'] },
+  { type: 'RETENTION_CURVE', phrases: ['curva de retencao', 'retencao'] },
+  { type: 'RADAR', phrases: ['radar'] },
+  { type: 'RANKING', phrases: ['ranking'] },
 ];
+
+/** "em linha", "como funil", "gráfico de rosca", "visualização em mapa". */
+function chartRequest(normalized: string) {
+  for (const entry of VISUALIZATION_LEXICON) {
+    for (const phrase of entry.phrases) {
+      const pattern = new RegExp(
+        `(^|\\s)(em|como|grafico de|grafico em|visualizacao de|visualizacao em|formato de|use|usar|mostre|mostra|exiba|troque para|mude para)\\s+(um |uma |o |a )?(grafico de |grafico em )?${phrase.replace('%', '\\%')}`,
+      );
+      if (pattern.test(normalized)) return entry.type;
+    }
+  }
+  return undefined;
+}
+
+/** "Qual gráfico faz mais sentido?", "melhor visualização para isso". */
+export function asksForChartRecommendation(prompt: string) {
+  return /(qual|que|melhor)\s+(o\s+)?(melhor\s+)?(grafico|visualizacao)|grafico (faz|fica) mais sentido|como (devo )?visualizar/.test(
+    normalizeSearchText(prompt),
+  );
+}
 
 const UPDATE_VERBS = [
   'separa',
@@ -332,9 +379,7 @@ export function parseIntent(prompt: string): ParsedIntent {
     }),
   };
   const dateRange = parseDateRange(normalized);
-  const visualization = VISUALIZATION_LEXICON.find((entry) =>
-    entry.phrases.some((phrase) => normalized.includes(phrase)),
-  )?.type;
+  const visualization = chartRequest(normalized);
   const comparison = normalized.includes('periodo anterior');
   const isQuestion =
     prompt.trim().endsWith('?') ||

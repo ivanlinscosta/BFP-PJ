@@ -408,18 +408,43 @@ export const VISUALIZATION_TYPES = [
   'AUTO',
   'TABLE',
   'KPI',
+  'BAR_HORIZONTAL',
+  'COLUMN',
+  'BAR_GROUPED',
+  'COLUMN_GROUPED',
+  'BAR_STACKED',
+  'COLUMN_STACKED',
+  'BAR_100_STACKED',
+  'COLUMN_100_STACKED',
+  'LINE',
+  'MULTI_LINE',
+  'AREA',
+  'AREA_STACKED',
+  'DONUT',
+  'TREEMAP',
+  'HEATMAP',
+  'CALENDAR_HEATMAP',
+  'FUNNEL',
+  'SANKEY',
+  'WATERFALL',
+  'SCATTER',
+  'BUBBLE',
+  'HISTOGRAM',
+  'BOX_PLOT',
+  'COHORT',
+  'RETENTION_CURVE',
+  'MAP',
+  'RADAR',
+  'QUADRANT',
+  'TIMELINE',
+  'RANKING',
+  // Legacy values kept so saved analyses keep opening (normalized by @bfp/shared).
   'BAR',
   'GROUPED_BAR',
   'STACKED_BAR',
-  'LINE',
-  'AREA',
-  'DONUT',
-  'FUNNEL',
-  'SCATTER',
-  'HEATMAP',
 ] as const;
 
-/** Visualization modes available in the playground and dashboards. */
+/** Supported visualization types for the playground. */
 export type VisualizationType = (typeof VISUALIZATION_TYPES)[number];
 
 /** Metric aggregations supported by the semantic layer. */
@@ -942,6 +967,42 @@ export interface SortSpec {
 /** Visualization preference stored with an analysis or dashboard card. */
 export interface VisualizationSpec {
   type: VisualizationType;
+  /**
+   * AUTO: the platform picks the best chart for the analysis (it may change when the analysis
+   * changes). MANUAL: the user's choice is kept. Missing = AUTO when type is AUTO, else MANUAL.
+   */
+  mode?: VisualizationMode;
+  settings?: VisualizationSettings;
+}
+
+/** Whether the chart is picked by the platform or by the user. */
+export type VisualizationMode = 'AUTO' | 'MANUAL';
+
+/** Per-chart options persisted with the analysis (only the ones the chart uses are read). */
+export interface VisualizationSettings {
+  orientation?: 'HORIZONTAL' | 'VERTICAL';
+  stacking?: 'NONE' | 'STACKED' | 'PERCENT';
+  showValues?: boolean;
+  showLegend?: boolean;
+  showTable?: boolean;
+  showGrid?: boolean;
+  showPoints?: boolean;
+  smooth?: boolean;
+  showPercent?: boolean;
+  trendLine?: boolean;
+  sort?: 'ASC' | 'DESC' | 'NONE' | 'LABEL';
+  topN?: number;
+  normalize?: boolean;
+  xAxis?: string;
+  yAxis?: string;
+  series?: string;
+  size?: string;
+  colorBy?: string;
+  mapLevel?: 'UF' | 'REGION';
+  bins?: number;
+  innerRadius?: number;
+  /** Table: bar behind metric values proportional to the column maximum. */
+  conditional?: boolean;
 }
 
 /** Metadata persisted alongside a serializable analysis specification. */
@@ -1139,7 +1200,46 @@ export interface MetricDefinitionBase {
   version: string;
   updatedAt: string;
   additivity: MetricAdditivity;
+  /** What the number represents (feeds chart recommendations). Inferred when missing. */
+  semanticType?: MetricSemanticType;
+  /** Position of the metric in the acquisition-to-activation funnel (1 = top). */
+  funnelStage?: number;
 }
+
+/** What a metric value represents, used to pick and validate charts. */
+export const METRIC_SEMANTIC_TYPES = [
+  'COUNT',
+  'AMOUNT',
+  'RATE',
+  'PERCENTAGE',
+  'SCORE',
+  'DURATION',
+  'VOLUME',
+  'CURRENCY',
+  'FUNNEL_VALUE',
+  'GEO_MEASURE',
+  'OTHER',
+] as const;
+
+/** What a metric value represents. */
+export type MetricSemanticType = (typeof METRIC_SEMANTIC_TYPES)[number];
+
+/** What a dimension represents, used to pick and validate charts. */
+export const DIMENSION_SEMANTIC_TYPES = [
+  'CATEGORY',
+  'TIME',
+  'GEO',
+  'FUNNEL_STAGE',
+  'SOURCE',
+  'DESTINATION',
+  'ENTITY',
+  'PRODUCT',
+  'CUSTOMER',
+  'EVENT',
+] as const;
+
+/** What a dimension represents. */
+export type DimensionSemanticType = (typeof DIMENSION_SEMANTIC_TYPES)[number];
 
 /** Ratio metric definition requiring numerator and denominator dependencies. */
 export interface RatioMetricDefinition extends MetricDefinitionBase {
@@ -1167,6 +1267,12 @@ export interface DimensionDefinition {
   allowedOperators: FilterOperator[];
   sensitivity: DataSensitivityLevel;
   certificationStatus: CertificationStatus;
+  /** What the dimension represents (feeds chart recommendations). Inferred when missing. */
+  semanticType?: DimensionSemanticType;
+  /** Date dimensions of a lifecycle: START opens a cohort, EVENT is a later milestone. */
+  cohortRole?: 'START' | 'EVENT';
+  /** Geographic level of GEO dimensions. */
+  geoLevel?: 'UF' | 'REGION';
 }
 
 /** Column definition returned by the analytics engine. */

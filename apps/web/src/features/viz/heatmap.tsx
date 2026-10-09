@@ -1,6 +1,8 @@
 import type { ColumnFormat } from '@bfp/domain';
+import type { AnalyticsResponse } from '@/features/explorer/api';
 import { formatMetricValue } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { compareCategory, dimensionColumns, labelOf, metricColumns, numeric } from './model';
 
 export interface HeatmapProps {
   rows: string[];
@@ -134,4 +136,58 @@ export function HeatmapLegend() {
       ))}
     </div>
   );
+}
+
+/** Pivots a 2-dimension result into the generic heatmap matrix. */
+export function toHeatmapMatrix(result: AnalyticsResponse, totalsResult?: AnalyticsResponse) {
+  const [rowDimension, columnDimension] = dimensionColumns(result);
+  const metric = metricColumns(result)[0];
+  if (!rowDimension || !columnDimension || !metric) {
+    return null;
+  }
+
+  const rowLabelByRaw = new Map<string, string>();
+  const columnLabels = new Set<string>();
+  const cell = new Map<string, number | null>();
+  for (const row of result.rows) {
+    const rowLabel = labelOf(result, rowDimension.key, row[rowDimension.key]);
+    const columnLabel = labelOf(result, columnDimension.key, row[columnDimension.key]);
+    rowLabelByRaw.set(String(row[rowDimension.key] ?? ''), rowLabel);
+    columnLabels.add(columnLabel);
+    cell.set(`${rowLabel}\u0000${columnLabel}`, numeric(row[metric.key]));
+  }
+
+  const totalsByLabel = new Map<string, number | null>();
+  for (const row of totalsResult?.rows ?? []) {
+    totalsByLabel.set(
+      labelOf(totalsResult!, rowDimension.key, row[rowDimension.key]),
+      numeric(row[metric.key]),
+    );
+  }
+
+  const rowAverage = (label: string) => {
+    const values = [...columnLabels]
+      .map((column) => cell.get(`${label}\u0000${column}`))
+      .filter((value): value is number => typeof value === 'number');
+    return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+  };
+  const rows = [...new Set(rowLabelByRaw.values())].sort((left, right) =>
+    totalsByLabel.size > 0
+      ? (totalsByLabel.get(right) ?? 0) - (totalsByLabel.get(left) ?? 0)
+      : rowAverage(right) - rowAverage(left),
+  );
+  const columns = [...columnLabels].sort((left, right) =>
+    compareCategory(columnDimension, left, right),
+  );
+
+  return {
+    rowHeader: rowDimension.label,
+    columnHeader: columnDimension.label,
+    rows,
+    columns,
+    values: rows.map((row) => columns.map((column) => cell.get(`${row}\u0000${column}`) ?? null)),
+    totals: totalsByLabel.size > 0 ? rows.map((row) => totalsByLabel.get(row) ?? null) : undefined,
+    format: metric.format,
+    metricLabel: metric.label,
+  };
 }

@@ -21,3 +21,6 @@ export {
 } from './describe';
 
 export { applyAnalysisOperations, type AnalysisOperation } from './operations';
+
+export * from './visualization/catalog';
+export * from './visualization/engine';

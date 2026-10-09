@@ -12,6 +12,7 @@ import type {
   FilterCondition,
   Product,
 } from '@bfp/domain';
+import { VISUALIZATION_TYPES } from '@bfp/domain';
 import { analysisSpecSchema, audienceRuleGroupSchema } from '@bfp/schemas';
 import {
   BUSINESS_GLOSSARY,
@@ -30,6 +31,7 @@ import { getAllowedDomains } from '@api/auth/rbac';
 import type { AuthenticatedUser } from '@api/auth/types';
 import { ApiError, NotFoundError, ValidationError } from '@api/common/errors';
 import { sampleNumbers } from '@api/services/intelligence/grounding';
+import { recommendFor, visualizationCompatibility } from '@api/services/intelligence/visualization';
 import type { ApiContext } from '@api/http/context';
 import { buildCustomer360 } from '@api/http/customer360';
 import { buildDataProductQualityCatalog } from '@api/http/qualitySummary';
@@ -65,6 +67,8 @@ export interface ToolContext {
   droppedSentences?: number;
   /** Cut of a refined study: added to every query of the job (replacing the same field). */
   requiredFilters?: FilterCondition[];
+  /** Analysis currently open in the conversation (charts are recommended for it). */
+  currentSpec?: AnalysisSpec;
   /** Previous study being refined (its chapters are redone with `requiredFilters`). */
   refines?: {
     prompt: string;
@@ -303,6 +307,31 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
         note: filters.length
           ? `Filtro aplicado sobre as primeiras ${preview.rows.length} linhas da base; para contagens use runAnalyticsQuery.`
           : undefined,
+      };
+    },
+  },
+  {
+    name: 'recommendVisualization',
+    description:
+      'Recomenda os gráficos mais adequados para a análise atual (ou a analysisSpec informada), com o motivo, e diz se um tipo pedido é compatível e o que falta. Use para "qual gráfico faz mais sentido?" ou antes de trocar a visualização.',
+    inputSchema: z.object({
+      type: z.enum(VISUALIZATION_TYPES).optional(),
+      analysisSpec: z.unknown().optional(),
+    }),
+    async execute(input, toolContext) {
+      const { type, analysisSpec } = z
+        .object({
+          type: z.enum(VISUALIZATION_TYPES).optional(),
+          analysisSpec: z.unknown().optional(),
+        })
+        .parse(input ?? {});
+      const spec = analysisSpec ? parseQueryInput({ analysisSpec }) : toolContext.currentSpec;
+      if (!spec || spec.metrics.length === 0) {
+        return { error: 'Não há análise aberta: adicione uma métrica primeiro.' };
+      }
+      return {
+        recommendations: recommendFor(spec),
+        requested: type ? { type, ...visualizationCompatibility(spec, type) } : undefined,
       };
     },
   },

@@ -16,35 +16,52 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { VisualizationType } from '@bfp/domain';
-import { formatMetricValue } from '@/lib/format';
 import type { AnalyticsResponse } from '@/features/explorer/api';
+import { formatMetricValue } from '@/lib/format';
 import { shapeSeries, SERIES_PALETTE, type ChartData, type ChartSeries } from './series';
+import { ChartTooltip } from './tooltip';
 
 const axisTick = { fill: 'var(--color-ink-faint)', fontSize: 11 };
-const tooltipStyle = {
-  borderRadius: 8,
-  border: '1px solid var(--color-line)',
-  background: 'var(--color-card)',
-  fontSize: 12,
-};
 
-type SeriesType = Extract<
-  VisualizationType,
-  'BAR' | 'GROUPED_BAR' | 'STACKED_BAR' | 'LINE' | 'AREA' | 'DONUT'
->;
+export type SeriesKind = 'bar' | 'line' | 'area' | 'donut';
+export type Stacking = 'NONE' | 'STACKED' | 'PERCENT';
 
-function compact(value: unknown, format: ChartSeries['format']) {
-  return formatMetricValue(value, format, { compact: true });
+export interface SeriesChartProps {
+  result: AnalyticsResponse;
+  kind: SeriesKind;
+  orientation?: 'HORIZONTAL' | 'VERTICAL';
+  stacking?: Stacking;
+  showLegend?: boolean;
+  showValues?: boolean;
+  showGrid?: boolean;
+  showPoints?: boolean;
+  smooth?: boolean;
+  showPercent?: boolean;
+  innerRadius?: number;
+  topN?: number;
+}
+
+function compact(value: unknown, format: ChartSeries['format'], percent?: boolean) {
+  return percent
+    ? formatMetricValue(value, 'percent')
+    : formatMetricValue(value, format, { compact: true });
 }
 
 function truncate(label: string, size: number) {
   return label.length > size ? `${label.slice(0, size - 1)}…` : label;
 }
 
-function Axes({ data, horizontal }: { data: ChartData; horizontal?: boolean }) {
+function Axes({
+  data,
+  horizontal,
+  percent,
+}: {
+  data: ChartData;
+  horizontal?: boolean;
+  percent?: boolean;
+}) {
   const left = data.series.find((series) => series.axis === 'left') ?? data.series[0]!;
-  const right = data.series.find((series) => series.axis === 'right');
+  const right = percent ? undefined : data.series.find((series) => series.axis === 'right');
   const many = data.rows.length > 8;
   if (horizontal) {
     return (
@@ -52,7 +69,7 @@ function Axes({ data, horizontal }: { data: ChartData; horizontal?: boolean }) {
         <XAxis
           axisLine={false}
           tick={axisTick}
-          tickFormatter={(value) => compact(value, left.format)}
+          tickFormatter={(value) => compact(value, left.format, percent)}
           tickLine={false}
           type="number"
         />
@@ -85,7 +102,7 @@ function Axes({ data, horizontal }: { data: ChartData; horizontal?: boolean }) {
       <YAxis
         axisLine={false}
         tick={axisTick}
-        tickFormatter={(value) => compact(value, left.format)}
+        tickFormatter={(value) => compact(value, left.format, percent)}
         tickLine={false}
         width={68}
         yAxisId="left"
@@ -105,24 +122,36 @@ function Axes({ data, horizontal }: { data: ChartData; horizontal?: boolean }) {
   );
 }
 
-function tooltipFormatter(data: ChartData) {
-  return (value: unknown, name: unknown) => {
-    const series = data.series.find((item) => item.label === name);
-    return [formatMetricValue(value, series?.format), String(name)];
+/** Keeps only the top N categories by the first series (charts stay readable). */
+function limitRows(data: ChartData, topN?: number): ChartData {
+  if (!topN || data.temporal || data.rows.length <= topN) return data;
+  return {
+    ...data,
+    rows: data.rows.slice(0, topN),
+    notes: [...data.notes, `Mostrando as ${topN} maiores categorias.`],
   };
 }
 
 /** Donut: one metric over the categories of one dimension (largest 7 + "Outros"). */
-function Donut({ data, showLegend }: { data: ChartData; showLegend: boolean }) {
+function Donut({
+  data,
+  showLegend,
+  showPercent,
+  innerRadius,
+}: {
+  data: ChartData;
+  showLegend: boolean;
+  showPercent: boolean;
+  innerRadius: number;
+}) {
   const metric = data.series[0]!;
   const values = data.rows
     .map((row) => ({ name: String(row.__category), value: Number(row[metric.key] ?? 0) }))
     .filter((item) => item.value > 0)
     .sort((left, right) => right.value - left.value);
-  const additive = metric.format !== 'percent';
   const top = values.slice(0, 7);
   const rest = values.slice(7).reduce((sum, item) => sum + item.value, 0);
-  const slices = additive && rest > 0 ? [...top, { name: 'Outros', value: rest }] : top;
+  const slices = rest > 0 ? [...top, { name: 'Outros', value: rest }] : top;
   const total = slices.reduce((sum, item) => sum + item.value, 0) || 1;
   return (
     <div className="grid items-center gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -132,7 +161,7 @@ function Donut({ data, showLegend }: { data: ChartData; showLegend: boolean }) {
             <Pie
               data={slices}
               dataKey="value"
-              innerRadius="55%"
+              innerRadius={`${innerRadius}%`}
               isAnimationActive={false}
               nameKey="name"
               outerRadius="90%"
@@ -144,8 +173,13 @@ function Donut({ data, showLegend }: { data: ChartData; showLegend: boolean }) {
               ))}
             </Pie>
             <Tooltip
-              contentStyle={tooltipStyle}
-              formatter={(value) => formatMetricValue(value, metric.format)}
+              content={(props) => (
+                <ChartTooltip
+                  active={props.active}
+                  formatOf={() => metric.format}
+                  payload={props.payload as never}
+                />
+              )}
             />
           </PieChart>
         </ResponsiveContainer>
@@ -165,7 +199,7 @@ function Donut({ data, showLegend }: { data: ChartData; showLegend: boolean }) {
               <span className="font-semibold text-brand-navy tabular-nums">
                 {compact(slice.value, metric.format)}
               </span>
-              {additive ? (
+              {showPercent ? (
                 <span className="w-12 text-right text-ink-soft tabular-nums">
                   {Math.round((slice.value / total) * 100)}%
                 </span>
@@ -179,24 +213,47 @@ function Donut({ data, showLegend }: { data: ChartData; showLegend: boolean }) {
 }
 
 /**
- * Charts with categories and series (columns, stacked columns, grouped bars, lines, areas and
- * donuts). Every type reads the same shaped data, so switching type never loses the analysis.
+ * Generic category × series chart: bars or columns (simple, grouped, stacked, 100%), lines,
+ * areas (simple or stacked) and donuts. Every type reads the same shaped data, so switching type
+ * never loses the analysis.
  */
 export function SeriesChart({
   result,
-  type,
+  kind,
+  orientation = 'VERTICAL',
+  stacking = 'NONE',
   showLegend = true,
   showValues = false,
-}: {
-  result: AnalyticsResponse;
-  type: SeriesType;
-  showLegend?: boolean;
-  showValues?: boolean;
-}) {
-  const data = shapeSeries(result);
-  if (!data) return null;
+  showGrid = true,
+  showPoints = true,
+  smooth = true,
+  showPercent = true,
+  innerRadius = 55,
+  topN,
+}: SeriesChartProps) {
+  const shaped = shapeSeries(result);
+  if (!shaped) return null;
+  const data = limitRows(shaped, kind === 'line' || kind === 'area' ? undefined : topN);
+  const percent = stacking === 'PERCENT';
+  const stacked = stacking !== 'NONE';
+  const horizontal = kind === 'bar' && orientation === 'HORIZONTAL';
+  const formatOf = (key: string) => data.series.find((series) => series.key === key)?.format;
+  const tooltip = (
+    <Tooltip
+      content={(props) => (
+        <ChartTooltip
+          active={props.active}
+          formatOf={(key) => formatOf(key)}
+          label={props.label}
+          payload={props.payload as never}
+          percent={percent}
+        />
+      )}
+      cursor={kind === 'bar' ? { fill: 'var(--color-muted)' } : undefined}
+    />
+  );
   const legend =
-    showLegend && (data.series.length > 1 || type === 'DONUT') ? (
+    showLegend && data.series.length > 1 ? (
       <Legend
         iconSize={10}
         iconType="circle"
@@ -204,50 +261,65 @@ export function SeriesChart({
         wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
       />
     ) : null;
-  // Value labels only where they stay readable: few categories, and one series on lines/areas.
   const labels =
     showValues &&
+    !percent &&
     data.rows.length <= 14 &&
-    (type === 'LINE' || type === 'AREA'
+    (kind === 'line' || kind === 'area'
       ? data.series.length === 1 && data.rows.length <= 12
-      : data.series.length <= 3);
-  // Horizontal bars grow with categories × series so every bar keeps a readable thickness.
-  const height =
-    type === 'BAR'
-      ? Math.max(220, data.rows.length * Math.max(26, data.series.length * 14 + 12) + 56)
-      : 320;
-  const formatTooltip = tooltipFormatter(data);
+      : data.series.length <= 3 && !stacked);
+  const height = horizontal
+    ? Math.max(
+        220,
+        data.rows.length * Math.max(26, (stacked ? 1 : data.series.length) * 14 + 12) + 56,
+      )
+    : 320;
   const notes = data.notes.length ? (
     <p className="m-0 mt-2 text-[11px] text-ink-soft">{data.notes.join(' ')}</p>
   ) : null;
 
-  if (type === 'DONUT') {
+  if (kind === 'donut') {
     return (
       <>
-        <Donut data={data} showLegend={showLegend} />
+        <Donut
+          data={data}
+          innerRadius={innerRadius}
+          showLegend={showLegend}
+          showPercent={showPercent}
+        />
         {notes}
       </>
     );
   }
 
+  const grid = showGrid ? (
+    <CartesianGrid horizontal={!horizontal} stroke="var(--color-line)" vertical={horizontal} />
+  ) : null;
+  const curve = smooth ? 'monotone' : 'linear';
+  const axisOf = (series: ChartSeries) => (stacked ? 'left' : series.axis);
+
   const chart =
-    type === 'LINE' ? (
+    kind === 'line' ? (
       <LineChart data={data.rows} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="var(--color-line)" vertical={false} />
+        {grid}
         <Axes data={data} />
-        <Tooltip contentStyle={tooltipStyle} formatter={formatTooltip} />
+        {tooltip}
         {legend}
         {data.series.map((series) => (
           <Line
             connectNulls
             dataKey={series.key}
-            dot={data.rows.length <= 24 ? { r: 3, strokeWidth: 0, fill: series.color } : false}
+            dot={
+              showPoints && data.rows.length <= 24
+                ? { r: 3, strokeWidth: 0, fill: series.color }
+                : false
+            }
             isAnimationActive={false}
             key={series.key}
             name={series.label}
             stroke={series.color}
             strokeWidth={2.25}
-            type="monotone"
+            type={curve}
             yAxisId={series.axis}
           >
             {labels ? (
@@ -262,46 +334,44 @@ export function SeriesChart({
           </Line>
         ))}
       </LineChart>
-    ) : type === 'AREA' ? (
-      <AreaChart data={data.rows} margin={{ top: 12, right: 12, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="var(--color-line)" vertical={false} />
-        <Axes data={data} />
-        <Tooltip contentStyle={tooltipStyle} formatter={formatTooltip} />
+    ) : kind === 'area' ? (
+      <AreaChart
+        data={data.rows}
+        margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
+        stackOffset={percent ? 'expand' : undefined}
+      >
+        {grid}
+        <Axes data={data} percent={percent} />
+        {tooltip}
         {legend}
         {data.series.map((series) => (
           <Area
             connectNulls
             dataKey={series.key}
             fill={series.color}
-            fillOpacity={data.series.length > 1 ? 0.12 : 0.18}
+            fillOpacity={stacked ? 0.55 : data.series.length > 1 ? 0.12 : 0.18}
             isAnimationActive={false}
             key={series.key}
             name={series.label}
+            stackId={stacked ? 'stack' : undefined}
             stroke={series.color}
             strokeWidth={2}
-            type="monotone"
-            yAxisId={series.axis}
+            type={curve}
+            yAxisId={axisOf(series)}
           />
         ))}
       </AreaChart>
     ) : (
       <BarChart
-        barCategoryGap={type === 'BAR' ? '22%' : '18%'}
+        barCategoryGap={horizontal ? '22%' : '18%'}
         data={data.rows}
-        layout={type === 'BAR' ? 'vertical' : 'horizontal'}
-        margin={{ top: 16, right: type === 'BAR' ? 48 : 12, bottom: 0, left: 0 }}
+        layout={horizontal ? 'vertical' : 'horizontal'}
+        margin={{ top: 16, right: horizontal ? 48 : 12, bottom: 0, left: 0 }}
+        stackOffset={percent ? 'expand' : undefined}
       >
-        <CartesianGrid
-          horizontal={type !== 'BAR'}
-          stroke="var(--color-line)"
-          vertical={type === 'BAR'}
-        />
-        <Axes data={data} horizontal={type === 'BAR'} />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          cursor={{ fill: 'var(--color-muted)' }}
-          formatter={formatTooltip}
-        />
+        {grid}
+        <Axes data={data} horizontal={horizontal} percent={percent} />
+        {tooltip}
         {legend}
         {data.series.map((series, index) => (
           <Bar
@@ -309,27 +379,29 @@ export function SeriesChart({
             fill={series.color}
             isAnimationActive={false}
             key={series.key}
-            maxBarSize={type === 'STACKED_BAR' ? 56 : 40}
+            maxBarSize={stacked ? 56 : 40}
             name={series.label}
             radius={
-              type === 'STACKED_BAR'
+              stacked
                 ? index === data.series.length - 1
-                  ? [3, 3, 0, 0]
+                  ? horizontal
+                    ? [0, 3, 3, 0]
+                    : [3, 3, 0, 0]
                   : 0
-                : type === 'BAR'
+                : horizontal
                   ? [0, 3, 3, 0]
                   : [3, 3, 0, 0]
             }
-            stackId={type === 'STACKED_BAR' ? 'stack' : undefined}
-            {...(type === 'BAR' ? {} : { yAxisId: type === 'STACKED_BAR' ? 'left' : series.axis })}
+            stackId={stacked ? 'stack' : undefined}
+            {...(horizontal ? {} : { yAxisId: axisOf(series) })}
           >
-            {labels && type !== 'STACKED_BAR' ? (
+            {labels ? (
               <LabelList
                 dataKey={series.key}
                 fill="var(--color-ink-soft)"
                 fontSize={10}
                 formatter={(value: unknown) => compact(value, series.format)}
-                position={type === 'BAR' ? 'right' : 'top'}
+                position={horizontal ? 'right' : 'top'}
               />
             ) : null}
           </Bar>
@@ -338,13 +410,13 @@ export function SeriesChart({
     );
 
   return (
-    <figure className="m-0" aria-label={`Gráfico por ${data.categoryLabel}`}>
+    <figure aria-label={`Gráfico por ${data.categoryLabel}`} className="m-0">
       <div style={{ height }}>
         <ResponsiveContainer height="100%" width="100%">
           {chart}
         </ResponsiveContainer>
       </div>
-      {data.series.some((series) => series.axis === 'right') ? (
+      {!stacked && data.series.some((series) => series.axis === 'right') ? (
         <p className="m-0 mt-1 text-[11px] text-ink-soft">
           Eixo direito:{' '}
           {data.series

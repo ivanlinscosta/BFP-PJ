@@ -7,7 +7,7 @@ import { logger } from '@api/common/logger';
 import { createApiContext } from '@api/http/context';
 import { createApp } from '@api/http/app';
 import type { OpenAIChatClient } from '@api/services/intelligence/openaiProvider';
-import { systemPrompt } from '@api/services/intelligence/bedrockProvider';
+import { finalizeModelAnswer, systemPrompt } from '@api/services/intelligence/bedrockProvider';
 import {
   GROUNDING_RULES,
   groundText,
@@ -473,7 +473,7 @@ describe('Studies over the selected bases', () => {
     const study = (await getStudyJob(context, auth.userId, job.id))?.study;
     expect(study?.generatedBy).toBe('ai');
     expect(study?.title).toBe('Estudo sobre Pix');
-    expect(study?.sections[0]?.visualization).toBe('BAR');
+    expect(study?.sections[0]?.visualization).toBe('BAR_HORIZONTAL');
     expect(prompts[0]).toContain('transactions');
     expect(prompts[0]).not.toContain('nps —');
     expect(prompts[0]).toMatch(/PIX_IN=/);
@@ -792,5 +792,71 @@ describe('Access channels (canal de acesso)', () => {
     expect(rows.some((row) => (row.bankline_active_companies as number) > 0)).toBe(true);
     const transactions = await query(['transactions'], 'transaction_volume', 'transaction_channel');
     expect(transactions.map((row) => row.transaction_channel)).not.toContain('INTERNET_BANKING');
+  });
+});
+
+describe('Inteligência PJ changes and recommends charts', () => {
+  const auth: AuthenticatedUser = {
+    userId: 'usr-analyst',
+    email: 'analyst@example.local',
+    role: 'analyst',
+    groups: ['analyst'],
+  };
+  const byChannel = {
+    datasets: ['customer_360'],
+    metrics: [{ id: 'account_conversion_rate' }],
+    dimensions: [{ id: 'acquisition_channel' }],
+    filters: [],
+    dateRange: { type: 'LAST_N_DAYS' as const, value: 365 },
+    visualization: { type: 'AUTO' as const },
+  };
+
+  it('"mostre isso em tabela" sets the visualization', async () => {
+    const { context } = createHarness();
+    const reply = await runIntelligence(context, auth, {
+      prompt: 'Mostre isso em tabela',
+      analysisSpec: byChannel,
+    });
+    expect(reply.operations).toEqual(
+      expect.arrayContaining([{ type: 'SET_VISUALIZATION', visualization: 'TABLE' }]),
+    );
+    expect(reply.analysisSpec?.visualization).toMatchObject({ type: 'TABLE', mode: 'MANUAL' });
+  });
+
+  it('explains what a map needs instead of drawing it without geography', async () => {
+    const { context } = createHarness();
+    const reply = await runIntelligence(context, auth, {
+      prompt: 'Compare em um mapa',
+      analysisSpec: byChannel,
+    });
+    expect(reply.operations).toEqual([]);
+    expect(reply.answer).toMatch(/Adicione Estado ou Região/);
+  });
+
+  it('answers which chart makes more sense with the engine', async () => {
+    const { context } = createHarness();
+    const reply = await runIntelligence(context, auth, {
+      prompt: 'Qual gráfico faz mais sentido?',
+      analysisSpec: byChannel,
+    });
+    expect(reply.answer).toMatch(/barras horizontais/);
+  });
+
+  it('the AI cannot apply an incompatible chart: it explains the requirement', () => {
+    const final = finalizeModelAnswer(
+      JSON.stringify({
+        action: 'UPDATE_ANALYSIS',
+        operations: [{ type: 'SET_VISUALIZATION', visualizationType: 'SANKEY' }],
+        answer: 'Feito.',
+      }),
+      {
+        analysisSpec: byChannel,
+        toolContext: { context: createHarness().context, auth, queries: [] },
+      },
+    );
+    expect(final?.operations ?? []).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'SET_VISUALIZATION' })]),
+    );
+    expect(final?.answer).toMatch(/origem/);
   });
 });

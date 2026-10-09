@@ -1,16 +1,15 @@
 import { ArrowRight, BadgeCheck } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
-import type { VisualizationType } from '@bfp/domain';
+import type { VisualizationSettings } from '@bfp/domain';
+import { chartName, type ChartType } from '@bfp/shared';
 import { Badge } from '@/components/ui/badge';
 import { Card, Eyebrow } from '@/components/ui/card';
 import { ActionChip } from '@/components/ui/chip';
-import { Select } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Tabs } from '@/components/ui/tabs';
 import type { MetricDetail } from '@/features/catalog/api';
-import type { BarSort } from '@/features/viz/bar-chart';
 import { AnalyticsTable } from '@/features/viz/data-table';
+import { VisualizationSettingsPanel } from '@/features/viz/visualization-settings';
 import { formatMinutes, formatShare } from '@/lib/format';
 import type { AnalyticsResponse } from '../api';
 import type { NextExploration } from '../explorations';
@@ -92,34 +91,18 @@ export function EmptySidePanel() {
   );
 }
 
-export interface VisualizationSettings {
-  sort: BarSort;
-  showValues: boolean;
-  showTable: boolean;
-  showLegend: boolean;
-}
-
-/** Right panel with visualization settings, data tab and next explorations. */
+/** Right panel: options of the selected chart, data tab and next explorations. */
 export function ResultSidePanel({
-  type,
-  options,
-  onTypeChange,
+  chartType,
   settings,
   onSettingsChange,
   explorations,
   onExplore,
   result,
 }: {
-  type: VisualizationType | 'KPI';
-  options: Array<{
-    type: VisualizationType;
-    label: string;
-    enabled: boolean;
-    requirement?: string;
-  }>;
-  onTypeChange(type: VisualizationType): void;
+  chartType: ChartType;
   settings: VisualizationSettings;
-  onSettingsChange(settings: VisualizationSettings): void;
+  onSettingsChange(patch: Partial<VisualizationSettings>): void;
   explorations: NextExploration[];
   onExplore(exploration: NextExploration): void;
   result: AnalyticsResponse | undefined;
@@ -138,58 +121,15 @@ export function ResultSidePanel({
       />
       {tab === 'viz' ? (
         <div className="mt-4 flex flex-col">
-          <label className="text-sm font-semibold text-ink" htmlFor="viz-type">
-            Tipo
-          </label>
-          <Select
-            className="mt-2 text-ink-soft"
-            id="viz-type"
-            leadingChevron
-            onChange={(event) => onTypeChange(event.target.value as VisualizationType)}
-            value={type}
-          >
-            {options.map((option) => (
-              <option disabled={!option.enabled} key={option.type} value={option.type}>
-                {option.enabled
-                  ? option.label
-                  : `${option.label} (precisa de ${option.requirement})`}
-              </option>
-            ))}
-          </Select>
-          <label className="mt-4 text-sm font-semibold text-ink" htmlFor="viz-sort">
-            Ordenação
-          </label>
-          <Select
-            className="mt-2 text-ink-soft"
-            id="viz-sort"
-            leadingChevron
-            onChange={(event) =>
-              onSettingsChange({ ...settings, sort: event.target.value as BarSort })
-            }
-            value={settings.sort}
-          >
-            <option value="DESC">Maior → menor</option>
-            <option value="ASC">Menor → maior</option>
-            <option value="LABEL">A → Z</option>
-          </Select>
-          <div className="mt-4 flex flex-col gap-3 text-sm text-ink">
-            {(
-              [
-                ['showValues', 'Mostrar valores'],
-                ['showTable', 'Mostrar tabela'],
-                ['showLegend', 'Legenda'],
-              ] as const
-            ).map(([key, label]) => (
-              <div className="flex items-center justify-between" key={key}>
-                <span>{label}</span>
-                <Switch
-                  checked={settings[key]}
-                  label={label}
-                  onCheckedChange={(checked) => onSettingsChange({ ...settings, [key]: checked })}
-                />
-              </div>
-            ))}
-          </div>
+          <p className="m-0 mb-3 text-xs font-semibold text-ink-soft">
+            Opções de {chartName(chartType).toLowerCase()}
+          </p>
+          <VisualizationSettingsPanel
+            onChange={onSettingsChange}
+            result={result}
+            settings={settings}
+            type={chartType}
+          />
           {explorations.length > 0 ? (
             <div className="mt-4 border-t border-line pt-3">
               <Eyebrow>Próximas explorações</Eyebrow>

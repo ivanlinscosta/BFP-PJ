@@ -1,4 +1,4 @@
-import type { ColumnFormat, MetricFormat } from '@bfp/domain';
+import type { ColumnFormat, MetricFormat, MetricSemanticType } from '@bfp/domain';
 
 const percentFormatter = new Intl.NumberFormat('pt-BR', {
   minimumFractionDigits: 1,
@@ -18,11 +18,21 @@ const compactCurrencyFormatter = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 1,
 });
 
-/** Formats a metric value using pt-BR conventions (14,8% · R$ 1.234 · 2.418). */
+const compactNumberFormatter = new Intl.NumberFormat('pt-BR', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+const oneDecimalFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+
+/**
+ * Central formatter of metric values (pt-BR): 8,8% · R$ 1,2 mi · 12.418 · 1,2 mi · 3,2 dias ·
+ * 84/100. `compact` shortens large numbers (axes, labels); `semantic` and `unit` come from the
+ * metric definition when known.
+ */
 export function formatMetricValue(
   value: unknown,
   format: ColumnFormat | MetricFormat | undefined,
-  options: { compact?: boolean } = {},
+  options: { compact?: boolean; semantic?: MetricSemanticType; unit?: string } = {},
 ) {
   if (value === null || value === undefined || value === '') {
     return '—';
@@ -40,10 +50,22 @@ export function formatMetricValue(
     return `${percentFormatter.format(value * 100)}%`;
   }
 
+  if (options.semantic === 'SCORE') {
+    return `${integerFormatter.format(Math.round(value))}/100`;
+  }
+
+  if (options.semantic === 'DURATION' && options.unit) {
+    return `${oneDecimalFormatter.format(value)} ${options.unit}`;
+  }
+
   if (format === 'currency') {
     return options.compact && Math.abs(value) >= 10_000
       ? compactCurrencyFormatter.format(value)
       : currencyFormatter.format(value);
+  }
+
+  if (options.compact && Math.abs(value) >= 10_000) {
+    return compactNumberFormatter.format(value);
   }
 
   return Number.isInteger(value) ? integerFormatter.format(value) : decimalFormatter.format(value);

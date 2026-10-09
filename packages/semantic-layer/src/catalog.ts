@@ -109,9 +109,50 @@ const fieldRef = <T extends keyof DatasetEntityModelMap>(
   field: Extract<keyof DatasetEntityModelMap[T], string>,
 ): SourceFieldRef => ({ entityType, field }) as unknown as SourceFieldRef;
 
+/**
+ * Semantic metadata read by the visualization engine (what each dimension represents: geography,
+ * origin/destination of flows, lifecycle dates of cohorts). Undeclared dimensions are inferred
+ * (date → TIME, otherwise CATEGORY).
+ */
+const DIMENSION_SEMANTICS: Record<
+  string,
+  Pick<GovernedDimensionDefinition, 'semanticType' | 'cohortRole' | 'geoLevel'>
+> = {
+  state: { semanticType: 'GEO', geoLevel: 'UF' },
+  region: { semanticType: 'GEO', geoLevel: 'REGION' },
+  acquisition_source: { semanticType: 'SOURCE' },
+  acquisition_channel: { semanticType: 'SOURCE' },
+  acquisition_campaign: { semanticType: 'SOURCE' },
+  campaign_channel: { semanticType: 'SOURCE' },
+  product: { semanticType: 'DESTINATION' },
+  product_category: { semanticType: 'DESTINATION' },
+  nba_action: { semanticType: 'DESTINATION' },
+  lead_date: { semanticType: 'TIME', cohortRole: 'START' },
+  account_opened_date: { semanticType: 'TIME', cohortRole: 'START' },
+  onboarding_completed_date: { semanticType: 'TIME', cohortRole: 'EVENT' },
+  activation_date: { semanticType: 'TIME', cohortRole: 'EVENT' },
+  app_action: { semanticType: 'EVENT' },
+  crm_interaction_type: { semanticType: 'EVENT' },
+};
+
+/** Metric metadata for charts: stage of the acquisition-to-activation funnel and scores. */
+const METRIC_SEMANTICS: Record<
+  string,
+  Pick<GovernedMetricDefinition, 'semanticType' | 'funnelStage'>
+> = {
+  impressions: { semanticType: 'FUNNEL_VALUE', funnelStage: 1 },
+  clicks: { semanticType: 'FUNNEL_VALUE', funnelStage: 2 },
+  leads: { semanticType: 'FUNNEL_VALUE', funnelStage: 3 },
+  accounts_opened: { semanticType: 'FUNNEL_VALUE', funnelStage: 4 },
+  onboarding_completed: { semanticType: 'FUNNEL_VALUE', funnelStage: 5 },
+  activation_d30: { semanticType: 'FUNNEL_VALUE', funnelStage: 6 },
+  avg_nba_score: { semanticType: 'SCORE' },
+};
+
 const defineDimensions = <const T extends readonly GovernedDimensionDefinition[]>(entries: T) =>
-  entries;
-const defineMetrics = <const T extends readonly GovernedMetricDefinition[]>(entries: T) => entries;
+  entries.map((entry) => ({ ...entry, ...DIMENSION_SEMANTICS[entry.id] })) as unknown as T;
+const defineMetrics = <const T extends readonly GovernedMetricDefinition[]>(entries: T) =>
+  entries.map((entry) => ({ ...entry, ...METRIC_SEMANTICS[entry.id] })) as unknown as T;
 const defineDataProducts = <const T extends readonly GovernedDataProductDefinition[]>(entries: T) =>
   entries;
 const defineGlossary = <const T extends readonly BusinessTerm[]>(entries: T) => entries;

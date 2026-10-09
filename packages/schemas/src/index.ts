@@ -148,8 +148,37 @@ export const sortSpecSchema = z.object({
 });
 
 /** Schema for visualization preferences. */
+export const visualizationSettingsSchema = z
+  .object({
+    orientation: z.enum(['HORIZONTAL', 'VERTICAL']).optional(),
+    stacking: z.enum(['NONE', 'STACKED', 'PERCENT']).optional(),
+    showValues: z.boolean().optional(),
+    showLegend: z.boolean().optional(),
+    showTable: z.boolean().optional(),
+    showGrid: z.boolean().optional(),
+    showPoints: z.boolean().optional(),
+    smooth: z.boolean().optional(),
+    showPercent: z.boolean().optional(),
+    trendLine: z.boolean().optional(),
+    sort: z.enum(['ASC', 'DESC', 'NONE', 'LABEL']).optional(),
+    topN: z.number().int().min(1).max(500).optional(),
+    normalize: z.boolean().optional(),
+    xAxis: z.string().max(100).optional(),
+    yAxis: z.string().max(100).optional(),
+    series: z.string().max(100).optional(),
+    size: z.string().max(100).optional(),
+    colorBy: z.string().max(100).optional(),
+    mapLevel: z.enum(['UF', 'REGION']).optional(),
+    bins: z.number().int().min(2).max(100).optional(),
+    innerRadius: z.number().min(0).max(90).optional(),
+    conditional: z.boolean().optional(),
+  })
+  .strip();
+
 export const visualizationSpecSchema = z.object({
   type: z.enum(VISUALIZATION_TYPES),
+  mode: z.enum(['AUTO', 'MANUAL']).optional(),
+  settings: visualizationSettingsSchema.optional(),
 });
 
 /** Schema for the AnalysisSpec metadata block. */
@@ -199,7 +228,7 @@ export const audienceRuleGroupSchema: z.ZodType<AudienceRuleGroup> = z.lazy(() =
 );
 
 /** Schema for structured AnalysisSpec operations proposed by the AI or the UI. */
-export const analysisOperationSchema = z.discriminatedUnion('type', [
+const analysisOperationUnion = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ADD_METRIC'), metricId: nonEmptyTrimmedString }),
   z.object({ type: z.literal('REMOVE_METRIC'), metricId: nonEmptyTrimmedString }),
   z.object({
@@ -225,6 +254,22 @@ export const analysisOperationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('REMOVE_DATASET'), datasetId: nonEmptyTrimmedString }),
   z.object({ type: z.literal('CLEAR') }),
 ]);
+
+/**
+ * Operation accepted from the UI and the AI. SET_VISUALIZATION may be written with
+ * `visualizationType` (the AI's spelling) instead of `visualization`.
+ */
+export const analysisOperationSchema = z.preprocess(
+  (value) =>
+    value &&
+    typeof value === 'object' &&
+    (value as { type?: unknown }).type === 'SET_VISUALIZATION' &&
+    'visualizationType' in value &&
+    !('visualization' in value)
+      ? { ...value, visualization: (value as { visualizationType: unknown }).visualizationType }
+      : value,
+  analysisOperationUnion,
+);
 
 /** Schema for activation requests of a saved audience. */
 export const activationRequestSchema = z.object({

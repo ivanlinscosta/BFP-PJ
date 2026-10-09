@@ -1,3 +1,8 @@
+import {
+  describeRecommendations,
+  recommendFor,
+  visualizationCompatibility,
+} from '@api/services/intelligence/visualization';
 import type { AnalysisSpec } from '@bfp/domain';
 import { applyAnalysisOperations, type AnalysisOperation } from '@bfp/shared';
 import { BUSINESS_GLOSSARY, withRequiredDatasets } from '@bfp/semantic-layer';
@@ -9,6 +14,7 @@ import {
   describeOperations,
 } from '@api/services/intelligence/compose';
 import {
+  asksForChartRecommendation,
   buildSpecFromIntent,
   buildUpdateOperations,
   parseIntent,
@@ -66,8 +72,47 @@ export async function runLocalProvider(input: {
   const context = input.analysisSpec ?? DEFAULT_CONTEXT;
   const intent = parseIntent(input.prompt);
 
+  // "Qual gráfico faz mais sentido?" is answered by the same engine the Explorer uses.
+  if (asksForChartRecommendation(input.prompt) && context.metrics.length > 0) {
+    const answer = describeRecommendations(context);
+    return {
+      action: 'NONE',
+      operations: [],
+      message: answer,
+      answer,
+      suggestions: recommendFor(context)
+        .slice(0, 2)
+        .map((item) => `Mostre em ${item.name.toLowerCase()}`),
+    };
+  }
+
   if (intent.kind === 'UPDATE') {
     let operations = buildUpdateOperations(intent, context);
+    // A chart that cannot draw the resulting analysis is explained, not applied.
+    let chartNote = '';
+    const chart = operations.find((operation) => operation.type === 'SET_VISUALIZATION');
+    if (chart && chart.type === 'SET_VISUALIZATION') {
+      const others = operations.filter((operation) => operation !== chart);
+      const compatibility = visualizationCompatibility(
+        applyAnalysisOperations(context, others),
+        chart.visualization,
+      );
+      if (!compatibility.compatible) {
+        chartNote = compatibility.reason;
+        operations = others;
+        if (operations.length === 0) {
+          return {
+            action: 'NONE',
+            operations: [],
+            message: chartNote,
+            answer: chartNote,
+            suggestions: recommendFor(context)
+              .slice(0, 2)
+              .map((item) => `Mostre em ${item.name.toLowerCase()}`),
+          };
+        }
+      }
+    }
 
     if (intent.normalized.includes('investig') && intent.filters.length > 0) {
       const fields = new Set(intent.filters.map((filter) => filter.field));
@@ -116,9 +161,9 @@ export async function runLocalProvider(input: {
       action: 'UPDATE_ANALYSIS',
       operations,
       analysisSpec: nextSpec,
-      message: describeOperations(operations),
+      message: [describeOperations(operations), chartNote].filter(Boolean).join(' '),
       // The adjusted analysis is answered too, so the conversation shows what changed in the data.
-      answer: composeAnswer(result),
+      answer: [composeAnswer(result), chartNote].filter(Boolean).join(' '),
       basis: describeBasis(nextSpec),
       evidence: result.insights,
       suggestions: buildSuggestions(nextSpec, result),

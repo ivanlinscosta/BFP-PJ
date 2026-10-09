@@ -1,3 +1,4 @@
+import { visualizationName } from '@bfp/shared';
 import { formatInsightValue, isLowerBetterMetric } from '@bfp/analytics-engine';
 import type { AnalysisSpec, ColumnDef } from '@bfp/domain';
 import { getDimensionDefinition, getMetricDefinition } from '@bfp/semantic-layer';
@@ -12,16 +13,6 @@ function metricLabel(id: string) {
 function dimensionLabel(id: string) {
   return getDimensionDefinition(id)?.label ?? id;
 }
-
-const VISUALIZATION_LABELS: Record<string, string> = {
-  AUTO: 'automática',
-  BAR: 'barras',
-  LINE: 'linha',
-  TABLE: 'tabela',
-  HEATMAP: 'mapa de calor',
-  SCATTER: 'dispersão',
-  KPI: 'KPI',
-};
 
 /** Short, deterministic confirmation of the operations applied to the playground. */
 export function describeOperations(operations: readonly AnalysisOperation[]) {
@@ -50,7 +41,7 @@ export function describeOperations(operations: readonly AnalysisOperation[]) {
         case 'SET_DATE_RANGE':
           return `Período alterado para ${describeDateRange(operation.dateRange)}.`;
         case 'SET_VISUALIZATION':
-          return `Visualização alterada para ${VISUALIZATION_LABELS[operation.visualization] ?? operation.visualization}.`;
+          return `Visualização alterada para ${visualizationName(operation.visualization).toLowerCase()}.`;
         case 'SET_COMPARISON':
           return operation.comparison === 'PREVIOUS_PERIOD'
             ? 'Comparação com o período anterior ativada.'

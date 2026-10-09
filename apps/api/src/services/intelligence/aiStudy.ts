@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-bedrock-runtime';
 import { z } from 'zod';
 import { ApiError } from '@api/common/errors';
+import { chartForResult } from '@api/services/intelligence/visualization';
 import { GROUNDING_RULES, isGrounded, numberPool } from '@api/services/intelligence/grounding';
 import { VISUALIZATION_TYPES, type AnalysisSpec } from '@bfp/domain';
 import { analysisSpecSchema } from '@bfp/schemas';
@@ -176,21 +177,12 @@ function extractJson(text: string) {
 
 export { isGrounded, numberPool } from '@api/services/intelligence/grounding';
 
-/** Chart of a chapter: the model's choice unless it is a table or does not fit the result. */
+/** Chart of a chapter: the shared engine keeps the model's choice when it fits the result. */
 function chartFor(
   query: { spec: AnalysisSpec; result: GovernedQueryResult },
   requested?: AnalysisSpec['visualization']['type'],
 ): AnalysisSpec['visualization']['type'] {
-  const dimensions = query.result.columns.filter((column) => column.type === 'dimension');
-  const metrics = query.result.columns.filter((column) => column.role === 'value');
-  if (dimensions.length === 0) return 'KPI';
-  if (dimensions.length > 2) return 'TABLE';
-  if (requested && requested !== 'TABLE' && requested !== 'AUTO' && requested !== 'KPI') {
-    if (requested !== 'HEATMAP' || dimensions.length === 2) return requested;
-  }
-  if (dimensions.some((column) => column.role === 'time')) return 'LINE';
-  if (dimensions.length === 2) return metrics.length === 1 ? 'HEATMAP' : 'GROUPED_BAR';
-  return metrics.length >= 2 ? 'GROUPED_BAR' : 'BAR';
+  return chartForResult(query.spec, query.result, requested);
 }
 
 /**

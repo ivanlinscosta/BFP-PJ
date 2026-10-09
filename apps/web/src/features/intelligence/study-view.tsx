@@ -1,7 +1,7 @@
 import { ExternalLink, Lightbulb, Save, Sparkles } from 'lucide-react';
 import type { AnalysisSpec } from '@bfp/domain';
 import { Card } from '@/components/ui/card';
-import { ResultView } from '@/features/viz/result-view';
+import { VisualizationRenderer, pinnedVisualization } from '@/features/viz/visualization-renderer';
 import { formatMetricValue } from '@/lib/format';
 import { PDF_BLOCK_ATTRIBUTE, PDF_EXPAND_ATTRIBUTE, PDF_IGNORE_ATTRIBUTE } from '@/lib/pdf';
 
@@ -97,10 +97,10 @@ export function StudyView({
             </div>
           </div>
           <div className="mt-3 max-h-[340px] overflow-auto" {...{ [PDF_EXPAND_ATTRIBUTE]: '' }}>
-            <ResultView
+            <VisualizationRenderer
               result={section.result}
-              showLegend
-              type={section.visualization === 'AUTO' ? 'BAR' : section.visualization}
+              spec={section.spec}
+              visualization={pinnedVisualization(section.visualization)}
             />
           </div>
           {section.findings.length > 0 ? (

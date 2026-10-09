@@ -34,7 +34,13 @@ test('Golden path 2: Inteligência PJ consulta dados e altera o AnalysisSpec', a
   });
   await expect(answer).toBeVisible();
   await expect(answer.getByText(/Fonte:/)).toBeVisible();
-  await answer.getByRole('button', { name: 'Tabela' }).click();
+  // The answer uses the same chart selector as the Explorer (compact).
+  await answer.locator('[aria-haspopup="listbox"]').click();
+  await page
+    .getByRole('listbox', { name: 'Tipos de visualização' })
+    .getByRole('option', { name: /^Tabela/ })
+    .first()
+    .click();
   await expect(answer.getByRole('columnheader', { name: 'CAC' })).toBeVisible();
 
   await input.fill('Agora separa por porte.');
