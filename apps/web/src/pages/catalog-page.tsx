@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, ChartNoAxesColumn, Database, Layers, Table2 } from 'lucide-react';
+import { ArrowRight, ChartNoAxesColumn, Database, Layers, Package, Table2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Badge, CertificationBadge } from '@/components/ui/badge';
@@ -10,19 +10,15 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tabs } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState, ErrorState } from '@/components/states/states';
-import {
-  fetchDataProducts,
-  fetchDimensions,
-  fetchGlossary,
-  fetchMetrics,
-} from '@/features/catalog/api';
+import { fetchDataProducts, fetchDimensions, fetchMetrics } from '@/features/catalog/api';
 import { useDebounced } from '@/lib/use-debounced';
 import { normalizeText } from '@/lib/text';
+import { BaseVsProduct } from '@/features/catalog/base-vs-product';
 import { useMeshDatasets } from '@/features/mesh/api';
 import { AtlanBadge } from '@/features/mesh/dataset-picker';
 import { IntegrationsBanner } from '@/features/mesh/integrations-banner';
 
-type CatalogTab = 'datasets' | 'metrics' | 'dimensions' | 'products' | 'glossary';
+type CatalogTab = 'datasets' | 'metrics' | 'dimensions' | 'products';
 
 const DOMAIN_LABELS: Record<string, string> = {
   acquisition: 'Aquisição',
@@ -59,11 +55,16 @@ function GridSkeleton() {
   );
 }
 
-/** Governed catalog: metrics, dimensions, data products and glossary with unified search. */
+/** Governed catalog: bases, metrics, dimensions and data products with unified search. */
 export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
-  const tab = (searchParams.get('aba') as CatalogTab | null) ?? 'datasets';
+  const requested = searchParams.get('aba');
+  const tab: CatalogTab = (['datasets', 'metrics', 'dimensions', 'products'] as const).includes(
+    requested as CatalogTab,
+  )
+    ? (requested as CatalogTab)
+    : 'datasets';
   const setTab = (next: CatalogTab) => {
     const params = new URLSearchParams(searchParams);
     params.set('aba', next);
@@ -87,11 +88,6 @@ export function CatalogPage() {
     queryFn: ({ signal }) => fetchDataProducts(q, signal),
     ...common,
   });
-  const glossary = useQuery({
-    queryKey: ['catalog', 'glossary', q],
-    queryFn: ({ signal }) => fetchGlossary(q, signal),
-    ...common,
-  });
   // Metric names for the product cards (independent of the current search).
   const allMetrics = useQuery({
     queryKey: ['catalog', 'metrics', ''],
@@ -101,7 +97,7 @@ export function CatalogPage() {
   const metricNameById = new Map(
     (allMetrics.data ?? []).map((metric) => [metric.id, metric.shortName]),
   );
-  const active = { datasets: mesh, metrics, dimensions, products, glossary }[tab];
+  const active = { datasets: mesh, metrics, dimensions, products }[tab];
   const meshItems = (mesh.data?.items ?? []).filter((dataset) =>
     normalizeText(
       `${dataset.name} ${dataset.description} ${dataset.owner} ${dataset.location.table}`,
@@ -127,7 +123,7 @@ export function CatalogPage() {
           else params.delete('q');
           setSearchParams(params, { replace: true });
         }}
-        placeholder="Buscar métricas, dimensões, produtos de dados ou termos"
+        placeholder="Buscar bases, métricas, dimensões ou produtos de dados"
         value={search}
       />
       <Tabs
@@ -138,7 +134,6 @@ export function CatalogPage() {
           { value: 'metrics', label: `Métricas · ${metrics.data?.length ?? '…'}` },
           { value: 'dimensions', label: `Dimensões · ${dimensions.data?.length ?? '…'}` },
           { value: 'products', label: `Produtos de dados · ${products.data?.length ?? '…'}` },
-          { value: 'glossary', label: `Glossário · ${glossary.data?.length ?? '…'}` },
         ]}
         label="Seções do catálogo"
         onChange={setTab}
@@ -150,6 +145,9 @@ export function CatalogPage() {
         id={`catalog-panel-${tab}`}
         role="tabpanel"
       >
+        {tab === 'datasets' || tab === 'products' ? (
+          <BaseVsProduct className="mb-5" highlight={tab === 'datasets' ? 'base' : 'product'} />
+        ) : null}
         {active.isLoading ? (
           <GridSkeleton />
         ) : active.isError ? (
@@ -314,7 +312,9 @@ export function CatalogPage() {
                       </div>
                       <div>
                         <h2 className="m-0 text-lg font-semibold text-brand-navy">
-                          {product.name}
+                          <Link className="hover:underline" to={`/catalogo/produtos/${product.id}`}>
+                            {product.name}
+                          </Link>
                         </h2>
                         <p className="m-0 mt-1 text-sm text-ink-soft">{product.description}</p>
                       </div>
@@ -352,6 +352,12 @@ export function CatalogPage() {
                       <p className="m-0 text-xs text-ink-soft">
                         Fontes de negócio: {product.businessSources.join(', ')}
                       </p>
+                      <Link
+                        className="inline-flex h-8 w-fit items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-navy px-3 text-[13px] font-semibold text-white hover:opacity-90"
+                        to={`/catalogo/produtos/${product.id}`}
+                      >
+                        <Package aria-hidden className="h-4 w-4" /> Ver produto de dados
+                      </Link>
                       <div className="mt-auto flex flex-wrap gap-2 border-t border-line pt-3">
                         <span className="text-xs text-ink-faint">Bases físicas:</span>
                         {bases.length === 0 ? (
@@ -377,26 +383,7 @@ export function CatalogPage() {
               })}
             </ul>
           )
-        ) : (glossary.data ?? []).length === 0 ? (
-          <EmptyState
-            icon={<BookOpen aria-hidden className="h-8 w-8" />}
-            title="Nenhum item encontrado"
-          />
-        ) : (
-          <dl className="m-0 grid gap-3">
-            {(glossary.data ?? []).map((term) => (
-              <Card className="px-5 py-4" key={term.id}>
-                <dt className="text-base font-semibold text-brand-navy">{term.term}</dt>
-                <dd className="m-0 mt-1 text-sm text-ink-soft">{term.definition}</dd>
-                {term.synonyms.length ? (
-                  <dd className="m-0 mt-2 text-xs text-ink-faint">
-                    Sinônimos: {term.synonyms.join(', ')}
-                  </dd>
-                ) : null}
-              </Card>
-            ))}
-          </dl>
-        )}
+        ) : null}
       </div>
     </div>
   );

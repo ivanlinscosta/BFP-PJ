@@ -99,11 +99,12 @@ export function Topbar() {
           <Bell aria-hidden className="h-5 w-5" strokeWidth={1.75} />
         </button>
         <Link
-          className="hidden items-center gap-2 text-[13px] font-semibold text-brand-navy sm:flex"
+          aria-label="Inteligência PJ"
+          className="hidden h-8 w-8 items-center justify-center rounded-full text-brand-navy hover:bg-muted sm:flex"
+          title="Inteligência PJ"
           to="/inteligencia"
         >
           <Sparkles aria-hidden className="h-[18px] w-[18px]" strokeWidth={1.75} />
-          Inteligência PJ
         </Link>
         <div className="relative" ref={menuRef}>
           <button

@@ -167,7 +167,7 @@ export function CatalogDatasetPage() {
           </span>
           <Link
             className="font-semibold text-brand-navy hover:underline"
-            to={`/catalogo?aba=products&q=${encodeURIComponent(dataset.dataProductId)}`}
+            to={`/catalogo/produtos/${dataset.dataProductId}`}
           >
             Ver produto de dados
           </Link>

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { FileDown } from 'lucide-react';
+import { FileDown, LayoutDashboard } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { AnalysisSpec } from '@bfp/domain';
@@ -78,10 +78,19 @@ export function SavedStudyPage() {
     <div className="pb-10">
       <PageHeader
         actions={
-          <Button disabled={exporting} onClick={() => void exportPdf()}>
-            <FileDown aria-hidden className="h-4 w-4" />
-            {exporting ? 'Gerando PDF…' : 'Baixar em PDF'}
-          </Button>
+          <>
+            <Button disabled={exporting} onClick={() => void exportPdf()}>
+              <FileDown aria-hidden className="h-4 w-4" />
+              {exporting ? 'Gerando PDF…' : 'Baixar em PDF'}
+            </Button>
+            <Button
+              onClick={() => navigate(`/dashboards/novo?estudo=${saved.data.id}`)}
+              variant="primary"
+            >
+              <LayoutDashboard aria-hidden className="h-4 w-4" />
+              Criar dashboard
+            </Button>
+          </>
         }
         breadcrumbs={[...breadcrumbs, { label: saved.data.name }]}
         subtitle={`Pergunta: “${saved.data.prompt}” · salvo ${formatRelative(saved.data.createdAt)}${

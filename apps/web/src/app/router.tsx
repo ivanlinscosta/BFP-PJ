@@ -7,6 +7,7 @@ import { AudienceBuilderPage } from '@/pages/audience-builder-page';
 import { AudiencesPage } from '@/pages/audiences-page';
 import { CatalogDatasetPage } from '@/pages/catalog-dataset-page';
 import { CatalogPage } from '@/pages/catalog-page';
+import { CatalogProductPage } from '@/pages/catalog-product-page';
 import { CustomerDetailPage } from '@/pages/customer-detail-page';
 import { CustomersPage } from '@/pages/customers-page';
 import { DashboardDetailPage } from '@/pages/dashboard-detail-page';
@@ -50,6 +51,7 @@ export const appChildRoutes: RouteObject[] = [
   { path: 'catalogo', element: <CatalogPage /> },
   { path: 'catalogo/metricas/:metricId', element: <MetricDetailPage /> },
   { path: 'catalogo/bases/:datasetId', element: <CatalogDatasetPage /> },
+  { path: 'catalogo/produtos/:productId', element: <CatalogProductPage /> },
   { path: 'governanca', element: <GovernancePage /> },
   { path: 'admin', element: <AdminPage /> },
   { path: 'busca', element: <SearchPage /> },

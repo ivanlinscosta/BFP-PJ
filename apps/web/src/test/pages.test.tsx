@@ -3,6 +3,7 @@ import { AdminPage } from '@/pages/admin-page';
 import { AudienceBuilderPage } from '@/pages/audience-builder-page';
 import { CatalogDatasetPage } from '@/pages/catalog-dataset-page';
 import { CatalogPage } from '@/pages/catalog-page';
+import { CatalogProductPage } from '@/pages/catalog-product-page';
 import { CustomerDetailPage } from '@/pages/customer-detail-page';
 import { DashboardEditorPage } from '@/pages/dashboard-editor-page';
 import { DashboardsPage } from '@/pages/dashboards-page';
@@ -311,6 +312,141 @@ describe('DashboardsPage', () => {
       ['c2', 0],
       ['c1', 6],
     ]);
+  });
+});
+
+describe('Dashboard from a saved study', () => {
+  it('turns each chapter into a card and saves their analyses with the dashboard', async () => {
+    signIn();
+    const section = (id: string, title: string) => ({
+      id,
+      title,
+      question: `${title}?`,
+      visualization: 'BAR',
+      spec: {
+        metrics: [{ id: 'accounts_opened' }],
+        dimensions: [{ id: 'acquisition_channel' }],
+        filters: [],
+        visualization: { type: 'TABLE' },
+      },
+      result: { columns: [], rows: [] },
+      findings: [],
+    });
+    let created = 0;
+    const calls = mockApi([
+      { path: '/analyses', respond: { items: [] } },
+      {
+        path: '/ai/saved-studies',
+        respond: {
+          items: [
+            {
+              id: 's1',
+              name: 'Estudo de aquisição',
+              prompt: 'Faça um estudo',
+              sections: 2,
+              generatedBy: 'ai',
+              summary: 'Resumo do estudo.',
+              createdAt: '2026-10-01T00:00:00Z',
+              updatedAt: '2026-10-01T00:00:00Z',
+            },
+          ],
+        },
+      },
+      {
+        path: '/ai/saved-studies/s1',
+        respond: {
+          study: {
+            id: 's1',
+            name: 'Estudo de aquisição',
+            prompt: 'Faça um estudo',
+            createdAt: '2026-10-01T00:00:00Z',
+            updatedAt: '2026-10-01T00:00:00Z',
+            study: {
+              title: 'Estudo de aquisição',
+              summary: 'Resumo do estudo.',
+              sections: [section('a', 'Contas por canal'), section('b', 'CAC por canal')],
+            },
+          },
+        },
+      },
+      {
+        method: 'POST',
+        path: '/analyses',
+        respond: ({ body }) => {
+          created += 1;
+          return { analysis: { ...(body as object), id: `an-${created}`, access: 'OWNER' } };
+        },
+      },
+      {
+        method: 'POST',
+        path: '/dashboards',
+        respond: ({ body }) => ({ dashboard: { ...(body as object), id: 'd-new' } }),
+      },
+    ]);
+    renderRoute(<DashboardEditorPage />, {
+      path: '/dashboards/novo',
+      url: '/dashboards/novo?estudo=s1',
+    });
+
+    expect(await screen.findByText('Contas por canal')).toBeInTheDocument();
+    expect(screen.getByText('CAC por canal')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nome do dashboard')).toHaveValue('Estudo de aquisição');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar dashboard' }));
+    await waitFor(() =>
+      expect(
+        calls.some((call) => call.method === 'POST' && call.url.pathname === '/api/dashboards'),
+      ).toBe(true),
+    );
+    const posted = calls.find(
+      (call) => call.method === 'POST' && call.url.pathname === '/api/dashboards',
+    )?.body as { cards: Array<{ analysisId: string }> };
+    expect(posted.cards.map((card) => card.analysisId).sort()).toEqual(['an-1', 'an-2']);
+  });
+});
+
+describe('Catalog data product page', () => {
+  it('shows the product contract, its bases and certified metrics', async () => {
+    signIn();
+    mockApi([
+      ...CATALOG_ROUTES,
+      {
+        path: '/catalog/data-products',
+        respond: {
+          items: [
+            {
+              id: 'customer360_profile',
+              name: 'Customer 360',
+              description: 'Visão unificada da empresa PJ.',
+              domain: 'customer360',
+              owner: 'Clientes PJ',
+              goldDataset: 'Customer 360 Gold',
+              businessSources: ['Cadastro PJ'],
+              freshnessSLOMinutes: 60,
+              qualityThreshold: 0.98,
+              metricIds: ['account_conversion_rate'],
+              dimensionIds: [],
+            },
+          ],
+          total: 1,
+          query: null,
+        },
+      },
+    ]);
+    renderRoute(<CatalogProductPage />, {
+      path: '/catalogo/produtos/:productId',
+      url: '/catalogo/produtos/customer360_profile',
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Customer 360', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Contrato do produto')).toBeInTheDocument();
+    expect(screen.getByText('A cada 1 h')).toBeInTheDocument();
+    expect(screen.getByText('98%')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Conversão de abertura' })).toHaveAttribute(
+      'href',
+      '/catalogo/metricas/account_conversion_rate',
+    );
+    expect(screen.getAllByText(/Base de dados/).length).toBeGreaterThan(0);
   });
 });
 
@@ -706,7 +842,7 @@ describe('Catalog base preview', () => {
 });
 
 describe('Catalog and governance', () => {
-  it('debounces the unified search for "conversão" across the four catalog domains', async () => {
+  it('debounces the unified search for "conversão" across the catalog domains', async () => {
     signIn();
     const calls = mockApi([
       {
@@ -750,7 +886,6 @@ describe('Catalog and governance', () => {
       },
       { path: '/catalog/dimensions', respond: { items: [], total: 0, query: null } },
       { path: '/catalog/data-products', respond: { items: [], total: 0, query: null } },
-      { path: '/catalog/glossary', respond: { items: [], total: 0, query: null } },
     ]);
     renderRoute(<CatalogPage />, { path: '/catalogo', url: '/catalogo' });
 
@@ -769,13 +904,10 @@ describe('Catalog and governance', () => {
       .filter((call) => call.url.searchParams.get('q') === 'conversão')
       .map((call) => call.url.pathname);
     expect(new Set(searched)).toEqual(
-      new Set([
-        '/api/catalog/metrics',
-        '/api/catalog/dimensions',
-        '/api/catalog/data-products',
-        '/api/catalog/glossary',
-      ]),
+      new Set(['/api/catalog/metrics', '/api/catalog/dimensions', '/api/catalog/data-products']),
     );
+    // The glossary tab was removed; bases and data products are explained side by side.
+    expect(screen.queryByRole('tab', { name: /Glossário/ })).not.toBeInTheDocument();
     expect(screen.getByText('Certificada')).toBeInTheDocument();
   });
 

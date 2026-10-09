@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from 'lucide-react';
-import { DragEvent, FormEvent, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import type { DashboardCard, SharingLevel } from '@bfp/domain';
+import { ArrowDown, ArrowUp, BookOpen, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { DragEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
+import type { AnalysisSpec, DashboardCard, SharingLevel } from '@bfp/domain';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Field, Input, Textarea } from '@/components/ui/input';
@@ -19,7 +19,8 @@ import {
   updateDashboard,
   type DashboardView,
 } from '@/features/dashboards/api';
-import { listAnalyses } from '@/features/explorer/api';
+import { listAnalyses, saveAnalysis } from '@/features/explorer/api';
+import { getSavedStudy, listSavedStudies } from '@/features/intelligence/api';
 import { describeError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 
@@ -57,15 +58,88 @@ function DashboardEditor({ existing }: { existing?: DashboardView }) {
   const [selectedAnalysis, setSelectedAnalysis] = useState('');
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [searchParams] = useSearchParams();
+  const studies = useQuery({ queryKey: ['saved-studies'], queryFn: listSavedStudies });
+  const [selectedStudy, setSelectedStudy] = useState(searchParams.get('estudo') ?? '');
+  // Cards that come from a study chapter: their analysis is saved together with the dashboard.
+  const [pending, setPending] = useState<Record<string, { name: string; spec: AnalysisSpec }>>({});
+
+  const useStudy = useMutation({
+    mutationFn: (studyId: string) => getSavedStudy(studyId),
+    onSuccess: (saved) => {
+      const stamp = Date.now().toString(36);
+      const additions = saved.study.sections.map((section, index) => {
+        const id = `study-${stamp}-${index}`;
+        const spec: AnalysisSpec = {
+          ...section.spec,
+          name: section.title,
+          visualization: { type: section.visualization },
+        };
+        return { id, name: section.title, spec };
+      });
+      setPending((current) => ({
+        ...current,
+        ...Object.fromEntries(additions.map(({ id, name, spec }) => [id, { name, spec }])),
+      }));
+      setCards((current) =>
+        additions.reduce<DashboardCard[]>((list, { id, name, spec }) => {
+          const index = list.length;
+          return [
+            ...list,
+            {
+              id,
+              title: name,
+              analysisId: id,
+              visualization: spec.visualization,
+              layout: {
+                mode: 'GRID',
+                x: (index % 2) * 6,
+                y: Math.floor(index / 2) * 4,
+                w: 6,
+                h: 4,
+              },
+            },
+          ];
+        }, current),
+      );
+      setName((current) => current || saved.name);
+      setDescription((current) => current || saved.study.summary);
+      setAnnouncement(`${additions.length} capítulos do estudo adicionados como cards.`);
+    },
+  });
+
+  // /dashboards/novo?estudo=<id> (from a saved study) starts with that study.
+  const appliedFromLink = useRef(false);
+  useEffect(() => {
+    const fromLink = searchParams.get('estudo');
+    if (fromLink && !appliedFromLink.current && !editing) {
+      appliedFromLink.current = true;
+      useStudy.mutate(fromLink);
+    }
+  }, [searchParams, editing, useStudy]);
 
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      // Each study chapter becomes a saved analysis (same visibility as the dashboard).
+      const resolved = await Promise.all(
+        cards.map(async (card) => {
+          const draft = pending[card.id];
+          if (!draft) return card;
+          const analysis = await saveAnalysis({
+            name: draft.name,
+            visibility,
+            team: existing?.team,
+            spec: draft.spec,
+          });
+          return { ...card, analysisId: analysis.id };
+        }),
+      );
       const input = {
         name: name.trim(),
         description: description.trim() || undefined,
         visibility,
         team: existing?.team,
-        cards: relayoutCards(cards),
+        cards: relayoutCards(resolved),
       };
       return editing ? updateDashboard(dashboardId!, input) : createDashboard(input);
     },
@@ -125,7 +199,7 @@ function DashboardEditor({ existing }: { existing?: DashboardView }) {
           { label: 'Dashboards', to: '/dashboards' },
           { label: editing ? 'Editar' : 'Novo dashboard' },
         ]}
-        subtitle="Organize análises salvas em um painel. A ordem dos cards é salva com o dashboard."
+        subtitle="Organize análises salvas ou transforme um estudo em painel. A ordem dos cards é salva com o dashboard."
         title={editing ? 'Editar dashboard' : 'Criar dashboard'}
       />
       {save.isError ? (
@@ -145,7 +219,7 @@ function DashboardEditor({ existing }: { existing?: DashboardView }) {
           {cards.length === 0 ? (
             <EmptyState
               className="py-10"
-              description="Escolha uma análise salva ao lado para criar o primeiro card."
+              description="Escolha uma análise salva abaixo ou use um estudo salvo (ao lado) para criar os cards."
               title="Nenhum card ainda"
             />
           ) : (
@@ -255,6 +329,46 @@ function DashboardEditor({ existing }: { existing?: DashboardView }) {
           {!editing || existing?.access === 'OWNER' ? (
             <VisibilityPicker onChange={setVisibility} value={visibility} />
           ) : null}
+          <div className="flex flex-col gap-2 border-t border-line pt-4">
+            <p className="m-0 flex items-center gap-2 text-sm font-semibold text-brand-navy">
+              <BookOpen aria-hidden className="h-4 w-4" />
+              Criar a partir de um estudo
+            </p>
+            <p className="m-0 text-xs text-ink-soft">
+              Cada capítulo do estudo salvo vira um card. As análises dos capítulos são salvas em
+              Minhas análises junto com o dashboard.
+            </p>
+            <Field htmlFor="add-study" label="Estudo salvo">
+              <Select
+                id="add-study"
+                onChange={(event) => setSelectedStudy(event.target.value)}
+                value={selectedStudy}
+              >
+                <option value="">
+                  {studies.isLoading
+                    ? 'Carregando estudos…'
+                    : (studies.data ?? []).length === 0
+                      ? 'Nenhum estudo salvo'
+                      : 'Selecione um estudo'}
+                </option>
+                {(studies.data ?? []).map((study) => (
+                  <option key={study.id} value={study.id}>
+                    {study.name} · {study.sections} capítulos
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Button
+              disabled={!selectedStudy || useStudy.isPending}
+              onClick={() => useStudy.mutate(selectedStudy)}
+            >
+              <BookOpen aria-hidden className="h-4 w-4" />
+              {useStudy.isPending ? 'Carregando estudo…' : 'Usar estudo'}
+            </Button>
+            {useStudy.isError ? (
+              <Notice tone="error">{describeError(useStudy.error).description}</Notice>
+            ) : null}
+          </div>
         </Card>
       </div>
     </form>
