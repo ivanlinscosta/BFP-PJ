@@ -49,6 +49,12 @@ export interface ToolContext {
 }
 
 /** A question needs a base the user did not select. */
+const previewInput = z.object({
+  datasetId: z.string().trim().min(1),
+  limit: z.number().int().min(1).max(20).default(10),
+  where: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+});
+
 export class DatasetScopeError extends ApiError {
   constructor(message: string) {
     super(422, 'dataset_scope', message);
@@ -169,15 +175,10 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
   {
     name: 'previewDatasetRows',
     description:
-      'Lê uma amostra de até 20 linhas de uma base selecionada (colunas governadas, sem dados pessoais). Use para entender valores e exemplos; para totais e comparações use runAnalyticsQuery.',
-    inputSchema: z.object({
-      datasetId: z.string().trim().min(1),
-      limit: z.number().int().min(1).max(20).default(10),
-    }),
+      'Lê uma amostra de até 20 linhas de uma base selecionada (colunas governadas, sem dados pessoais), opcionalmente filtrada por igualdade em colunas (where: {"segment": "Varejo"}). Use para exemplos de registros; para totais, contagens e comparações use runAnalyticsQuery.',
+    inputSchema: previewInput,
     async execute(input, toolContext) {
-      const { datasetId, limit } = z
-        .object({ datasetId: z.string(), limit: z.number().int().min(1).max(20).default(10) })
-        .parse(input);
+      const { datasetId, limit, where } = previewInput.parse(input);
       const dataset = MESH_DATASET_BY_ID.get(datasetId as MeshDatasetId);
       if (!dataset || !domainAllowed(toolContext.auth, dataset.domain)) {
         throw new NotFoundError('Base de dados não encontrada.');
@@ -185,17 +186,39 @@ export const GOVERNED_TOOLS: GovernedTool[] = [
       if (toolContext.datasets && !toolContext.datasets.includes(dataset.id)) {
         throw new DatasetScopeError(`A base ${dataset.name} não está entre as bases selecionadas.`);
       }
+      const filters = Object.entries(where ?? {});
+      const unknown = filters.find(([column]) => !dataset.columns.some((c) => c.name === column));
+      if (unknown) {
+        throw new ApiError(
+          422,
+          'unknown_column',
+          `A coluna ${unknown[0]} não existe em ${dataset.name}. Colunas: ${dataset.columns.map((c) => c.name).join(', ')}.`,
+        );
+      }
+      // Filters run over the preview window (up to 100 rows), never over the whole table.
       const preview = await previewMeshDataset(
         toolContext.context,
         toolContext.auth,
         dataset.id,
-        limit,
+        filters.length ? 100 : limit,
       );
-      toolContext.samples = (toolContext.samples ?? 0) + preview.rows.length;
+      const normalize = (value: unknown) =>
+        String(value ?? '')
+          .trim()
+          .toLowerCase();
+      const rows = preview.rows
+        .filter((row) =>
+          filters.every(([column, value]) => normalize(row[column]) === normalize(value)),
+        )
+        .slice(0, limit);
+      toolContext.samples = (toolContext.samples ?? 0) + rows.length;
       return {
         dataset: dataset.name,
         columns: preview.columns.map((column) => column.name),
-        rows: preview.rows,
+        rows,
+        note: filters.length
+          ? `Filtro aplicado sobre as primeiras ${preview.rows.length} linhas da base; para contagens use runAnalyticsQuery.`
+          : undefined,
       };
     },
   },

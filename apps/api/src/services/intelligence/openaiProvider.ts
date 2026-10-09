@@ -16,7 +16,7 @@ import {
 import type { ProviderResult } from '@api/services/intelligence/types';
 import { readJsonSecret } from '@api/services/integrations/secrets';
 
-const MAX_ITERATIONS = 6;
+const MAX_ITERATIONS = 8;
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 type ChatMessage =
@@ -145,8 +145,10 @@ export async function runOpenAIProvider(input: {
             : {};
           content = JSON.stringify({ result: await tool.execute(args, input.toolContext) });
         } catch (error) {
+          // Validation details tell the model which id or field to fix in the next call.
           content = JSON.stringify({
             error: error instanceof Error ? error.message : 'Falha na ferramenta.',
+            details: error instanceof ApiError ? error.details : undefined,
           });
         }
       }

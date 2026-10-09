@@ -250,6 +250,55 @@ describe('Inteligência PJ restricted to the selected bases', () => {
     expect(described).not.toContain('transactions');
   });
 
+  it('keeps grounded answers with a misnamed action and filters sample rows', async () => {
+    const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
+    const { client, toolResults } = scriptedClient(
+      [
+        {
+          name: 'previewDatasetRows',
+          args: { datasetId: 'customer_360', limit: 3, where: { company_size: 'MICRO' } },
+        },
+      ],
+      'Três empresas MICRO aparecem na amostra da base Customer 360.',
+    );
+    const original = client.complete.bind(client);
+    client.complete = async (body) => {
+      const reply = await original(body);
+      const content = reply.choices[0]?.message.content;
+      if (content) reply.choices[0]!.message.content = content.replace('ANSWER_QUESTION', 'CLEAR');
+      return reply;
+    };
+    const reply = await runIntelligence(
+      context,
+      auth,
+      { prompt: 'Mostre empresas micro', datasets: ['customer_360'] },
+      'corr-sample',
+      { openaiClient: client },
+    );
+    expect(reply.answer).toContain('MICRO');
+    const sample = JSON.parse(toolResults.find((item) => item.includes('"rows"')) ?? '{}');
+    expect(sample.result.rows.length).toBeGreaterThan(0);
+    expect(sample.result.rows.length).toBeLessThanOrEqual(3);
+    for (const row of sample.result.rows)
+      expect(String(row.company_size).toUpperCase()).toBe('MICRO');
+  });
+
+  it('accepts a refusal that only names the selected base', async () => {
+    const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
+    const { client } = scriptedClient(
+      [{ name: 'describeSelectedBases', args: {} }],
+      'A base Customer 360 (customer_360) não tem dados de Pix; selecione Transações PJ.',
+    );
+    const reply = await runIntelligence(
+      context,
+      auth,
+      { prompt: 'Volume de Pix?', datasets: ['customer_360'] },
+      'corr-refusal',
+      { openaiClient: client },
+    );
+    expect(reply.answer).toMatch(/não tem dados de Pix/);
+  });
+
   it('refuses queries outside the selected bases', async () => {
     const { context } = createHarness({ AI_PROVIDER: 'openai', OPENAI_MODEL: 'gpt-test' });
     const { client, toolResults } = scriptedClient(

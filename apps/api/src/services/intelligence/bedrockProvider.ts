@@ -9,7 +9,11 @@ import {
 import { z } from 'zod';
 import type { AnalysisSpec } from '@bfp/domain';
 import { analysisOperationSchema } from '@bfp/schemas';
-import { validateAnalysisSpec, withRequiredDatasets } from '@bfp/semantic-layer';
+import {
+  MESH_DATASET_BY_ID,
+  validateAnalysisSpec,
+  withRequiredDatasets,
+} from '@bfp/semantic-layer';
 import { applyAnalysisOperations, type AnalysisOperation } from '@bfp/shared';
 import { ApiError } from '@api/common/errors';
 import {
@@ -37,11 +41,36 @@ export function toDocument(value: unknown): JsonDocument {
 }
 const TIMEOUT_MS = 30_000;
 
+// Lenient on purpose: a misnamed action or one malformed operation must not discard a grounded
+// answer. Invalid operations are dropped one by one and the semantic layer validates the rest.
 const finalSchema = z.object({
-  action: z.enum(['UPDATE_ANALYSIS', 'ANSWER_QUESTION', 'NONE']).default('NONE'),
-  operations: z.array(analysisOperationSchema).default([]),
-  answer: z.string().trim().default(''),
-  suggestions: z.array(z.string().trim().min(1)).max(4).default([]),
+  action: z
+    .string()
+    .optional()
+    .transform((value) =>
+      value === 'UPDATE_ANALYSIS' || value === 'ANSWER_QUESTION' ? value : 'NONE',
+    ),
+  operations: z
+    .array(z.unknown())
+    .catch([])
+    .default([])
+    .transform((items) =>
+      items.flatMap((item) => {
+        const operation = analysisOperationSchema.safeParse(item);
+        return operation.success ? [operation.data] : [];
+      }),
+    ),
+  answer: z.string().trim().catch('').default(''),
+  suggestions: z
+    .array(z.unknown())
+    .catch([])
+    .default([])
+    .transform((items) =>
+      items
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item) => item.trim())
+        .slice(0, 4),
+    ),
 });
 
 /** Minimal client surface so tests can inject a fake Bedrock runtime. */
@@ -71,6 +100,8 @@ export function systemPrompt(spec: AnalysisSpec | undefined, datasets?: readonly
     'Quando o usuário pedir para mudar a análise (separar por, adicionar, remover, filtrar, mudar período ou visualização), devolva action UPDATE_ANALYSIS com operations.',
     'Operações válidas: ADD_METRIC{metricId}, REMOVE_METRIC{metricId}, ADD_DIMENSION{dimensionId,granularity?}, REMOVE_DIMENSION{dimensionId}, ADD_FILTER{filter}, REMOVE_FILTER{field}, SET_DATE_RANGE{dateRange}, SET_VISUALIZATION{visualization}, SORT{field,direction}, SET_COMPARISON{comparison}, CLEAR.',
     'Ao final responda SOMENTE um JSON: {"action": "...", "operations": [...], "answer": "...", "suggestions": ["..."]}.',
+    'action é ANSWER_QUESTION para responder uma pergunta (o normal) ou UPDATE_ANALYSIS só quando o usuário pede para mudar a análise atual; cada operação tem o formato {"type": "ADD_DIMENSION", "dimensionId": "..."}.',
+    'answer traz a resposta completa em texto, com os números obtidos nas ferramentas.',
     `AnalysisSpec atual: ${JSON.stringify(spec ?? null)}`,
   ].join('\n');
 }
@@ -153,6 +184,14 @@ export async function withTimeout<T>(promise: Promise<T>) {
  * are validated against the semantic layer and an answer with numbers is only accepted when a
  * governed query ran in the turn. Returns null when nothing usable came back.
  */
+function stripBaseNames(text: string) {
+  let stripped = text;
+  for (const dataset of MESH_DATASET_BY_ID.values()) {
+    stripped = stripped.split(dataset.id).join(' ').split(dataset.name).join(' ');
+  }
+  return stripped;
+}
+
 export function finalizeModelAnswer(
   text: string,
   input: { analysisSpec?: AnalysisSpec; toolContext: ToolContext },
@@ -170,7 +209,8 @@ export function finalizeModelAnswer(
   };
   const { accepted, spec } = sanitizeOperations(context, parsed.data.operations);
   const lastQuery = input.toolContext.queries[input.toolContext.queries.length - 1];
-  const hasNumbers = /\d/.test(parsed.data.answer);
+  // Base names and ids (e.g. "Customer 360") are not figures: only other digits need a query.
+  const hasNumbers = /\d/.test(stripBaseNames(parsed.data.answer));
   const grounded = Boolean(lastQuery) || (input.toolContext.samples ?? 0) > 0;
   const groundedAnswer =
     hasNumbers && !grounded
