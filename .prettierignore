@@ -9,3 +9,4 @@ infra/cdk.out
 playwright-report
 test-results
 artifacts
+apps/web/public/docs
