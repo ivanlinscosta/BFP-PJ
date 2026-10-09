@@ -273,6 +273,7 @@ function createFixtureBundle(): DatasetBundle {
     appNavigationEvents: [],
     transactions: [],
     npsResponses: [],
+    customerIntelligence: [],
     qualityStatuses: [
       {
         id: 'quality-001',

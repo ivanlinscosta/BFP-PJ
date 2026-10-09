@@ -59,6 +59,8 @@ export interface IntelligenceReply {
   suggestions: string[];
   study?: IntelligenceStudy;
   studyJob?: { id: string; status: 'running' | 'done' | 'error'; progress: string };
+  /** Customer the answer is about (Cliente PJ context). */
+  customer?: { customerId: string; tradeName: string };
   explainability: { tools: string[]; note: string; refusal?: string };
 }
 
@@ -66,15 +68,17 @@ export async function askIntelligence(input: {
   prompt: string;
   analysisSpec?: AnalysisSpec;
   conversationId?: string;
+  customerId?: string;
 }) {
   return apiRequest<
     IntelligenceReply,
-    { prompt: string; analysisSpec?: AnalysisSpec; conversationId?: string }
+    { prompt: string; analysisSpec?: AnalysisSpec; conversationId?: string; customerId?: string }
   >('/ai/chat', {
     method: 'POST',
     body: {
       prompt: input.prompt,
       conversationId: input.conversationId,
+      customerId: input.customerId,
       analysisSpec:
         input.analysisSpec && input.analysisSpec.metrics.length > 0
           ? toQueryBody(input.analysisSpec)

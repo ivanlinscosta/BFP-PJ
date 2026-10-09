@@ -123,6 +123,13 @@ export class InMemoryDatasetRepository implements DatasetRepository {
       (item) => item.respondedAt,
     );
     this.indexItems(
+      'customerIntelligence',
+      bundle.customerIntelligence,
+      (item) => item.id,
+      (item) => item.companyId,
+      (item) => item.calculatedAt,
+    );
+    this.indexItems(
       'qualityStatus',
       bundle.qualityStatuses,
       (item) => item.id,
@@ -210,6 +217,7 @@ export class InMemoryDatasetRepository implements DatasetRepository {
       case 'appNavigation':
       case 'transaction':
       case 'npsResponse':
+      case 'customerIntelligence':
         if ('companyId' in item && typeof item.companyId === 'string') {
           return item.companyId;
         }
@@ -245,6 +253,8 @@ export class InMemoryDatasetRepository implements DatasetRepository {
         return 'occurredAt' in item ? item.occurredAt : '';
       case 'npsResponse':
         return 'respondedAt' in item ? item.respondedAt : '';
+      case 'customerIntelligence':
+        return 'calculatedAt' in item ? item.calculatedAt : '';
       case 'conversation':
         return 'startedAt' in item ? item.startedAt : '';
       case 'qualityStatus':
@@ -299,6 +309,7 @@ export function createEmptyDatasetBundle(): DatasetBundle {
     appNavigationEvents: [],
     transactions: [],
     npsResponses: [],
+    customerIntelligence: [],
     qualityStatuses: [],
     auditLogs: [],
   };

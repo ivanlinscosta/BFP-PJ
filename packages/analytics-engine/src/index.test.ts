@@ -285,6 +285,7 @@ function createFixtureBundle(): DatasetBundle {
     appNavigationEvents: [],
     transactions: [],
     npsResponses: [],
+    customerIntelligence: [],
     qualityStatuses: [],
     auditLogs: [],
   };

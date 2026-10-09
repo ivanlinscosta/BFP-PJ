@@ -1,3 +1,13 @@
+import type { CustomerIntelligenceProfile } from '@bfp/customer-intelligence';
+import {
+  DynamoCustomerIntelligenceRepository,
+  DynamoRecommendationOutcomeRepository,
+  InMemoryCustomerIntelligenceRepository,
+  InMemoryRecommendationOutcomeRepository,
+  loadLocalProfiles,
+  type CustomerIntelligenceRepository,
+  type RecommendationOutcomeRepository,
+} from '@api/services/customerIntelligence/repository';
 import { DOCUMENT_CLIENT_OPTIONS } from '@api/repositories/factory';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,6 +58,9 @@ export interface ApiContext {
   getAnalyticsEngine(user: AuthenticatedUser): HttpAnalyticsEngine;
   /** When the analytical dataset was last loaded (drives freshness indicators). */
   getDataLoadedAt(): Promise<string>;
+  /** Customer Intelligence read model (DNA, signals, NBA) materialized by the rebuild. */
+  getCustomerIntelligenceRepository(): CustomerIntelligenceRepository;
+  getRecommendationOutcomeRepository(): RecommendationOutcomeRepository;
 }
 
 export interface ApiContextOptions {
@@ -59,6 +72,8 @@ export interface ApiContextOptions {
   objectRepository?: ObjectRepository;
   clock?: () => Date;
   auditSpy?: (entry: AuditLogEntry) => void | Promise<void>;
+  /** Pre-built intelligence profiles (tests); local dev reads data/customer-intelligence.json. */
+  intelligenceProfiles?: CustomerIntelligenceProfile[];
 }
 
 function loadDevDatasetBundle(config: AppConfig, fallbackBundle?: DatasetBundle) {
@@ -168,6 +183,23 @@ export function createApiContext(options: ApiContextOptions = {}): ApiContext {
     return objectRepository;
   };
 
+  let intelligenceRepository: CustomerIntelligenceRepository | undefined;
+  let outcomeRepository: RecommendationOutcomeRepository | undefined;
+  const getCustomerIntelligenceRepository = () => {
+    intelligenceRepository ??= config.useDynamo
+      ? new DynamoCustomerIntelligenceRepository(getDocumentClient(), config.dynamoDatasetTable)
+      : new InMemoryCustomerIntelligenceRepository(
+          options.intelligenceProfiles ?? loadLocalProfiles(config.dataPath),
+        );
+    return intelligenceRepository;
+  };
+  const getRecommendationOutcomeRepository = () => {
+    outcomeRepository ??= config.useDynamo
+      ? new DynamoRecommendationOutcomeRepository(getDocumentClient(), config.dynamoDatasetTable)
+      : new InMemoryRecommendationOutcomeRepository();
+    return outcomeRepository;
+  };
+
   const persistAudit = async (entry: AuditLogEntry) => {
     await getDatasetRepository().put('auditLog', entry);
     await options.auditSpy?.(entry);
@@ -258,5 +290,7 @@ export function createApiContext(options: ApiContextOptions = {}): ApiContext {
     getObjectRepository,
     getAnalyticsEngine,
     getDataLoadedAt,
+    getCustomerIntelligenceRepository,
+    getRecommendationOutcomeRepository,
   };
 }

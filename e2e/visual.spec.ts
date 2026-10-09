@@ -42,7 +42,7 @@ test('visual: telas de referência em 1440 × 1024', async ({ page }) => {
 
   await page.goto('/clientes?q=Atlas%20Tecnologia');
   await page.getByRole('link', { name: 'Atlas Tecnologia Ltda.' }).click();
-  await expect(page.getByText('Uma jornada, todas as conexões')).toBeVisible();
+  await expect(page.getByText('DNA do cliente')).toBeVisible();
   await shot('05-cliente-360-atlas');
 
   await page.goto('/catalogo/metricas/account_conversion_rate');

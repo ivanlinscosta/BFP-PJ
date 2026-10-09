@@ -60,6 +60,11 @@ export const DIMENSION_COLUMNS: Record<MeshDatasetId, Record<string, string>> = 
     transaction_date: 'occurred_at',
   },
   nps_responses: { nps_touchpoint: 'touchpoint', nps_date: 'responded_at' },
+  customer_intelligence: {
+    nba_action: 'nba_action',
+    dna_commercial_intent_level: 'commercial_intent_level',
+    dna_digital_engagement_level: 'digital_engagement_level',
+  },
 };
 
 /** Gold tables per mesh dataset (kept for documentation and the lake loader). */
@@ -78,6 +83,7 @@ const TIMESTAMP_COLUMNS = new Set([
   'started_at',
   'created_at',
   'responded_at',
+  'calculated_at',
 ]);
 
 interface BaseMetricSql {
@@ -202,6 +208,46 @@ export const BASE_METRIC_SQL: Record<string, BaseMetricSql> = {
   },
   transaction_volume: { dataset: 'transactions', time: 'occurred_at', expression: 'SUM(f.amount)' },
   transactions_count: { dataset: 'transactions', time: 'occurred_at', expression: 'COUNT(*)' },
+  intelligence_customers: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'COUNT(DISTINCT f.company_id)',
+  },
+  avg_nba_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.nba_score AS DOUBLE))',
+  },
+  dna_digital_engagement_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.dna_digital_engagement AS DOUBLE))',
+  },
+  dna_product_depth_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.dna_product_depth AS DOUBLE))',
+  },
+  dna_relationship_strength_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.dna_relationship_strength AS DOUBLE))',
+  },
+  dna_commercial_intent_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.dna_commercial_intent AS DOUBLE))',
+  },
+  dna_business_momentum_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.dna_business_momentum AS DOUBLE))',
+  },
+  dna_transaction_activity_score: {
+    dataset: 'customer_intelligence',
+    time: 'calculated_at',
+    expression: 'AVG(CAST(f.dna_transaction_activity AS DOUBLE))',
+  },
   nps_responses: { dataset: 'nps_responses', time: 'responded_at', expression: 'COUNT(*)' },
   nps: {
     dataset: 'nps_responses',

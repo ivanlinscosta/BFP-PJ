@@ -1,11 +1,16 @@
 import type { DatasetBundle, DigitalEvent } from '@bfp/domain';
 import { MESH_DATASETS, type MeshDatasetDefinition } from '@bfp/semantic-layer';
 
-type Row = Record<string, string | number | boolean | null>;
+export type Row = Record<string, string | number | boolean | null>;
 
-/** One mesh data product ready to be loaded (silver NDJSON → Gold Parquet). */
-export interface LakeTable {
-  dataset: MeshDatasetDefinition;
+/** Physical table description accepted by the loader (mesh data products and auxiliary gold tables). */
+export type LakeDatasetDefinition = Omit<MeshDatasetDefinition, 'id' | 'entityTypes'> & {
+  id: string;
+};
+
+/** One table ready to be loaded (silver NDJSON → Gold Parquet). */
+export interface LakeTable<TDataset extends LakeDatasetDefinition = MeshDatasetDefinition> {
+  dataset: TDataset;
   rows: Row[];
 }
 
@@ -135,18 +140,41 @@ export function buildLakeTables(bundle: DatasetBundle): LakeTable[] {
       score: response.score,
       responded_at: response.respondedAt,
     })),
+    customer_intelligence: (bundle.customerIntelligence ?? []).map((snapshot) => ({
+      snapshot_id: snapshot.id,
+      company_id: snapshot.companyId,
+      calculated_at: snapshot.calculatedAt,
+      nba_action: snapshot.nbaActionId,
+      nba_score: snapshot.nbaScore,
+      nba_confidence: snapshot.nbaConfidence,
+      primary_signal: snapshot.primarySignal,
+      signal_count: snapshot.signalCount,
+      dna_digital_engagement: snapshot.dnaDigitalEngagement,
+      dna_product_depth: snapshot.dnaProductDepth,
+      dna_relationship_strength: snapshot.dnaRelationshipStrength,
+      dna_commercial_intent: snapshot.dnaCommercialIntent,
+      dna_business_momentum: snapshot.dnaBusinessMomentum,
+      dna_transaction_activity: snapshot.dnaTransactionActivity,
+      commercial_intent_level: snapshot.commercialIntentLevel,
+      digital_engagement_level: snapshot.digitalEngagementLevel,
+      dna_version: snapshot.dnaVersion,
+      model_version: snapshot.modelVersion,
+    })),
   };
 
   return MESH_DATASETS.map((dataset) => ({ dataset, rows: rowsById[dataset.id] }));
 }
 
 /** Domain database of a mesh data product. */
-export function domainDatabase(prefix: string, dataset: MeshDatasetDefinition) {
+export function domainDatabase(
+  prefix: string,
+  dataset: Pick<LakeDatasetDefinition, 'glueDatabase'>,
+) {
   return `${prefix}_${dataset.glueDatabase}`;
 }
 
 /** Athena DDL for the silver NDJSON table (timestamps stay ISO strings in silver). */
-export function silverDdl(prefix: string, bucket: string, table: LakeTable) {
+export function silverDdl(prefix: string, bucket: string, table: LakeTable<LakeDatasetDefinition>) {
   const columns = table.dataset.columns.map(
     (column) => `\`${column.name}\` ${column.type === 'timestamp' ? 'string' : column.type}`,
   );
@@ -154,7 +182,7 @@ export function silverDdl(prefix: string, bucket: string, table: LakeTable) {
 }
 
 /** Athena CTAS that materializes the Gold Parquet table with typed timestamps and comments. */
-export function goldCtas(prefix: string, bucket: string, table: LakeTable) {
+export function goldCtas(prefix: string, bucket: string, table: LakeTable<LakeDatasetDefinition>) {
   const database = domainDatabase(prefix, table.dataset);
   const select = table.dataset.columns.map((column) =>
     column.type === 'timestamp'

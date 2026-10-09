@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
-import { FileDown, MessageSquarePlus, RotateCcw, Sparkles, X } from 'lucide-react';
+import { Building2, FileDown, MessageSquarePlus, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import type { AnalysisSpec } from '@bfp/domain';
 import { describeAnalysisSpec } from '@bfp/shared';
 import { ActionChip } from '@/components/ui/chip';
@@ -40,6 +40,8 @@ interface ChatEntry {
 
 interface ChatState {
   conversationId?: string;
+  /** Cliente PJ in context (opened from the customer page). */
+  customer?: { customerId: string; tradeName?: string };
   entries: ChatEntry[];
 }
 
@@ -100,7 +102,12 @@ export function IntelligencePage() {
   const loadAnalysis = useAnalysisStore((state) => state.loadAnalysis);
   const markSaved = useAnalysisStore((state) => state.markSaved);
   const clearAnalysis = useAnalysisStore((state) => state.clearAnalysis);
-  const [chat, setChat] = useState<ChatState>(loadChat);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [chat, setChat] = useState<ChatState>(() => {
+    const customerId = searchParams.get('cliente');
+    // Coming from a customer page starts a conversation about that customer.
+    return customerId ? { customer: { customerId }, entries: [] } : loadChat();
+  });
   const [prompt, setPrompt] = useState('');
   const [saveTarget, setSaveTarget] = useState<{ spec: AnalysisSpec; name: string } | null>(null);
   const [dashboardTarget, setDashboardTarget] = useState<{
@@ -130,19 +137,24 @@ export function IntelligencePage() {
     }
   }, [chat]);
 
-  const append = useCallback((entries: ChatEntry[], conversationId?: string) => {
-    setChat((current) => ({
-      conversationId: conversationId ?? current.conversationId,
-      entries: [...current.entries, ...entries],
-    }));
-  }, []);
+  const append = useCallback(
+    (entries: ChatEntry[], conversationId?: string, customer?: ChatState['customer']) => {
+      setChat((current) => ({
+        conversationId: conversationId ?? current.conversationId,
+        customer: customer ?? current.customer,
+        entries: [...current.entries, ...entries],
+      }));
+    },
+    [],
+  );
 
   const mutation = useMutation({
     mutationFn: (text: string) =>
       askIntelligence({
         prompt: text,
-        analysisSpec: hasContext ? spec : undefined,
+        analysisSpec: hasContext && !chat.customer ? spec : undefined,
         conversationId: chat.conversationId,
+        customerId: chat.customer?.customerId,
       }),
     onSuccess: (reply) => {
       // The analysis of the answer becomes the context of the next question.
@@ -163,6 +175,7 @@ export function IntelligencePage() {
           },
         ],
         reply.conversationId,
+        reply.customer,
       );
     },
     onError: (error, text) => {
@@ -184,6 +197,18 @@ export function IntelligencePage() {
     setPrompt('');
     mutation.mutate(trimmed);
   }
+
+  // A question asked from the customer page is sent once, then removed from the URL.
+  const initialQuestion = useRef(searchParams.get('pergunta'));
+  useEffect(() => {
+    const question = initialQuestion.current;
+    if (!question || !flags.aiCopilot) return;
+    initialQuestion.current = null;
+    setSearchParams({}, { replace: true });
+    send(question);
+    // `send` is recreated every render; the question is consumed only once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flags.aiCopilot]);
 
   // A background study finished: keep it in the conversation; chapter 1 becomes the context.
   const handleStudyReady = useCallback(
@@ -336,6 +361,12 @@ export function IntelligencePage() {
                       </p>
                     ) : null}
 
+                    {reply?.customer && reply.basis ? (
+                      <p className="m-0 mt-2 text-[11px] text-ink-faint">
+                        {reply.basis.title} · {reply.basis.items.join(' · ')}
+                      </p>
+                    ) : null}
+
                     {answered ? (
                       <AnalysisCard
                         exporting={exporting === entry.id}
@@ -430,7 +461,30 @@ export function IntelligencePage() {
             A Inteligência PJ foi desativada pela administração. Continue a análise no Explorar.
           </Notice>
         ) : null}
-        {hasContext ? (
+        {chat.customer ? (
+          <div className="mb-2 flex items-center gap-2 px-1 text-xs text-ink-soft">
+            <Building2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-brand-navy" />
+            <span className="truncate">
+              Cliente em contexto:{' '}
+              <Link
+                className="font-semibold text-brand-navy hover:underline"
+                to={`/clientes/${chat.customer.customerId}`}
+              >
+                {chat.customer.tradeName ?? chat.customer.customerId}
+              </Link>{' '}
+              · DNA, sinais e próximas ações
+            </span>
+            <button
+              aria-label="Remover cliente do contexto"
+              className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-semibold text-brand-navy hover:bg-muted"
+              onClick={() => setChat((current) => ({ ...current, customer: undefined }))}
+              type="button"
+            >
+              <X aria-hidden className="h-3 w-3" />
+              Limpar
+            </button>
+          </div>
+        ) : hasContext ? (
           <div className="mb-2 flex items-center gap-2 px-1 text-xs text-ink-soft">
             <span className="truncate">
               Contexto da conversa:{' '}

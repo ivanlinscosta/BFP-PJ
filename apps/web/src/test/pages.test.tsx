@@ -9,6 +9,11 @@ import { GovernancePage } from '@/pages/governance-page';
 import { IntelligencePage } from '@/pages/intelligence-page';
 import { MetricDetailPage } from '@/pages/metric-detail-page';
 import { useAnalysisStore } from '@/features/explorer/store';
+import { buildCustomerProfile, explainDeterministically } from '@bfp/customer-intelligence';
+import {
+  AS_OF,
+  creditIntentRaw,
+} from '../../../../packages/customer-intelligence/src/__fixtures__/raw';
 import { CATALOG_ROUTES, CONVERSION_BY_CHANNEL } from './fixtures';
 import { mockApi, renderRoute, signIn } from './utils';
 
@@ -132,6 +137,47 @@ describe('IntelligencePage', () => {
     const aiCall = calls.find((call) => call.url.pathname === '/api/ai/chat');
     expect(aiCall?.body).toMatchObject({
       analysisSpec: { filters: [{ field: 'state', value: 'SP' }] },
+    });
+  });
+
+  it('opens with the customer as context and sends the question asked on the customer page', async () => {
+    signIn();
+    const calls = mockApi([
+      ...CATALOG_ROUTES,
+      {
+        method: 'POST',
+        path: '/ai/chat',
+        respond: {
+          conversationId: 'c2',
+          provider: 'local',
+          model: 'deterministic-insights',
+          action: 'ANSWER_QUESTION',
+          operations: [],
+          message: 'A principal oportunidade é Oferecer Capital de Giro (score 87).',
+          answer: 'A principal oportunidade é Oferecer Capital de Giro (score 87).',
+          basis: { title: 'Cliente Atlas Tecnologia Ltda.', items: ['DNA dna-1.0.0'] },
+          suggestions: ['O que mudou nos últimos 30 dias?'],
+          customer: { customerId: 'company-1', tradeName: 'Atlas Tecnologia Ltda.' },
+          explainability: { tools: ['getNextBestActions'], note: '' },
+        },
+      },
+    ]);
+    renderRoute(<IntelligencePage />, {
+      path: '/inteligencia',
+      url: '/inteligencia?cliente=company-1&pergunta=Qual%20%C3%A9%20a%20principal%20oportunidade%3F',
+    });
+    expect(
+      await screen.findByText('A principal oportunidade é Oferecer Capital de Giro (score 87).'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Atlas Tecnologia Ltda.' })).toHaveAttribute(
+      'href',
+      '/clientes/company-1',
+    );
+    const chat = calls.filter((call) => call.url.pathname === '/api/ai/chat');
+    expect(chat).toHaveLength(1);
+    expect(chat[0]?.body).toMatchObject({
+      prompt: 'Qual é a principal oportunidade?',
+      customerId: 'company-1',
     });
   });
 });
@@ -383,87 +429,132 @@ describe('AudienceBuilderPage', () => {
 });
 
 describe('CustomerDetailPage', () => {
-  it('renders the 360 summary, the chronological journey and a prefilled explorer link', async () => {
+  // Real profile computed by the deterministic pipeline (no hardcoded scores in the page).
+  const profile = buildCustomerProfile(
+    {
+      ...creditIntentRaw('company-1'),
+      identity: {
+        ...creditIntentRaw('company-1').identity,
+        tradeName: 'Atlas Tecnologia Ltda.',
+        legalName: 'Atlas Soluções Tecnológicas Ltda.',
+        companySize: 'Média',
+        segment: 'Tecnologia',
+      },
+    },
+    AS_OF,
+  );
+  const response = {
+    customer: profile.identity,
+    tenureMonths: profile.tenureMonths,
+    dna: profile.dna,
+    changes: profile.changes,
+    signals: profile.signals,
+    recommendations: profile.recommendations,
+    readingShift: profile.readingShift,
+    tabs: profile.tabs,
+    similar: profile.similar,
+    outcomes: [],
+    updatedAt: profile.updatedAt,
+    dataQuality: profile.dataQuality,
+    dnaVersion: profile.dnaVersion,
+    modelVersion: profile.modelVersion,
+  };
+  const top = profile.recommendations[0]!;
+
+  function renderCustomer() {
     signIn();
-    mockApi([
+    const calls = mockApi([
       ...CATALOG_ROUTES,
+      { path: '/customers/company-1/intelligence', respond: response },
       {
-        path: '/customers/company-1',
-        respond: {
-          customer: {
-            company: {
-              id: 'company-1',
-              tradeName: 'Atlas Tecnologia Ltda.',
-              legalName: 'Atlas Soluções Tecnológicas Ltda.',
-              cnpjMasked: '10.000.045/0001-**',
-              companySize: 'Média',
-              segment: 'Tecnologia',
-              state: 'SP',
-              city: 'São Paulo',
-              region: 'Sudeste',
-              status: 'ACTIVE',
-              industry: 'SaaS',
-              employeeCountRange: '51-200',
-              riskProfile: 'LOW',
-              lgpdConsent: true,
-            },
-            partners: [],
-            accounts: [],
-            products: [],
-            campaigns: [],
-            touchpoints: [],
-            funnel: [],
-            crm: [],
-            conversations: [],
-            digitalEvents: [],
-            journey: [
-              {
-                id: 'j1',
-                occurredAt: '2026-07-12T10:00:00.000Z',
-                kind: 'media',
-                title: 'Exposição Google Ads',
-                category: 'Mídia',
-                source: 'Google Ads',
-              },
-              {
-                id: 'j2',
-                occurredAt: '2026-07-18T10:00:00.000Z',
-                kind: 'account',
-                title: 'Conta aberta',
-                category: 'Abertura de contas',
-                source: 'Cadastro PJ',
-              },
-            ],
-            summary: {
-              acquisitionChannel: 'GOOGLE_SEARCH',
-              accountOpenedAt: '2026-07-18T10:00:00.000Z',
-              onboardingStatus: 'COMPLETED',
-              onboardingDays: 2,
-              activatedD30: true,
-              activeProducts: 4,
-              lastInteractionAt: new Date().toISOString(),
-            },
+        method: 'POST',
+        path: `/recommendations/${encodeURIComponent(top.id)}/outcomes`,
+        respond: ({ body }) => ({
+          outcome: {
+            ...(body as object),
+            recommendationId: top.id,
+            timestamp: new Date().toISOString(),
           },
-        },
+        }),
+      },
+      {
+        method: 'POST',
+        path: /\/recommendations\/.+\/explain$/,
+        respond: { explanation: explainDeterministically(profile, top) },
       },
     ]);
-    renderRoute(<CustomerDetailPage />, {
+    const view = renderRoute(<CustomerDetailPage />, {
       path: '/clientes/:companyId',
       url: '/clientes/company-1',
     });
+    return { calls, ...view };
+  }
 
+  it('renders the header, the DNA, the next best action and what changed', async () => {
+    renderCustomer();
     expect(
       await screen.findByRole('heading', { name: 'Atlas Tecnologia Ltda.' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Concluído em 2 dias')).toBeInTheDocument();
-    expect(screen.getByText('Hoje')).toBeInTheDocument();
-    const journey = screen.getByRole('list', { name: '' }).closest('section') ?? document.body;
-    expect(within(journey as HTMLElement).getByText('Exposição Google Ads')).toBeInTheDocument();
-    expect(screen.getByText('Mídia · Google Ads')).toBeInTheDocument();
+    expect(screen.getByText('DNA do cliente')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: new RegExp(`Intenção comercial: ${profile.dna.commercialIntent.score} de 100`),
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(top.actionName)).toBeInTheDocument();
+    expect(screen.getByText('Por que agora?')).toBeInTheDocument();
+    expect(screen.getByText('O que mudou neste cliente?')).toBeInTheDocument();
+    expect(screen.getByText(/não é nota de crédito/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Explorar empresas semelhantes/ });
     expect(decodeURIComponent(link.getAttribute('href') ?? '')).toContain(
-      '"field":"company_size","operator":"EQ","value":"Média"',
+      '"customer_intelligence"',
     );
+  });
+
+  it('opens the DNA drivers and the recommendation explanation drawers', async () => {
+    const { calls } = renderCustomer();
+    fireEvent.click(await screen.findByRole('button', { name: /Intenção comercial: / }));
+    expect(await screen.findByRole('dialog', { name: 'Intenção comercial' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Entender recomendação' }));
+    expect(
+      await screen.findByText('Explicação estruturada (sem IA generativa)'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Como o score foi calculado')).toBeInTheDocument();
+    expect(calls.some((call) => call.url.pathname.endsWith('/explain'))).toBe(true);
+  });
+
+  it('starts an action (simulated) and records ACTIVATED', async () => {
+    const { calls } = renderCustomer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Iniciar ação' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Enviar ao CRM' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar ação' }));
+    expect(await screen.findByText(/Ação registrada como ativada/)).toBeInTheDocument();
+    const outcome = calls.find((call) => call.url.pathname.endsWith('/outcomes'));
+    expect(outcome?.body).toMatchObject({ status: 'ACTIVATED', reason: 'Enviar ao CRM' });
+  });
+
+  it('switches tabs: signals with filters and the ranking comparison', async () => {
+    renderCustomer();
+    const sections = await screen.findByRole('tablist', { name: 'Seções do cliente' });
+    fireEvent.click(within(sections).getByRole('tab', { name: 'Sinais' }));
+    expect(await screen.findByText(/meia-vida de 21 dias/)).toBeInTheDocument();
+    const filters = screen.getByRole('tablist', { name: 'Filtrar sinais' });
+    fireEvent.click(within(filters).getByRole('tab', { name: 'Produtos' }));
+    expect(screen.getByText('Gap identificado: Capital de Giro')).toBeInTheDocument();
+    fireEvent.click(within(sections).getByRole('tab', { name: 'Produtos' }));
+    expect(await screen.findByText('Lacunas relevantes')).toBeInTheDocument();
+    fireEvent.click(within(sections).getByRole('tab', { name: 'Próximas ações' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Comparar recomendações' }));
+    expect(screen.getByRole('columnheader', { name: 'Relevância' })).toBeInTheDocument();
+  });
+
+  it('asks Inteligência PJ with the customer as context', async () => {
+    const { router } = renderCustomer();
+    fireEvent.click(await screen.findByRole('button', { name: 'Me explique este cliente' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/inteligencia'));
+    expect(router.state.location.search).toContain('cliente=company-1');
   });
 });
 

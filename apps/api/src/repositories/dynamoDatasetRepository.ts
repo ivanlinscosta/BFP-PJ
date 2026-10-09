@@ -44,6 +44,7 @@ function getCompanyId(entityType: DatasetEntityType, entity: DatasetEntity) {
     case 'appNavigation':
     case 'transaction':
     case 'npsResponse':
+    case 'customerIntelligence':
       return 'companyId' in entity ? entity.companyId : null;
     case 'qualityStatus':
     case 'auditLog':
@@ -76,6 +77,8 @@ function getEntityTimestamp(entityType: DatasetEntityType, entity: DatasetEntity
       return 'occurredAt' in entity ? entity.occurredAt : '';
     case 'npsResponse':
       return 'respondedAt' in entity ? entity.respondedAt : '';
+    case 'customerIntelligence':
+      return 'calculatedAt' in entity ? entity.calculatedAt : '';
     case 'conversation':
       return 'startedAt' in entity ? entity.startedAt : '';
     case 'qualityStatus':

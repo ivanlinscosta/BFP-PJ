@@ -1,4 +1,5 @@
 import type { Company, DatasetBundle } from '@bfp/domain';
+import { HISTORY_START_DATE } from './constants';
 
 export interface CoherenceAssertion {
   name: string;
@@ -7,7 +8,15 @@ export interface CoherenceAssertion {
 }
 
 /** Evaluates the mandatory synthetic-data business narratives from architecture §13. */
-export function evaluateCoherence(bundle: DatasetBundle): CoherenceAssertion[] {
+export function evaluateCoherence(fullBundle: DatasetBundle): CoherenceAssertion[] {
+  // Acquisition narratives describe companies acquired inside the history window; established
+  // customers (account opened before it) only feed the customer-intelligence layer.
+  const bundle: DatasetBundle = {
+    ...fullBundle,
+    companies: fullBundle.companies.filter(
+      (company) => company.leadCreatedAt >= HISTORY_START_DATE,
+    ),
+  };
   const byChannel = buildChannelMetrics(bundle);
   const google = byChannel.GOOGLE_SEARCH;
   const linkedin = byChannel.LINKEDIN;

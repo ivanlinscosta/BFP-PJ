@@ -87,7 +87,7 @@ describe('CDK stacks', () => {
       TagKey: MESH_TAGS.domain,
       TagValues: Match.arrayWith(['customer360', 'media', 'digital']),
     });
-    templates.data.resourceCountIs('AWS::LakeFormation::TagAssociation', 9);
+    templates.data.resourceCountIs('AWS::LakeFormation::TagAssociation', 10);
     templates.data.resourceCountIs('AWS::SecretsManager::Secret', 2);
     templates.data.hasResourceProperties('AWS::Athena::WorkGroup', {
       Name: 'bfp-pj-dev-etl',
@@ -130,7 +130,7 @@ describe('CDK stacks', () => {
       },
       BucketEncryption: Match.objectLike({}),
     });
-    templates.data.resourceCountIs('AWS::Glue::Database', 9);
+    templates.data.resourceCountIs('AWS::Glue::Database', 10);
     templates.data.hasResourceProperties('AWS::Glue::Database', {
       DatabaseInput: Match.objectLike({ Name: 'bfp_pj_dev_digital' }),
     });
@@ -179,6 +179,20 @@ describe('CDK stacks', () => {
         ]),
         CacheBehaviors: Match.arrayWith([Match.objectLike({ PathPattern: '/api/*' })]),
       }),
+    });
+  });
+
+  it('rebuilds Customer Intelligence daily with a dedicated Lambda', () => {
+    templates.api.hasResourceProperties('AWS::Lambda::Function', {
+      Handler: 'index.intelligenceRebuildHandler',
+      Timeout: 900,
+      Environment: { Variables: Match.objectLike({ INTELLIGENCE_RAW_BUCKET: Match.anyValue() }) },
+    });
+    templates.api.hasResourceProperties('AWS::Events::Rule', {
+      ScheduleExpression: 'cron(0 6 * * ? *)',
+      Targets: Match.arrayWith([
+        Match.objectLike({ Input: JSON.stringify({ bfpTask: 'intelligenceRebuild' }) }),
+      ]),
     });
   });
 

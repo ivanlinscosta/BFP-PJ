@@ -1,3 +1,4 @@
+import { createCustomerIntelligenceRouter } from '@api/http/routes/customerIntelligence';
 import { randomUUID } from 'node:crypto';
 import cors from 'cors';
 import express from 'express';
@@ -122,6 +123,7 @@ export function createApp(overrides: Partial<AppDependencies> = {}) {
   app.use('/api/mesh', createMeshRouter(context));
   app.use('/api/integrations', createIntegrationsRouter(context));
   app.use('/api/ai', createAiRouter(context));
+  app.use('/api', createCustomerIntelligenceRouter(context));
 
   app.use((_req, _res, next) => {
     next(new NotFoundError());

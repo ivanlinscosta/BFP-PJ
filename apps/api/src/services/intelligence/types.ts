@@ -20,6 +20,8 @@ export interface ProviderResult {
   study?: Study;
   /** Background study being built (poll GET /api/ai/studies/:id). */
   studyJob?: { id: string; status: 'running' | 'done' | 'error'; progress: string };
+  /** Customer the answer is about (Cliente PJ context). */
+  customer?: { customerId: string; tradeName: string };
 }
 
 /** One stored turn of an Inteligência PJ conversation. */

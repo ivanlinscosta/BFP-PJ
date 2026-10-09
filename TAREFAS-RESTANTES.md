@@ -1,13 +1,13 @@
 # TAREFAS RESTANTES — BFP-PJ
 
-Estado em 07/10/2026. As fases 12 (Catálogo/Governança), 10-UI (Dashboards), 14 (polish),
+Estado em 09/10/2026. As fases 12 (Catálogo/Governança), 10-UI (Dashboards), 14 (polish),
 16 (E2E) e 17 (CDK + docs + roteiro) foram implementadas. O SAM foi substituído por AWS CDK.
 
 ## Gates
 
 ```bash
 npm run typecheck && npm run lint && npm run test && npm run build   # 0/0/0/0
-npm run test:e2e                                                      # 5 specs Playwright
+npm run test:e2e                                                      # 7 testes Playwright (+ visual)
 npm run synth -w infra -- -c env=dev                                  # CDK synth
 ```
 
@@ -49,3 +49,26 @@ Pendências:
 - **DataZone** não existe na conta; quando houver domínio, informar `-c datazoneDomainId`.
 - **Dados reais**: o mesh é populado pelo seed sintético (LGPD); os domínios reais devem publicar
   nas mesmas tabelas/colunas (contrato em `packages/semantic-layer/src/mesh.ts`).
+
+## Clientes PJ · Customer DNA e Próxima Melhor Ação (fase 19)
+
+Implementados (09/10/2026): página Cliente PJ redesenhada (cabeçalho, DNA em árvore com drawer de
+drivers, card da próxima melhor ação com explicação, Iniciar ação simulado e dispensa com motivo,
+o que mudou, abas Visão geral/Jornada/Produtos/Transações/Digital/Interações/Sinais/Próximas
+ações, empresas semelhantes e perguntas à Inteligência PJ), pacote `customer-intelligence`,
+APIs, read model no DynamoDB, produto `customer_intelligence` no mesh, tabelas gold, rebuild
+diário (EventBridge → Lambda), DNA do público no Audience Builder, testes unitários, de API, web
+e E2E. Detalhes em `docs/customer-intelligence-architecture.md`.
+
+Pendências:
+
+- **Claude no Bedrock** continua bloqueado pelo formulário de caso de uso da Anthropic na conta;
+  até lá explicações e respostas sobre o cliente usam o provedor determinístico (rotulado na UI).
+- **Ativação real**: "Iniciar ação" é simulado (grava `ACTIVATED`); integrar CRM, tarefas do
+  gerente e comunicação quando houver os sistemas de destino.
+- **Outcomes reais** (aceite, conversão) ainda não chegam de sistemas externos; o cooldown usa os
+  outcomes registrados na plataforma e os sintéticos.
+- **Calibração**: pesos de DNA e NBA são configuráveis (`DnaScoringConfig`/`NbaScoringConfig`),
+  mas foram calibrados na base sintética; recalibrar com dados reais e medir conversão por ação.
+- **Similaridade em escala**: a busca de semelhantes varre os resumos (`INTEL#SUMMARY`); acima de
+  algumas dezenas de milhares de clientes, mover para índice vetorial ou Athena.

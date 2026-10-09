@@ -16,6 +16,7 @@ export const MESH_DATASET_IDS = [
   'app_navigation',
   'transactions',
   'nps_responses',
+  'customer_intelligence',
 ] as const;
 
 export type MeshDatasetId = (typeof MESH_DATASET_IDS)[number];
@@ -271,6 +272,40 @@ export const MESH_DATASETS: readonly MeshDatasetDefinition[] = [
       col('touchpoint', 'string', 'ONBOARDING, APP, SERVICE ou RELATIONSHIP_MANAGER'),
       col('score', 'bigint', 'Nota de 0 a 10'),
       col('responded_at', 'timestamp', 'Data da resposta'),
+    ],
+  },
+  {
+    id: 'customer_intelligence',
+    name: 'Customer DNA e Próxima Melhor Ação',
+    description:
+      'DNA de 6 dimensões e ação #1 por empresa, materializados pelo pipeline de inteligência (rebuild diário).',
+    domain: 'customer360',
+    owner: 'Inteligência de Clientes PJ',
+    glueDatabase: 'intelligence',
+    table: 'customer_intelligence',
+    grain: '1 linha por empresa e cálculo',
+    sourceSystem: 'Customer Intelligence (DNA dna-1.0.0 · NBA nba-1.0.0)',
+    entityTypes: ['customerIntelligence'],
+    dataProductId: 'customer_intelligence_nba',
+    columns: [
+      col('snapshot_id', 'string', 'Identificador do cálculo'),
+      COMPANY_KEY,
+      col('calculated_at', 'timestamp', 'Data do cálculo'),
+      col('nba_action', 'string', 'Ação #1 recomendada'),
+      col('nba_score', 'double', 'Score 0-100 da ação #1'),
+      col('nba_confidence', 'double', 'Confiança 0-100 da ação #1'),
+      col('primary_signal', 'string', 'Sinal mais forte'),
+      col('signal_count', 'bigint', 'Quantidade de sinais ativos'),
+      col('dna_digital_engagement', 'double', 'Engajamento digital (0-100)'),
+      col('dna_product_depth', 'double', 'Profundidade de produtos (0-100)'),
+      col('dna_relationship_strength', 'double', 'Relacionamento (0-100)'),
+      col('dna_commercial_intent', 'double', 'Intenção comercial (0-100)'),
+      col('dna_business_momentum', 'double', 'Momentum do negócio (0-100)'),
+      col('dna_transaction_activity', 'double', 'Atividade transacional (0-100)'),
+      col('commercial_intent_level', 'string', 'LOW, MEDIUM, HIGH ou VERY_HIGH'),
+      col('digital_engagement_level', 'string', 'LOW, MEDIUM, HIGH ou VERY_HIGH'),
+      col('dna_version', 'string', 'Versão do DNA'),
+      col('model_version', 'string', 'Versão do modelo de NBA'),
     ],
   },
 ];

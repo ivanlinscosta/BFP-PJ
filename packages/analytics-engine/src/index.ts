@@ -37,6 +37,7 @@ const ENTITY_TYPE_TO_BUNDLE_KEY = {
   appNavigation: 'appNavigationEvents',
   transaction: 'transactions',
   npsResponse: 'npsResponses',
+  customerIntelligence: 'customerIntelligence',
   qualityStatus: 'qualityStatuses',
   auditLog: 'auditLogs',
 } as const satisfies Record<DatasetEntityType, keyof DatasetBundle>;
@@ -56,6 +57,7 @@ const DEFAULT_ENTITY_FIELDS = {
   appNavigation: ['id', 'companyId'],
   transaction: ['id', 'companyId'],
   npsResponse: ['id', 'companyId'],
+  customerIntelligence: ['id', 'companyId'],
   qualityStatus: ['id', 'companyId'],
   auditLog: ['id', 'companyId'],
 } as const satisfies Record<DatasetEntityType, readonly string[]>;
@@ -83,9 +85,21 @@ const TIMESTAMP_FIELDS_BY_ENTITY_TYPE = {
   appNavigation: ['occurredAt'],
   transaction: ['occurredAt'],
   npsResponse: ['respondedAt'],
+  customerIntelligence: ['calculatedAt'],
   qualityStatus: ['checkedAt'],
   auditLog: ['timestamp'],
 } as const satisfies Record<DatasetEntityType, readonly string[]>;
+
+/** Customer Intelligence score field read by each average metric. */
+const INTELLIGENCE_SCORE_FIELDS: Record<string, string> = {
+  avg_nba_score: 'nbaScore',
+  dna_digital_engagement_score: 'dnaDigitalEngagement',
+  dna_product_depth_score: 'dnaProductDepth',
+  dna_relationship_strength_score: 'dnaRelationshipStrength',
+  dna_commercial_intent_score: 'dnaCommercialIntent',
+  dna_business_momentum_score: 'dnaBusinessMomentum',
+  dna_transaction_activity_score: 'dnaTransactionActivity',
+};
 
 type AnalyticsDocument = Record<string, unknown>;
 type LoadedDocuments = Partial<Record<DatasetEntityType, readonly AnalyticsDocument[]>>;
@@ -1123,6 +1137,23 @@ function computeNonRatioMetricValue(
         (total, document) => total + (toNumber(getDocumentValue(document, 'amount')) ?? 0),
         0,
       );
+    case 'intelligence_customers':
+      return documents.length;
+    case 'avg_nba_score':
+    case 'dna_digital_engagement_score':
+    case 'dna_product_depth_score':
+    case 'dna_relationship_strength_score':
+    case 'dna_commercial_intent_score':
+    case 'dna_business_momentum_score':
+    case 'dna_transaction_activity_score': {
+      const field = INTELLIGENCE_SCORE_FIELDS[metric.definition.id];
+      const values = documents
+        .map((document) => toNumber(getDocumentValue(document, field)))
+        .filter((value): value is number => value !== null);
+      return values.length === 0
+        ? null
+        : values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
     case 'nps': {
       // Net Promoter Score: % promoters (9-10) minus % detractors (0-6).
       const scores = documents

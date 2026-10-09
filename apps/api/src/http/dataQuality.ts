@@ -43,6 +43,7 @@ const REQUIRED_FIELDS: Partial<Record<DatasetEntityType, readonly string[]>> = {
   appNavigation: ['id', 'companyId', 'screen', 'action', 'platform', 'occurredAt'],
   transaction: ['id', 'companyId', 'transactionType', 'channel', 'amount', 'occurredAt'],
   npsResponse: ['id', 'companyId', 'touchpoint', 'score', 'respondedAt'],
+  customerIntelligence: ['id', 'companyId', 'calculatedAt', 'nbaActionId', 'nbaScore'],
 };
 
 function isFilled(value: unknown) {

@@ -43,6 +43,10 @@ export function flattenDatasetBundle(bundle: DatasetBundle): DatasetEntityRecord
     })),
     ...bundle.transactions.map((entity) => ({ entityType: 'transaction' as const, entity })),
     ...bundle.npsResponses.map((entity) => ({ entityType: 'npsResponse' as const, entity })),
+    ...(bundle.customerIntelligence ?? []).map((entity) => ({
+      entityType: 'customerIntelligence' as const,
+      entity,
+    })),
     ...bundle.qualityStatuses.map((entity) => ({ entityType: 'qualityStatus' as const, entity })),
     ...bundle.auditLogs.map((entity) => ({ entityType: 'auditLog' as const, entity })),
   ];
@@ -157,6 +161,7 @@ function getCompanyId(record: DatasetEntityRecord) {
     case 'appNavigation':
     case 'transaction':
     case 'npsResponse':
+    case 'customerIntelligence':
       return 'companyId' in entity ? entity.companyId : undefined;
     case 'qualityStatus':
     case 'auditLog':
@@ -187,6 +192,8 @@ function getTimestamp(record: DatasetEntityRecord) {
       return 'occurredAt' in entity ? entity.occurredAt : undefined;
     case 'npsResponse':
       return 'respondedAt' in entity ? entity.respondedAt : undefined;
+    case 'customerIntelligence':
+      return 'calculatedAt' in entity ? entity.calculatedAt : undefined;
     case 'conversation':
       return 'startedAt' in entity ? entity.startedAt : undefined;
     case 'qualityStatus':

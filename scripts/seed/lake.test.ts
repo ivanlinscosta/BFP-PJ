@@ -4,7 +4,33 @@ import { generateDatasetBundle } from './generator';
 import { buildLakeTables, goldCtas, silverDdl } from './lake-model';
 
 describe('data mesh lake model', () => {
-  const tables = buildLakeTables(generateDatasetBundle({ scale: 0.05 }));
+  const bundle = generateDatasetBundle({ scale: 0.05 });
+  // The intelligence snapshot is materialized by `intelligence:rebuild`; one row is enough here.
+  const tables = buildLakeTables({
+    ...bundle,
+    customerIntelligence: [
+      {
+        id: 'company-0001:2026-10-09',
+        companyId: 'company-0001',
+        calculatedAt: '2026-10-09T12:00:00.000Z',
+        nbaActionId: 'OFFER_WORKING_CAPITAL',
+        nbaScore: 87,
+        nbaConfidence: 93,
+        primarySignal: 'HIGH_CREDIT_INTENT',
+        signalCount: 4,
+        dnaDigitalEngagement: 91,
+        dnaProductDepth: 47,
+        dnaRelationshipStrength: 82,
+        dnaCommercialIntent: 85,
+        dnaBusinessMomentum: 70,
+        dnaTransactionActivity: 75,
+        commercialIntentLevel: 'HIGH',
+        digitalEngagementLevel: 'VERY_HIGH',
+        dnaVersion: 'dna-1.0.0',
+        modelVersion: 'nba-1.0.0',
+      },
+    ],
+  });
 
   it('publishes one normalized table per mesh data product', () => {
     expect(tables.map((table) => table.dataset.id)).toEqual(

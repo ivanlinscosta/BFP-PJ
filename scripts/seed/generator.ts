@@ -269,17 +269,24 @@ export function generateDatasetBundle(options: GenerationOptions = {}): DatasetB
     referenceDate,
     campaignIdsByChannel,
   });
-  const companies = sortById([
-    ...applyShowcaseCompany(coreCompanies, companyProducts),
-    ...prospects,
-  ]);
+  const showcase = applyShowcaseCompany(coreCompanies, companyProducts);
+  const established = generateEstablishedCustomers({
+    count:
+      options.scale && options.scale < 1
+        ? Math.max(30, Math.round(ESTABLISHED_CUSTOMERS * options.scale))
+        : ESTABLISHED_CUSTOMERS,
+    startIndex: coreCompanies.length + prospects.length,
+    seed,
+    faker,
+  });
+  const companies = sortById([...showcase.companies, ...prospects, ...established]);
 
   return {
     companies,
     partners,
     accounts,
     products: sortById(products),
-    companyProducts,
+    companyProducts: showcase.companyProducts,
     mediaCampaigns: sortById(mediaCampaigns),
     mediaTouchpoints,
     funnelEvents,
@@ -289,6 +296,7 @@ export function generateDatasetBundle(options: GenerationOptions = {}): DatasetB
     appNavigationEvents,
     transactions,
     npsResponses,
+    customerIntelligence: [],
     qualityStatuses: [],
     auditLogs: [],
   };
@@ -411,18 +419,135 @@ function applyShowcaseCompany(companies: Company[], companyProducts: CompanyProd
   )[0];
 
   if (!showcase) {
-    return companies;
+    return { companies, companyProducts };
   }
 
-  return companies.map((company) =>
-    company.id === showcase.id
-      ? {
-          ...company,
-          tradeName: 'Atlas Tecnologia Ltda.',
-          legalName: 'Atlas Soluções Tecnológicas Ltda.',
-        }
-      : company,
-  );
+  // The showcase reproduces the Cliente PJ 360 story: acquired by Google Search in July 2026,
+  // fast onboarding, Conta PJ and Cartão PJ contracted and no working capital yet.
+  return {
+    companies: companies.map((company) =>
+      company.id === showcase.id
+        ? {
+            ...company,
+            tradeName: 'Atlas Tecnologia Ltda.',
+            legalName: 'Atlas Soluções Tecnológicas Ltda.',
+            segment: 'Tecnologia',
+            industry: 'SaaS B2B',
+            companySize: 'Média' as const,
+            state: 'SP',
+            city: 'São Paulo',
+            region: 'Sudeste',
+            leadCreatedAt: '2026-07-13T14:20:00.000Z',
+            accountOpeningStartedAt: '2026-07-15T10:05:00.000Z',
+            accountOpenedAt: '2026-07-18T16:40:00.000Z',
+            onboardingStartedAt: '2026-07-18T17:00:00.000Z',
+            onboardingCompletedAt: '2026-07-20T11:30:00.000Z',
+            activationDate: '2026-07-23T09:15:00.000Z',
+            status: 'ACTIVE' as const,
+            createdAt: '2026-07-13T14:20:00.000Z',
+          }
+        : company,
+    ),
+    companyProducts: companyProducts
+      .filter(
+        (item) =>
+          item.companyId !== showcase.id ||
+          item.productId === 'product-001' ||
+          item.productId === 'product-002',
+      )
+      .map((item) =>
+        item.companyId === showcase.id
+          ? {
+              ...item,
+              status: 'ACTIVE' as const,
+              contractedAt:
+                item.productId === 'product-001'
+                  ? '2026-07-18T16:40:00.000Z'
+                  : '2026-07-27T15:00:00.000Z',
+            }
+          : item,
+      ),
+  };
+}
+
+/** Customers with accounts opened before the acquisition window (relationship history). */
+export const ESTABLISHED_CUSTOMERS = 3000;
+
+/**
+ * Established customers: accounts opened between April and September 2025, before the
+ * acquisition window. They carry no acquisition events here (the funnel calibration only uses
+ * companies acquired inside the window); their behavior comes from the intelligence dataset.
+ */
+function generateEstablishedCustomers(input: {
+  count: number;
+  startIndex: number;
+  seed: number;
+  faker: Faker;
+}): Company[] {
+  const customers: Company[] = [];
+  const channels = Object.keys(CHANNEL_PROFILES) as Array<keyof typeof CHANNEL_PROFILES>;
+  for (let offset = 0; offset < input.count; offset += 1) {
+    const index = input.startIndex + offset;
+    const id = `company-${String(index + 1).padStart(5, '0')}`;
+    const rand = createKeyedRandom(input.seed, `established:${id}`);
+    const channel = pickWeighted(
+      channels.map((value) => ({ value, weight: CHANNEL_PROFILES[value].companyWeight })),
+      rand,
+    );
+    const profile = CHANNEL_PROFILES[channel];
+    const stateEntry = pickWeighted(
+      BRAZIL_STATES.map((entry) => ({ value: entry, weight: entry.weight })),
+      rand,
+    );
+    const size = pickWeighted(
+      profile.companySizes.map(([value, weight]) => ({ value, weight })),
+      rand,
+    );
+    const segment = SEGMENTS[Math.floor(rand() * SEGMENTS.length)] ?? SEGMENTS[0];
+    const industries = INDUSTRIES_BY_SEGMENT[segment];
+    const industry = industries[Math.floor(rand() * industries.length)] ?? industries[0];
+    const revenueRange = adjustRevenueRange(size, channel, rand);
+    const opened = randomDateBetween(
+      rand,
+      new Date('2025-04-01T00:00:00.000Z'),
+      new Date('2025-09-20T00:00:00.000Z'),
+    );
+    const lead = addDays(opened, -randomInteger(rand, 8, 120));
+    const root = input.faker.person.lastName();
+    customers.push({
+      id,
+      cnpjMasked: buildMaskedCnpj(index),
+      legalName: `${COMPANY_NAME_PREFIXES[index % COMPANY_NAME_PREFIXES.length]} ${root} ${segment} ${COMPANY_NAME_SUFFIXES[index % COMPANY_NAME_SUFFIXES.length]}`,
+      tradeName: buildTradeName(index, root, industry),
+      segment,
+      industry,
+      companySize: size,
+      state: stateEntry.state,
+      city:
+        stateEntry.cities[Math.floor(rand() * stateEntry.cities.length)] ?? stateEntry.cities[0],
+      region: stateEntry.region,
+      employeeCountRange: pickWeighted(
+        COMPANY_SIZE_TO_EMPLOYEE_RANGE[size].map((value) => ({ value, weight: 1 })),
+        rand,
+      ),
+      annualRevenueRange: revenueRange,
+      acquisitionSource: CHANNEL_TO_SOURCE[channel],
+      acquisitionChannel: channel,
+      acquisitionCampaignId: null,
+      leadCreatedAt: toIso(lead),
+      accountOpeningStartedAt: toIso(addDays(opened, -randomInteger(rand, 1, 6))),
+      accountOpenedAt: toIso(opened),
+      onboardingStartedAt: toIso(opened),
+      onboardingCompletedAt: toIso(addDays(opened, randomInteger(rand, 1, 12))),
+      activationDate: toIso(addDays(opened, randomInteger(rand, 3, 40))),
+      status: 'ACTIVE',
+      relationshipManagerId: MANAGER_IDS[index % MANAGER_IDS.length] ?? MANAGER_IDS[0],
+      lgpdConsent: rand() > 0.05,
+      riskProfile: resolveRiskProfile(rand, size, revenueRange),
+      createdAt: toIso(lead),
+    });
+  }
+  return customers;
 }
 
 function generateCampaigns(total: number, seed: number, referenceDate: Date): MediaCampaign[] {

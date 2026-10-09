@@ -36,16 +36,17 @@ Detalhes em [docs/aws-architecture.md](docs/aws-architecture.md). O documento
 [docs/architecture.md](docs/architecture.md) é o discovery original (histórico; menciona o plano
 Firebase abandonado — não há nenhuma dependência Firebase no código).
 
-| Camada      | Implementação                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Frontend    | React 19, TypeScript, Vite, Tailwind v4 (tokens em `apps/web/src/app/styles.css`), TanStack Query, Zustand, Recharts           |
-| API         | Express empacotado para Lambda (`apps/api`), Zod, RBAC, logs estruturados                                                      |
-| Semântica   | `packages/semantic-layer` — 48 métricas, 32 dimensões, 10 produtos de dados, glossário, linhagem                               |
-| Motor       | `packages/analytics-engine` — engine local/DynamoDB, **AthenaQueryCompiler**, Insight Engine, Audience Engine                  |
-| IA          | Inteligência PJ: provedor determinístico local ou **Amazon Bedrock** (Converse + ferramentas governadas)                       |
-| Data mesh   | 9 produtos de dados (Glue + Lake Formation, DataZone opcional); o usuário escolhe as bases e o motor faz JOIN por `company_id` |
-| Integrações | **Atlan** (certificação, owners, glossário) e **FullStory** (sessões e eventos da jornada digital)                             |
-| Infra       | **AWS CDK** (`infra/`): Data, Auth, AI, Api, Web, Observability (+ GitHub OIDC opcional)                                       |
+| Camada      | Implementação                                                                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend    | React 19, TypeScript, Vite, Tailwind v4 (tokens em `apps/web/src/app/styles.css`), TanStack Query, Zustand, Recharts                   |
+| API         | Express empacotado para Lambda (`apps/api`), Zod, RBAC, logs estruturados                                                              |
+| Semântica   | `packages/semantic-layer` — 56 métricas, 35 dimensões, 11 produtos de dados, glossário, linhagem                                       |
+| Motor       | `packages/analytics-engine` — engine local/DynamoDB, **AthenaQueryCompiler**, Insight Engine, Audience Engine                          |
+| IA          | Inteligência PJ: provedor determinístico local ou **Amazon Bedrock** (Converse + ferramentas governadas)                               |
+| Data mesh   | 10 produtos de dados (Glue + Lake Formation, DataZone opcional); o usuário escolhe as bases e o motor faz JOIN por `company_id`        |
+| Clientes PJ | `packages/customer-intelligence` — Cliente PJ 360 + Customer DNA, sinais e Próxima Melhor Ação (motor determinístico; a IA só explica) |
+| Integrações | **Atlan** (certificação, owners, glossário) e **FullStory** (sessões e eventos da jornada digital)                                     |
+| Infra       | **AWS CDK** (`infra/`): Data, Auth, AI, Api, Web, Observability (+ GitHub OIDC opcional)                                               |
 
 ## Pré-requisitos
 
@@ -57,6 +58,7 @@ Firebase abandonado — não há nenhuma dependência Firebase no código).
 ```bash
 npm install
 npm run seed          # gera data/dataset.json (determinístico, ~19 mil empresas sintéticas)
+npm run intelligence:rebuild  # DNA, sinais e próxima melhor ação dos 5.004 clientes (~6 s)
 npm run dev           # web :5173 + api :3001 (proxy /api)
 ```
 
@@ -80,7 +82,7 @@ npm run typecheck     # todos os workspaces + scripts
 npm run lint          # eslint + prettier
 npm run test          # unit + integração (packages, api, web, infra) + seed
 npm run build
-npm run test:e2e      # Playwright: 3 golden paths + Cliente 360 + capturas 1440×1024
+npm run test:e2e      # Playwright: golden paths, Cliente PJ 360 (DNA/NBA), cluster de audiência e capturas 1440×1024
 npm run test:visual   # só as capturas em artifacts/screens/
 ```
 
@@ -96,6 +98,7 @@ npm run deploy -w infra -- -c env=dev -c bedrockModelId=<INFERENCE_PROFILE_LIBER
 # carga de dados e usuários (variáveis vêm dos outputs dos stacks)
 npm run seed:aws        # DATASET_TABLE, AWS_REGION
 npm run seed:lake       # DATA_LAKE_BUCKET, MESH_DATABASE_PREFIX, ATHENA_WORKGROUP=bfp-pj-<env>-etl, DATA_LOADED_AT_PARAMETER, AWS_REGION
+npm run seed:intelligence # DATASET_TABLE + variáveis do lake: perfis de inteligência, dados brutos e tabelas gold
 npm run fullstory:export # opcional: eventos reais do FullStory → produto digital_journey
 npm run seed:workspace  # OBJECTS_TABLE, AWS_REGION
 npm run cognito:users   # COGNITO_USER_POOL_ID, DEMO_USER_PASSWORD, AWS_REGION
@@ -135,6 +138,7 @@ packages/schemas    validação Zod
 packages/semantic-layer  catálogo semântico, validator, linhagem, qualidade
 packages/analytics-engine motores, compilador Athena, Insight Engine, Audience Engine
 packages/shared     descritores de spec e operações (UPDATE_ANALYSIS)
+packages/customer-intelligence  features, Customer DNA, sinais, mudanças, elegibilidade, NBA, clusters e semelhança
 scripts/seed        gerador sintético, cargas DynamoDB / Data Lake / workspace
 infra               AWS CDK
 e2e                 Playwright
@@ -153,3 +157,7 @@ docs                arquitetura, dados, semântica, motor, IA, segurança, deplo
 - [docs/security.md](docs/security.md)
 - [docs/deployment.md](docs/deployment.md)
 - [docs/demo-script.md](docs/demo-script.md)
+- Clientes PJ: [arquitetura da Customer Intelligence](docs/customer-intelligence-architecture.md),
+  [Customer DNA](docs/customer-dna.md), [sinais](docs/signals.md),
+  [próxima melhor ação](docs/next-best-action.md), [score da NBA](docs/nba-scoring.md) e
+  [dados sintéticos](docs/synthetic-data.md)

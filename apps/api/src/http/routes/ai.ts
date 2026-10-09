@@ -184,6 +184,11 @@ export function createAiRouter(context: ApiContext) {
     prompt: z.string().trim().min(1).max(COPILOT_MAX_PROMPT_LENGTH),
     analysisSpec: analysisSpecSchema.optional(),
     conversationId: z.string().trim().min(1).max(64).optional(),
+    customerId: z
+      .string()
+      .trim()
+      .regex(/^[\w-]{1,64}$/)
+      .optional(),
   });
 
   router.post('/chat', async (req, res, next) => {

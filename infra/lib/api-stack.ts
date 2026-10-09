@@ -5,6 +5,8 @@ import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import type * as cognito from 'aws-cdk-lib/aws-cognito';
 import type * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import type * as kms from 'aws-cdk-lib/aws-kms';
 import * as lakeformation from 'aws-cdk-lib/aws-lakeformation';
@@ -48,6 +50,7 @@ export class ApiStack extends Stack {
   readonly api: apigw.HttpApi;
   readonly handler: lambda.Function;
   readonly logGroup: logs.LogGroup;
+  readonly intelligenceRebuild: lambda.Function;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -57,6 +60,28 @@ export class ApiStack extends Stack {
       logGroupName: `/aws/lambda/${config.prefix}-api`,
       retention: config.logRetentionDays,
     });
+
+    const environment = {
+      NODE_ENV: 'production',
+      AUTH_MODE: 'cognito',
+      COGNITO_USER_POOL_ID: props.userPool.userPoolId,
+      COGNITO_CLIENT_ID: props.client.userPoolClientId,
+      DATASET_TABLE: props.datasetTable.tableName,
+      OBJECTS_TABLE: props.objectsTable.tableName,
+      ANALYTICS_ENGINE: 'athena',
+      ATHENA_DATABASE: props.meshDatabasePrefix,
+      ATHENA_WORKGROUP: props.workgroupName,
+      MESH_CATALOG: 'glue',
+      MESH_DATABASE_PREFIX: props.meshDatabasePrefix,
+      DATA_LOADED_AT_PARAMETER: props.dataLoadedAtParameter.parameterName,
+      ATLAN_SECRET_ID: props.atlanSecret.secretName,
+      FULLSTORY_SECRET_ID: props.fullstorySecret.secretName,
+      ...(props.datazoneDomainId ? { DATAZONE_DOMAIN_ID: props.datazoneDomainId } : {}),
+      BEDROCK_MODEL_ID: ssm.StringParameter.valueForStringParameter(this, props.modelParameterName),
+      SEED_DEMO_WORKSPACE: 'false',
+      WEB_ORIGIN: 'https://localhost',
+      NODE_OPTIONS: '--enable-source-maps',
+    };
 
     this.handler = new lambda.Function(this, 'ApiFunction', {
       functionName: `${config.prefix}-api`,
@@ -70,30 +95,7 @@ export class ApiStack extends Stack {
       timeout: Duration.seconds(120),
       tracing: lambda.Tracing.ACTIVE,
       logGroup: this.logGroup,
-      environment: {
-        NODE_ENV: 'production',
-        AUTH_MODE: 'cognito',
-        COGNITO_USER_POOL_ID: props.userPool.userPoolId,
-        COGNITO_CLIENT_ID: props.client.userPoolClientId,
-        DATASET_TABLE: props.datasetTable.tableName,
-        OBJECTS_TABLE: props.objectsTable.tableName,
-        ANALYTICS_ENGINE: 'athena',
-        ATHENA_DATABASE: props.meshDatabasePrefix,
-        ATHENA_WORKGROUP: props.workgroupName,
-        MESH_CATALOG: 'glue',
-        MESH_DATABASE_PREFIX: props.meshDatabasePrefix,
-        DATA_LOADED_AT_PARAMETER: props.dataLoadedAtParameter.parameterName,
-        ATLAN_SECRET_ID: props.atlanSecret.secretName,
-        FULLSTORY_SECRET_ID: props.fullstorySecret.secretName,
-        ...(props.datazoneDomainId ? { DATAZONE_DOMAIN_ID: props.datazoneDomainId } : {}),
-        BEDROCK_MODEL_ID: ssm.StringParameter.valueForStringParameter(
-          this,
-          props.modelParameterName,
-        ),
-        SEED_DEMO_WORKSPACE: 'false',
-        WEB_ORIGIN: 'https://localhost',
-        NODE_OPTIONS: '--enable-source-maps',
-      },
+      environment,
     });
 
     props.datasetTable.grantReadWriteData(this.handler);
@@ -227,6 +229,39 @@ export class ApiStack extends Stack {
       ],
       integration,
       authorizer,
+    });
+
+    // Customer Intelligence: daily rebuild of features → signals → DNA → NBA (same bundle,
+    // dedicated handler with a longer timeout; reads raw behavior from S3, writes DynamoDB).
+    this.intelligenceRebuild = new lambda.Function(this, 'IntelligenceRebuildFunction', {
+      functionName: `${config.prefix}-intelligence-rebuild`,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      architecture: lambda.Architecture.ARM_64,
+      code: lambda.Code.fromAsset(props.lambdaCodePath ?? LAMBDA_BUNDLE),
+      handler: 'index.intelligenceRebuildHandler',
+      memorySize: 3008,
+      timeout: Duration.minutes(15),
+      tracing: lambda.Tracing.ACTIVE,
+      logGroup: new logs.LogGroup(this, 'IntelligenceRebuildLogs', {
+        logGroupName: `/aws/lambda/${config.prefix}-intelligence-rebuild`,
+        retention: config.logRetentionDays,
+      }),
+      environment: { ...environment, INTELLIGENCE_RAW_BUCKET: props.lakeBucket.bucketName },
+    });
+    props.datasetTable.grantReadWriteData(this.intelligenceRebuild);
+    props.objectsTable.grantReadData(this.intelligenceRebuild);
+    props.lakeBucket.grantRead(this.intelligenceRebuild, 'intelligence/raw/*');
+    props.dataKey.grantDecrypt(this.intelligenceRebuild);
+    new events.Rule(this, 'IntelligenceRebuildSchedule', {
+      ruleName: `${config.prefix}-intelligence-rebuild`,
+      description: 'Recalcula Customer DNA, sinais e próxima melhor ação (diário, 06:00 UTC).',
+      schedule: events.Schedule.cron({ minute: '0', hour: '6' }),
+      targets: [
+        new targets.LambdaFunction(this.intelligenceRebuild, {
+          event: events.RuleTargetInput.fromObject({ bfpTask: 'intelligenceRebuild' }),
+          retryAttempts: 1,
+        }),
+      ],
     });
 
     new CfnOutput(this, 'ApiEndpoint', { value: this.api.apiEndpoint });

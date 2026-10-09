@@ -19,12 +19,16 @@ Perfil: **Mariana Souza · Growth PJ** (`analyst@example.local`).
    playground abre com a dimensão aplicada.
 7. **Teste arquitetural** — pergunte "Compare CAC e ativação D30 por canal, porte e estado nos
    últimos 120 dias": é só um novo `AnalysisSpec`.
-8. **Catálogo** — aba _Bases de dados_: os 9 produtos do mesh lidos do Glue, com status de Atlan,
+8. **Catálogo** — aba _Bases de dados_: os 10 produtos do mesh lidos do Glue, com status de Atlan,
    DataZone e FullStory. Em seguida, _Conversão de abertura_: definição, fórmula, confiança, dimensões compatíveis e
    linhagem _CRM + Mídia + Abertura de contas → Acquisition Gold → métrica → uso_. _Usar na análise_.
-9. **Cliente PJ 360** — busque _Atlas Tecnologia_: resumo, jornada cronológica (marcos digitais do
-   FullStory e painel de sessões quando a integração estiver configurada) e _Explorar
-   empresas semelhantes_ (abre o playground pré-filtrado).
+9. **Cliente PJ 360** — busque _Atlas Tecnologia_: DNA do cliente (clique em _Intenção comercial_
+   para ver os drivers), próxima melhor ação _Oferecer Capital de Giro_ com _Por que agora?_,
+   _Entender recomendação_ (score, evidências, elegibilidade, alternativas), _Iniciar ação_
+   (simulado), _O que mudou neste cliente?_, abas _Sinais_ e _Próximas ações → Comparar
+   recomendações_, _Explorar empresas semelhantes_ (playground com o produto Customer DNA) e
+   _Perguntar à Inteligência PJ_ ("Por que Capital de Giro é a ação #1?"). No Audience Builder,
+   _Analisar DNA do público_ mostra o DNA agregado e a ação #1 mais frequente do grupo.
 10. **Audiência** — modelo _Oportunidade Capital de Giro — SP_: regras E/OU, prévia agregada,
     _Salvar_ e _Enviar para CRM_ (Na fila → Processando → Concluído, simulado).
 11. **Governança** — produtos de dados com owner, freshness × SLO e qualidade medida.

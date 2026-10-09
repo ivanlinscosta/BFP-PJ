@@ -304,6 +304,7 @@ export const DATASET_ENTITY_TYPES = [
   'appNavigation',
   'transaction',
   'npsResponse',
+  'customerIntelligence',
   'qualityStatus',
   'auditLog',
 ] as const;
@@ -753,6 +754,31 @@ export interface NpsResponse {
   respondedAt: string;
 }
 
+/**
+ * Materialized Customer Intelligence of a company (Customer DNA + next best action #1).
+ * Scores are computed by the deterministic pipeline (packages/customer-intelligence).
+ */
+export interface CustomerIntelligenceSnapshot {
+  id: string;
+  companyId: string;
+  calculatedAt: string;
+  nbaActionId: string;
+  nbaScore: number;
+  nbaConfidence: number;
+  primarySignal: string | null;
+  signalCount: number;
+  dnaDigitalEngagement: number;
+  dnaProductDepth: number;
+  dnaRelationshipStrength: number;
+  dnaCommercialIntent: number;
+  dnaBusinessMomentum: number;
+  dnaTransactionActivity: number;
+  commercialIntentLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+  digitalEngagementLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+  dnaVersion: string;
+  modelVersion: string;
+}
+
 /** Single quality incident attached to a monitored scope. */
 export interface Incident {
   id: string;
@@ -808,6 +834,7 @@ export type DatasetEntity =
   | AppNavigationEvent
   | Transaction
   | NpsResponse
+  | CustomerIntelligenceSnapshot
   | QualityStatus
   | AuditLogEntry;
 
@@ -1164,6 +1191,8 @@ export interface DatasetBundle {
   appNavigationEvents: AppNavigationEvent[];
   transactions: Transaction[];
   npsResponses: NpsResponse[];
+  /** Materialized by `npm run intelligence:rebuild` (empty until then). */
+  customerIntelligence: CustomerIntelligenceSnapshot[];
   qualityStatuses: QualityStatus[];
   auditLogs: AuditLogEntry[];
 }

@@ -23,6 +23,7 @@ import {
 import { createRule, newId, OperatorToggle, RuleBuilder } from '@/features/audiences/rule-builder';
 import { TEMPLATES } from '@/features/audiences/templates';
 import { useFeatureFlags } from '@/features/admin/hooks';
+import { AudienceDnaButton } from '@/features/customer-intelligence/audience-dna';
 import { describeError } from '@/lib/errors';
 import { formatCount, formatRelative, formatShare } from '@/lib/format';
 import { useDebounced } from '@/lib/use-debounced';
@@ -331,6 +332,9 @@ function AudienceEditor({
                 Fontes: {preview.data.sources.join(', ').replace(/, ([^,]*)$/, ' e $1')}. Prévia
                 agregada, sem dados pessoais expostos.
               </p>
+              <div className="mt-6">
+                <AudienceDnaButton group={debouncedGroup} />
+              </div>
             </div>
           ) : null}
         </Card>

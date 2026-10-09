@@ -67,3 +67,21 @@ Lambda se auto-invoca (`InvocationType=Event`, timeout 120 s); localmente roda n
   executada são descartados e frases com números ausentes dos resultados são removidas.
 - **Sem Claude:** estudo determinístico guiado pelos temas da pergunta (aquisição, ativação, app,
   transações, NPS, atendimento, CRM, jornada digital), com o motivo exibido ao usuário.
+
+## Perguntas sobre um cliente (Cliente PJ)
+
+Os atalhos "Perguntar à Inteligência PJ" da página do cliente abrem o chat com
+`?cliente=<id>&pergunta=<texto>`; a conversa mantém o cliente em contexto (barra "Cliente em
+contexto") e envia `customerId` para `POST /api/ai/chat`. Perguntas suportadas: "Me explique este
+cliente", "Qual é a principal oportunidade?", "Por que essa ação está em primeiro?", "O que mudou?",
+"Tem algum motivo para não abordar agora?", "Quais outras ações foram consideradas?" e "Encontre
+clientes semelhantes".
+
+- **Bedrock**: o Claude usa as ferramentas `getCustomerDNA`, `getCustomerSignals`,
+  `getCustomerChanges`, `getNextBestActions`, `explainRecommendation` e `findSimilarCustomers`
+  (somente leitura do perfil materializado). Frases com números ausentes dos resultados das
+  ferramentas são descartadas.
+- **Local / fallback**: respostas estruturadas a partir do mesmo perfil, com a origem informada.
+
+A IA nunca altera ação, score, ranking ou elegibilidade (ver
+[customer-intelligence-architecture.md](customer-intelligence-architecture.md)).

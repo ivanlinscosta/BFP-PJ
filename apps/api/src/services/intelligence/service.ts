@@ -1,3 +1,4 @@
+import { runCustomerAssistant } from '@api/services/customerIntelligence/assistant';
 import { isStudyRequest } from '@api/services/intelligence/study';
 import { startStudyJob } from '@api/services/intelligence/studyJobs';
 import { randomUUID } from 'node:crypto';
@@ -26,6 +27,8 @@ export interface IntelligenceRequest {
   prompt: string;
   analysisSpec?: AnalysisSpec;
   conversationId?: string;
+  /** Cliente PJ in context: questions are answered from its DNA, signals and NBA. */
+  customerId?: string;
 }
 
 export interface IntelligenceDependencies {
@@ -62,6 +65,7 @@ export async function runIntelligence(
   let provider: 'bedrock' | 'local' = context.config.aiProvider === 'bedrock' ? 'bedrock' : 'local';
   let model = provider === 'bedrock' ? context.config.bedrockModelId : 'deterministic-insights';
   const refusal = detectGuardrailRefusal(request.prompt);
+  let customerTools: string[] = [];
 
   let result: ProviderResult;
   if (refusal) {
@@ -86,6 +90,16 @@ export async function runIntelligence(
         },
       ),
     };
+  } else if (request.customerId) {
+    const customer = await runCustomerAssistant(
+      context,
+      { prompt: request.prompt, customerId: request.customerId },
+      dependencies.bedrockClient,
+    );
+    result = customer.result;
+    provider = customer.provider;
+    model = customer.model;
+    customerTools = customer.tools;
   } else if (isStudyRequest(request.prompt)) {
     // A study is agentic and slow (planning + queries + analysis): it runs as a background job
     // and the client follows its progress.
@@ -214,11 +228,18 @@ export async function runIntelligence(
     provider,
     model,
     explainability: {
-      tools: toolContext.queries.length > 0 ? ['runAnalyticsQuery'] : [],
+      tools:
+        customerTools.length > 0
+          ? customerTools
+          : toolContext.queries.length > 0
+            ? ['runAnalyticsQuery']
+            : [],
       note:
-        toolContext.queries.length > 0
-          ? 'Números obtidos exclusivamente por runAnalyticsQuery sobre métricas certificadas, respeitando filtros e permissões.'
-          : 'Nenhum número foi gerado nesta resposta.',
+        customerTools.length > 0
+          ? 'Fatos obtidos do perfil materializado do cliente (DNA, sinais e NBA determinísticos).'
+          : toolContext.queries.length > 0
+            ? 'Números obtidos exclusivamente por runAnalyticsQuery sobre métricas certificadas, respeitando filtros e permissões.'
+            : 'Nenhum número foi gerado nesta resposta.',
       refusal: refusal?.code,
     },
   };

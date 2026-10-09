@@ -1,0 +1,237 @@
+{
+  "asOf": "2026-10-09T12:00:00.000Z",
+  "customers": 5004,
+  "volumes": {
+    "transactionWeeks": 258622,
+    "sessions": 304869,
+    "digitalEvents": 849947,
+    "interactions": 59351,
+    "serviceCases": 609,
+    "products": 21380,
+    "signals": 16083,
+    "recommendations": 24888
+  },
+  "dnaDistribution": {
+    "relationshipStrength": {
+      "mean": 69,
+      "levels": {
+        "LOW": 16,
+        "MEDIUM": 2406,
+        "HIGH": 2303,
+        "VERY_HIGH": 279
+      }
+    },
+    "digitalEngagement": {
+      "mean": 67,
+      "levels": {
+        "LOW": 1095,
+        "MEDIUM": 814,
+        "HIGH": 1397,
+        "VERY_HIGH": 1698
+      }
+    },
+    "productDepth": {
+      "mean": 57,
+      "levels": {
+        "LOW": 0,
+        "MEDIUM": 4171,
+        "HIGH": 489,
+        "VERY_HIGH": 344
+      }
+    },
+    "transactionActivity": {
+      "mean": 54,
+      "levels": {
+        "LOW": 1018,
+        "MEDIUM": 2908,
+        "HIGH": 1014,
+        "VERY_HIGH": 64
+      }
+    },
+    "businessMomentum": {
+      "mean": 45,
+      "levels": {
+        "LOW": 1690,
+        "MEDIUM": 2954,
+        "HIGH": 337,
+        "VERY_HIGH": 23
+      }
+    },
+    "commercialIntent": {
+      "mean": 15,
+      "levels": {
+        "LOW": 4084,
+        "MEDIUM": 749,
+        "HIGH": 171,
+        "VERY_HIGH": 0
+      }
+    }
+  },
+  "nbaDistribution": [
+    {
+      "actionId": "NO_ACTION",
+      "actionName": "Não abordar agora",
+      "customers": 942,
+      "share": 0.188
+    },
+    {
+      "actionId": "REENGAGE_DIGITAL",
+      "actionName": "Reengajar nos canais digitais",
+      "customers": 737,
+      "share": 0.147
+    },
+    {
+      "actionId": "OFFER_WORKING_CAPITAL",
+      "actionName": "Oferecer Capital de Giro",
+      "customers": 656,
+      "share": 0.131
+    },
+    {
+      "actionId": "PROMOTE_PIX_COLLECTION",
+      "actionName": "Apresentar Pix Cobrança",
+      "customers": 591,
+      "share": 0.118
+    },
+    {
+      "actionId": "PROMOTE_POS_MACHINE",
+      "actionName": "Oferecer Maquininha",
+      "customers": 488,
+      "share": 0.098
+    },
+    {
+      "actionId": "RESOLVE_SERVICE_ISSUE",
+      "actionName": "Resolver atendimento pendente",
+      "customers": 427,
+      "share": 0.085
+    },
+    {
+      "actionId": "COMPLETE_ONBOARDING",
+      "actionName": "Concluir onboarding",
+      "customers": 371,
+      "share": 0.074
+    },
+    {
+      "actionId": "CONTACT_RELATIONSHIP_MANAGER",
+      "actionName": "Contato consultivo do gerente",
+      "customers": 358,
+      "share": 0.072
+    },
+    {
+      "actionId": "PROMOTE_INVESTMENTS",
+      "actionName": "Apresentar investimentos PJ",
+      "customers": 259,
+      "share": 0.052
+    },
+    {
+      "actionId": "PROMOTE_INSURANCE",
+      "actionName": "Oferecer seguro empresarial",
+      "customers": 160,
+      "share": 0.032
+    },
+    {
+      "actionId": "PROMOTE_BUSINESS_CARD",
+      "actionName": "Oferecer Cartão PJ",
+      "customers": 14,
+      "share": 0.003
+    },
+    {
+      "actionId": "PROMOTE_BOLETO",
+      "actionName": "Apresentar cobrança por boletos",
+      "customers": 1,
+      "share": 0
+    }
+  ],
+  "signalDistribution": [
+    {
+      "type": "HIGH_DIGITAL_ENGAGEMENT",
+      "customers": 2615,
+      "share": 0.523
+    },
+    {
+      "type": "RECENT_PRODUCT_INTEREST",
+      "customers": 1650,
+      "share": 0.33
+    },
+    {
+      "type": "PRODUCT_GAP_PIX_COLLECTION",
+      "customers": 1491,
+      "share": 0.298
+    },
+    {
+      "type": "RELATIONSHIP_COOLDOWN",
+      "customers": 1359,
+      "share": 0.272
+    },
+    {
+      "type": "PRODUCT_GAP_WORKING_CAPITAL",
+      "customers": 1339,
+      "share": 0.268
+    },
+    {
+      "type": "TRANSACTION_GROWTH",
+      "customers": 1090,
+      "share": 0.218
+    },
+    {
+      "type": "LOW_DIGITAL_ENGAGEMENT",
+      "customers": 983,
+      "share": 0.196
+    },
+    {
+      "type": "HIGH_PIX_USAGE",
+      "customers": 969,
+      "share": 0.194
+    },
+    {
+      "type": "HIGH_CREDIT_INTENT",
+      "customers": 921,
+      "share": 0.184
+    },
+    {
+      "type": "INCREASED_PAYMENT_VOLUME",
+      "customers": 803,
+      "share": 0.16
+    },
+    {
+      "type": "PRODUCT_GAP_CARD",
+      "customers": 731,
+      "share": 0.146
+    },
+    {
+      "type": "TRANSACTION_DECLINE",
+      "customers": 523,
+      "share": 0.105
+    },
+    {
+      "type": "RECENT_COMPLAINT",
+      "customers": 432,
+      "share": 0.086
+    },
+    {
+      "type": "ABANDONED_CREDIT_SIMULATION",
+      "customers": 373,
+      "share": 0.075
+    },
+    {
+      "type": "UNRESOLVED_SERVICE",
+      "customers": 360,
+      "share": 0.072
+    },
+    {
+      "type": "ONBOARDING_INCOMPLETE",
+      "customers": 264,
+      "share": 0.053
+    },
+    {
+      "type": "HIGH_VALUE_RELATIONSHIP",
+      "customers": 180,
+      "share": 0.036
+    }
+  ],
+  "noActionRate": 0.188,
+  "maxActionShare": 0.188,
+  "concentrationOk": true,
+  "durationsMs": {
+    "features_dna_signals_nba": 3966
+  }
+}

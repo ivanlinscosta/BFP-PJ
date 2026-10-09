@@ -15,11 +15,12 @@ Empresas, 45.000 transações e 5.000 respostas NPS.
 Tipos adicionados para análises de uso e relacionamento (todos ligados por `company_id` e só para
 empresas com conta aberta):
 
-| Entidade        | Campos                                                                                 | Produto de dados (mesh) |
-| --------------- | -------------------------------------------------------------------------------------- | ----------------------- |
-| `appNavigation` | sessão, tela (Início, Extrato, Pix, Boletos…), ação, plataforma, versão, tempo em tela | `app_navigation`        |
-| `transaction`   | tipo (Pix recebido/enviado, boleto emitido/pago, TED, cartão), canal, valor            | `transactions`          |
-| `npsResponse`   | momento (onboarding, app, atendimento, gerente) e nota 0–10, sem texto livre           | `nps_responses`         |
+| Entidade               | Campos                                                                                              | Produto de dados (mesh) |
+| ---------------------- | --------------------------------------------------------------------------------------------------- | ----------------------- |
+| `appNavigation`        | sessão, tela (Início, Extrato, Pix, Boletos…), ação, plataforma, versão, tempo em tela              | `app_navigation`        |
+| `transaction`          | tipo (Pix recebido/enviado, boleto emitido/pago, TED, cartão), canal, valor                         | `transactions`          |
+| `npsResponse`          | momento (onboarding, app, atendimento, gerente) e nota 0–10, sem texto livre                        | `nps_responses`         |
+| `customerIntelligence` | snapshot por empresa: ação #1, score, confiança, sinal principal, 6 scores do DNA e níveis, versões | `customer_intelligence` |
 
 Padrões: empresas maiores e ativadas usam mais o app e transacionam mais; o ticket segue o porte;
 o NPS sobe com onboarding rápido e cai com conversas não resolvidas.

@@ -75,17 +75,18 @@ s3://bfp-data-<env>-<account>/
 
 Produtos de dados (tabelas gold), todos com chave `company_id`:
 
-| Banco Glue                  | Tabela              | Domínio                        |
-| --------------------------- | ------------------- | ------------------------------ |
-| `bfp_pj_<env>_customer360`  | `customer_360`      | Clientes PJ                    |
-| `bfp_pj_<env>_media`        | `media_touchpoints` | Mídia PJ                       |
-| `bfp_pj_<env>_products`     | `company_products`  | Produtos PJ                    |
-| `bfp_pj_<env>_service`      | `conversations`     | Atendimento PJ                 |
-| `bfp_pj_<env>_relationship` | `crm_interactions`  | Relacionamento PJ              |
-| `bfp_pj_<env>_digital`      | `digital_journey`   | Canais Digitais PJ (FullStory) |
-| `bfp_pj_<env>_app`          | `app_navigation`    | Canais Digitais PJ (app)       |
-| `bfp_pj_<env>_payments`     | `transactions`      | Pagamentos PJ                  |
-| `bfp_pj_<env>_experience`   | `nps_responses`     | Experiência do Cliente PJ      |
+| Banco Glue                  | Tabela                                                                                                                     | Domínio                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `bfp_pj_<env>_customer360`  | `customer_360`                                                                                                             | Clientes PJ                    |
+| `bfp_pj_<env>_media`        | `media_touchpoints`                                                                                                        | Mídia PJ                       |
+| `bfp_pj_<env>_products`     | `company_products`                                                                                                         | Produtos PJ                    |
+| `bfp_pj_<env>_service`      | `conversations`                                                                                                            | Atendimento PJ                 |
+| `bfp_pj_<env>_relationship` | `crm_interactions`                                                                                                         | Relacionamento PJ              |
+| `bfp_pj_<env>_digital`      | `digital_journey`                                                                                                          | Canais Digitais PJ (FullStory) |
+| `bfp_pj_<env>_app`          | `app_navigation`                                                                                                           | Canais Digitais PJ (app)       |
+| `bfp_pj_<env>_payments`     | `transactions`                                                                                                             | Pagamentos PJ                  |
+| `bfp_pj_<env>_experience`   | `nps_responses`                                                                                                            | Experiência do Cliente PJ      |
+| `bfp_pj_<env>_intelligence` | `customer_intelligence` (+ `customer_features`, `customer_dna`, `customer_signals`, `nba_recommendations`, `nba_outcomes`) | Inteligência de Clientes PJ    |
 
 Detalhes de governança, seleção de bases e integrações em
 [data-mesh-and-integrations.md](data-mesh-and-integrations.md).

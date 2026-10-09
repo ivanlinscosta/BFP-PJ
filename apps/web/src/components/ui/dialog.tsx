@@ -12,6 +12,7 @@ export function Dialog({
   children,
   footer,
   className,
+  placement = 'center',
 }: {
   open: boolean;
   onClose: () => void;
@@ -20,6 +21,8 @@ export function Dialog({
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** 'right' renders a full-height side drawer (explanations, evidence, details). */
+  placement?: 'center' | 'right';
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -72,13 +75,20 @@ export function Dialog({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-navy-strong/30 p-4">
+    <div
+      className={cn(
+        'fixed inset-0 z-50 flex bg-brand-navy-strong/30',
+        placement === 'right' ? 'justify-end' : 'items-center justify-center p-4',
+      )}
+    >
       <div aria-hidden className="absolute inset-0" onClick={onClose} />
       <div
         aria-labelledby={titleId}
         aria-modal="true"
         className={cn(
-          'relative w-full max-w-lg rounded-[var(--radius-card)] border border-line bg-card p-6 shadow-[0_12px_40px_rgba(0,26,71,0.18)]',
+          placement === 'right'
+            ? 'relative flex h-full w-full max-w-[560px] flex-col overflow-y-auto border-l border-line bg-card p-6 shadow-[-12px_0_40px_rgba(0,26,71,0.18)]'
+            : 'relative w-full max-w-lg rounded-[var(--radius-card)] border border-line bg-card p-6 shadow-[0_12px_40px_rgba(0,26,71,0.18)]',
           className,
         )}
         ref={panelRef}

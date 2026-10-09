@@ -1,3 +1,4 @@
+import { clusterIntelligence } from '@api/services/customerIntelligence/service';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Router } from 'express';
@@ -220,6 +221,22 @@ export function createAudiencesRouter(context: ApiContext) {
         previewAudience(profiles, group, { freshness, sources: AUDIENCE_SOURCES }),
       );
       res.json({ preview });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Cluster intelligence of the audience: individual NBAs first, then aggregated (never one
+  // action decreed for the whole group).
+  router.post('/intelligence', async (req, res, next) => {
+    try {
+      const payload = parseWithZod(previewPayloadSchema, req.body, {
+        message: 'Regras de audiência inválidas.',
+      });
+      const group = resolveRuleGroup({ filterGroups: payload.filterGroups, filters: [] });
+      const { profiles } = await loadProfiles(context);
+      const customerIds = runRules(() => evaluateAudience(profiles, group));
+      res.json({ cluster: await clusterIntelligence(context, { customerIds }) });
     } catch (error) {
       next(error);
     }

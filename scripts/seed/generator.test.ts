@@ -1,5 +1,6 @@
 import { evaluateCoherence } from './coherence';
-import { generateDatasetBundle, resolveGenerationCounts } from './generator';
+import { HISTORY_START_DATE } from './constants';
+import { ESTABLISHED_CUSTOMERS, generateDatasetBundle, resolveGenerationCounts } from './generator';
 
 describe('seed generator', () => {
   it('is deterministic for the same small-scale input', () => {
@@ -16,7 +17,12 @@ describe('seed generator', () => {
     const assertions = evaluateCoherence(bundle);
 
     const prospects = bundle.companies.filter((company) => company.status === 'LEAD');
-    const coreCompanies = bundle.companies.length - prospects.length;
+    const established = bundle.companies.filter(
+      (company) => company.leadCreatedAt < HISTORY_START_DATE,
+    );
+    const coreCompanies = bundle.companies.length - prospects.length - established.length;
+    expect(established.length).toBe(Math.round(ESTABLISHED_CUSTOMERS * scale));
+    expect(established.every((company) => company.accountOpenedAt !== null)).toBe(true);
     expect(coreCompanies).toBeGreaterThan(0);
     expect(coreCompanies).toBeLessThanOrEqual(counts.companies);
     expect(prospects.length).toBeGreaterThan(counts.companies);
@@ -26,7 +32,8 @@ describe('seed generator', () => {
     expect(bundle.partners).toHaveLength(counts.partners);
     expect(bundle.accounts).toHaveLength(counts.accounts);
     expect(bundle.products).toHaveLength(counts.products);
-    expect(bundle.companyProducts).toHaveLength(counts.companyProducts);
+    // The showcase (Atlas) keeps only Conta PJ and Cartão PJ.
+    expect(bundle.companyProducts.length).toBeLessThanOrEqual(counts.companyProducts);
     expect(bundle.mediaCampaigns).toHaveLength(counts.mediaCampaigns);
     expect(bundle.mediaTouchpoints).toHaveLength(counts.mediaTouchpoints);
     expect(bundle.funnelEvents).toHaveLength(counts.funnelEvents);
