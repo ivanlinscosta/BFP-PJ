@@ -126,6 +126,12 @@ export async function publishLakeTable(
       Body: ndjson(table.rows),
     }),
   );
+  // The silver table is a staging table: recreate it so new columns of the contract appear.
+  await runAthena(
+    athena,
+    `DROP TABLE IF EXISTS ${database}.silver_${table.dataset.table}`,
+    workgroup,
+  );
   await runAthena(athena, silverDdl(prefix, bucket, table), workgroup);
   await runAthena(athena, `DROP TABLE IF EXISTS ${database}.${table.dataset.table}`, workgroup);
   await emptyPrefix(s3, bucket, `gold/${table.dataset.glueDatabase}/${table.dataset.table}/`);
