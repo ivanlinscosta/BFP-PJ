@@ -264,7 +264,7 @@ export function IntelligencePage() {
     .find((entry) => entry.role === 'assistant')?.id;
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-170px)] w-full max-w-[960px] flex-col lg:h-[calc(100dvh-124px)]">
+    <div className="flex h-[calc(100dvh-170px)] w-full flex-col lg:h-[calc(100dvh-124px)]">
       <header className="flex items-center justify-between gap-3 pb-3">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-orange text-white">
