@@ -1,12 +1,4 @@
-import {
-  ArrowRight,
-  Download,
-  LayoutGrid,
-  LoaderCircle,
-  Save,
-  Share2,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Download, LayoutGrid, LoaderCircle, Save, Sparkles } from 'lucide-react';
 import { Link } from 'react-router';
 import type { AnalysisSpec } from '@bfp/domain';
 import type { ChartType } from '@bfp/shared';
@@ -47,10 +39,8 @@ interface ResultCanvasProps {
   metricDetail: MetricDetail | undefined;
   explorations: NextExploration[];
   onExplore(exploration: NextExploration): void;
-  showInlineExplorations: boolean;
   saveStatus: string;
   onSave(): void;
-  onShare(): void;
   onAddToDashboard(): void;
   onExport(): void;
   canExport: boolean;
@@ -187,39 +177,48 @@ export function ResultCanvas(props: ResultCanvasProps) {
         ) : null}
       </Card>
 
-      {result && insights.length > 0 ? (
+      {result && (insights.length > 0 || props.explorations.length > 0) ? (
         <Card className="px-3 pt-3.5 pb-3">
-          <div className="flex items-center justify-between">
-            <Eyebrow>Insights da análise</Eyebrow>
-            <Badge className="h-5 text-[11px]" tone="cream">
-              {insights.length} {insights.length === 1 ? 'insight' : 'insights'}
-            </Badge>
-          </div>
-          <ul
-            className={cn(
-              'm-0 mt-3 grid list-none gap-2 p-0',
-              insights.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2',
-            )}
-          >
-            {insights.map((insight, index) => (
-              <li
+          {insights.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between">
+                <Eyebrow>Insights da análise</Eyebrow>
+                <Badge className="h-5 text-[11px]" tone="cream">
+                  {insights.length} {insights.length === 1 ? 'insight' : 'insights'}
+                </Badge>
+              </div>
+              <ul
                 className={cn(
-                  'rounded-[var(--radius-control)] px-2.5 py-2.5',
-                  index === 0 ? 'bg-cream' : 'bg-muted',
+                  'm-0 mt-3 grid list-none gap-2 p-0',
+                  insights.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2',
                 )}
-                key={insight.id}
               >
-                <p className="text-[13px] leading-snug font-semibold text-brand-navy">
-                  {insight.title}
-                </p>
-                <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
-                  {insight.description}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {props.showInlineExplorations && props.explorations.length > 0 ? (
-            <div className="mt-3 flex flex-wrap items-start gap-3 border-t border-line pt-3">
+                {insights.map((insight, index) => (
+                  <li
+                    className={cn(
+                      'rounded-[var(--radius-control)] px-2.5 py-2.5',
+                      index === 0 ? 'bg-cream' : 'bg-muted',
+                    )}
+                    key={insight.id}
+                  >
+                    <p className="text-[13px] leading-snug font-semibold text-brand-navy">
+                      {insight.title}
+                    </p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
+                      {insight.description}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {props.explorations.length > 0 ? (
+            <div
+              className={cn(
+                'flex flex-wrap items-start gap-3',
+                insights.length > 0 && 'mt-3 border-t border-line pt-3',
+              )}
+            >
               <Eyebrow className="mt-2">Próximas explorações</Eyebrow>
               <div className="flex flex-1 flex-wrap gap-2">
                 {props.explorations.map((exploration) => (
@@ -247,10 +246,6 @@ export function ResultCanvas(props: ResultCanvasProps) {
         <Button onClick={props.onSave} variant="primary">
           <Save aria-hidden className="h-4 w-4" />
           Salvar análise
-        </Button>
-        <Button onClick={props.onShare}>
-          <Share2 aria-hidden className="h-4 w-4" />
-          Compartilhar
         </Button>
         <Button onClick={props.onAddToDashboard}>
           <LayoutGrid aria-hidden className="h-4 w-4" />

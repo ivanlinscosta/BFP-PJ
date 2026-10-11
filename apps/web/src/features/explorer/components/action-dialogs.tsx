@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import type { AnalysisSpec, SharingLevel } from '@bfp/domain';
@@ -18,7 +17,6 @@ import {
 } from '@/features/dashboards/api';
 import { describeError } from '@/lib/errors';
 import { saveAnalysis, type SavedAnalysis } from '../api';
-import { buildExplorerHref } from '../spec';
 
 export function SaveAnalysisDialog({
   open,
@@ -112,87 +110,6 @@ export function SaveAnalysisDialog({
   );
 }
 
-export function ShareDialog({
-  open,
-  onClose,
-  spec,
-  saved,
-}: {
-  open: boolean;
-  onClose(): void;
-  spec: AnalysisSpec;
-  saved: { id: string; name: string } | null;
-}) {
-  const queryClient = useQueryClient();
-  const [visibility, setVisibility] = useState<SharingLevel>('TEAM');
-  const [copied, setCopied] = useState(false);
-  const link = `${window.location.origin}${buildExplorerHref(spec)}`;
-  const mutation = useMutation({
-    mutationFn: () => saveAnalysis({ id: saved!.id, name: saved!.name, visibility, spec }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['analyses'] }),
-  });
-
-  async function copy() {
-    await navigator.clipboard?.writeText(link);
-    setCopied(true);
-  }
-
-  return (
-    <Dialog
-      description="Compartilhe o link da análise ou defina quem pode acessá-la."
-      onClose={onClose}
-      open={open}
-      title="Compartilhar análise"
-    >
-      <div className="flex flex-col gap-5">
-        <Field htmlFor="share-link" label="Link da análise">
-          <div className="flex gap-2">
-            <Input id="share-link" readOnly value={link} />
-            <Button aria-label="Copiar link" onClick={copy}>
-              {copied ? (
-                <Check aria-hidden className="h-4 w-4" />
-              ) : (
-                <Copy aria-hidden className="h-4 w-4" />
-              )}
-              {copied ? 'Copiado' : 'Copiar'}
-            </Button>
-          </div>
-        </Field>
-        {saved ? (
-          <>
-            <VisibilityPicker onChange={setVisibility} value={visibility} />
-            {mutation.isSuccess ? (
-              <Notice tone="success">Compartilhamento atualizado.</Notice>
-            ) : null}
-            {mutation.isError ? (
-              <Notice tone="error">{describeError(mutation.error).description}</Notice>
-            ) : null}
-            <div className="flex justify-end">
-              <Button
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate()}
-                variant="primary"
-              >
-                Salvar compartilhamento
-              </Button>
-            </div>
-          </>
-        ) : (
-          <Notice tone="info">
-            Salve a análise para definir permissões de time ou somente leitura. O link acima abre o
-            mesmo recorte.
-          </Notice>
-        )}
-      </div>
-    </Dialog>
-  );
-}
-
-/**
- * Lists the dashboards the user can edit (or creates a new one) and adds the analysis as a card.
- * An analysis that was never saved is saved first (private), so the user goes straight to the
- * dashboard choice instead of a separate "save" step.
- */
 export function AddToDashboardDialog({
   open,
   onClose,

@@ -53,6 +53,7 @@
 
   /* Layout */
   --spacing-sidebar: 224px;
+  --spacing-sidebar-collapsed: 72px;
   --spacing-topbar: 72px;
 }
 

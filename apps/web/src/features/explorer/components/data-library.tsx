@@ -162,7 +162,8 @@ export function DataLibrary(props: LibraryProps) {
   return (
     <aside
       aria-label="Biblioteca de dados"
-      className="flex flex-col rounded-[var(--radius-card)] border border-line bg-card px-4 pt-4 pb-5"
+      // Never taller than the screen: the list scrolls inside (sticky under the topbar).
+      className="flex flex-col rounded-[var(--radius-card)] border border-line bg-card px-4 pt-4 pb-5 lg:max-h-[calc(100vh-var(--spacing-topbar)-32px)]"
     >
       <div className="flex items-center justify-between">
         <h2 className="m-0 text-[15px] font-semibold text-brand-navy">Biblioteca de dados</h2>
@@ -202,7 +203,12 @@ export function DataLibrary(props: LibraryProps) {
           ))}
         </div>
       ) : (
-        <div className="mt-3 flex flex-col">
+        <div
+          aria-label="Itens da biblioteca"
+          className="-mr-2 mt-3 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pr-2"
+          role="region"
+          tabIndex={0}
+        >
           {tab !== 'dimensions' ? (
             <section aria-label="Métricas">
               <Eyebrow className="mb-1 px-0 pt-1">Métricas</Eyebrow>

@@ -15,17 +15,11 @@ import { getAnalysis } from '@/features/explorer/api';
 import {
   AddToDashboardDialog,
   SaveAnalysisDialog,
-  ShareDialog,
 } from '@/features/explorer/components/action-dialogs';
 import { DataLibrary } from '@/features/explorer/components/data-library';
 import { EmptyCanvas } from '@/features/explorer/components/empty-canvas';
 import { QueryBuilder } from '@/features/explorer/components/query-builder';
 import { ResultCanvas } from '@/features/explorer/components/result-canvas';
-import {
-  EmptySidePanel,
-  MetricTrustCard,
-  ResultSidePanel,
-} from '@/features/explorer/components/side-panel';
 import type { DraggedItem } from '@/features/explorer/dnd';
 import { buildNextExplorations } from '@/features/explorer/explorations';
 import { useAnalysisResult } from '@/features/explorer/hooks';
@@ -46,7 +40,7 @@ import { useMeshDatasets } from '@/features/mesh/api';
 import { DatasetPicker } from '@/features/mesh/dataset-picker';
 import { capitalize } from '@/lib/format';
 
-type DialogName = 'save' | 'share' | 'dashboard' | null;
+type DialogName = 'save' | 'dashboard' | null;
 
 export function ExplorerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -262,72 +256,44 @@ export function ExplorerPage() {
           ) : null}
 
           {!hasAnalysis ? (
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_248px]">
-              <EmptyCanvas
-                onPickDatasets={() => setPickerOpen(true)}
-                hasDatasets={selectedDatasets.length > 0}
-              />
-              <EmptySidePanel />
-            </div>
+            <EmptyCanvas
+              onPickDatasets={() => setPickerOpen(true)}
+              hasDatasets={selectedDatasets.length > 0}
+            />
           ) : (
             <>
               <p className="-mt-1 text-sm text-ink-soft">{capitalize(description.sentence)}</p>
-              <div
-                className={
-                  type === 'HEATMAP'
-                    ? 'flex flex-col gap-4'
-                    : 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_256px]'
+              <ResultCanvas
+                canExport={flags.csvExport && Boolean(result.data && result.data.rows.length > 0)}
+                error={result.error}
+                explorations={explorations}
+                fetching={result.isFetching}
+                labels={labels}
+                loading={result.isLoading || !engineReady}
+                metricDetail={metricDetail.data}
+                onAddToDashboard={() => setDialog('dashboard')}
+                onExplore={(exploration) =>
+                  store.applyOperations(exploration.operations, exploration.message)
                 }
-              >
-                <ResultCanvas
-                  canExport={flags.csvExport && Boolean(result.data && result.data.rows.length > 0)}
-                  error={result.error}
-                  explorations={explorations}
-                  fetching={result.isFetching}
-                  labels={labels}
-                  loading={result.isLoading || !engineReady}
-                  metricDetail={metricDetail.data}
-                  onAddToDashboard={() => setDialog('dashboard')}
-                  onExplore={(exploration) =>
-                    store.applyOperations(exploration.operations, exploration.message)
-                  }
-                  onExport={() =>
-                    result.data && downloadCsv(result.data, store.saved?.name ?? description.title)
-                  }
-                  onRetry={() => void result.refetch()}
-                  onSave={() => setDialog('save')}
-                  onShare={() => setDialog('share')}
-                  model={visualizationModel}
-                  fixFor={fixFor}
-                  onApplyFix={(chart, fix) =>
-                    store.adjustSpec(
-                      fix.spec,
-                      `Análise ajustada para ${chartName(chart).toLowerCase()}: ${fix.label}`,
-                    )
-                  }
-                  onSelectVisualization={(value) => store.setVisualization(value)}
-                  result={result.data}
-                  saveStatus={saveStatus}
-                  showInlineExplorations={type === 'HEATMAP'}
-                  spec={spec}
-                  totalsResult={totals.data}
-                />
-                {type !== 'HEATMAP' ? (
-                  <div className="flex flex-col gap-3">
-                    <ResultSidePanel
-                      chartType={type}
-                      explorations={explorations}
-                      onExplore={(exploration) =>
-                        store.applyOperations(exploration.operations, exploration.message)
-                      }
-                      onSettingsChange={store.setVisualizationSettings}
-                      result={result.data}
-                      settings={spec.visualization.settings ?? {}}
-                    />
-                    <MetricTrustCard detail={metricDetail.data} />
-                  </div>
-                ) : null}
-              </div>
+                onExport={() =>
+                  result.data && downloadCsv(result.data, store.saved?.name ?? description.title)
+                }
+                onRetry={() => void result.refetch()}
+                onSave={() => setDialog('save')}
+                model={visualizationModel}
+                fixFor={fixFor}
+                onApplyFix={(chart, fix) =>
+                  store.adjustSpec(
+                    fix.spec,
+                    `Análise ajustada para ${chartName(chart).toLowerCase()}: ${fix.label}`,
+                  )
+                }
+                onSelectVisualization={(value) => store.setVisualization(value)}
+                result={result.data}
+                saveStatus={saveStatus}
+                spec={spec}
+                totalsResult={totals.data}
+              />
             </>
           )}
         </div>
@@ -350,9 +316,6 @@ export function ExplorerPage() {
           open
           selected={selectedDatasets}
         />
-      ) : null}
-      {dialog === 'share' ? (
-        <ShareDialog onClose={() => setDialog(null)} open saved={store.saved} spec={spec} />
       ) : null}
       {dialog === 'dashboard' ? (
         <AddToDashboardDialog
