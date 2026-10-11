@@ -52,14 +52,16 @@ export function LoginPage() {
     }
   }
 
+  // Everything fits in one viewport (no page scroll): a compact header and footer and a
+  // content area that takes the remaining height; spacing tightens on short screens.
   return (
-    <div className="flex min-h-screen flex-col bg-card">
-      <header className="flex items-center justify-between gap-4 border-b border-line px-4 py-5 sm:px-12">
-        <div className="flex items-center gap-4 sm:gap-12">
-          <img alt="Itaú" className="h-12 w-12" height={48} src="/itau-logo.png" width={48} />
+    <div className="flex h-dvh flex-col overflow-hidden bg-card">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-4 py-3 sm:px-12">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <img alt="Itaú" className="h-10 w-10" height={40} src="/itau-logo.png" width={40} />
           <div>
-            <p className="m-0 text-lg leading-tight font-bold text-brand-navy">BFP - PJ</p>
-            <p className="m-0 mt-1 text-xs text-ink-soft">Business Friendly Platform</p>
+            <p className="m-0 text-base leading-tight font-bold text-brand-navy">BFP - PJ</p>
+            <p className="m-0 mt-0.5 text-xs text-ink-soft">Business Friendly Platform</p>
           </div>
         </div>
         <p className="m-0 hidden text-[13px] text-ink-soft sm:block">
@@ -67,50 +69,55 @@ export function LoginPage() {
         </p>
       </header>
 
-      <main className="grid flex-1 lg:grid-cols-[minmax(0,624px)_minmax(0,1fr)]">
+      <main className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
         <section
           aria-label="Sobre a BFP - PJ"
-          className="flex flex-col justify-center bg-tint px-4 py-12 sm:px-16"
+          className="hidden min-h-0 flex-col justify-center overflow-hidden bg-tint px-10 py-6 md:flex lg:px-16 [@media(max-height:760px)]:py-4"
         >
           <p className="m-0 text-xs font-semibold tracking-wide text-brand-navy uppercase">
             Inteligência para o seu negócio
           </p>
-          <p className="m-0 mt-5 text-[32px] leading-[1.4] font-semibold text-brand-navy">
+          <p className="m-0 mt-4 text-[30px] leading-[1.3] font-semibold text-brand-navy [@media(max-height:760px)]:mt-2 [@media(max-height:760px)]:text-[24px]">
             Dados que aproximam.
             <br />
             Decisões que avançam.
           </p>
-          <p className="m-0 mt-5 max-w-[430px] text-sm leading-relaxed text-ink-soft">
+          <p className="m-0 mt-4 max-w-[430px] text-sm leading-relaxed text-ink-soft [@media(max-height:760px)]:mt-2">
             Um espaço para explorar dados, conhecer melhor seus clientes e orientar a próxima
             decisão.
           </p>
-          <hr className="my-10 max-w-[496px] border-line" />
-          <ul className="m-0 flex list-none flex-col gap-6 p-0">
+          <hr className="my-7 max-w-[496px] border-line [@media(max-height:760px)]:my-4" />
+          <ul className="m-0 flex list-none flex-col gap-5 p-0 [@media(max-height:760px)]:gap-3">
             {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
               <li className="flex items-center gap-4" key={title}>
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-card text-brand-navy">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-card text-brand-navy [@media(max-height:760px)]:h-8 [@media(max-height:760px)]:w-8">
                   <Icon aria-hidden className="h-5 w-5" strokeWidth={1.75} />
                 </span>
                 <span>
                   <span className="block text-sm font-semibold text-brand-navy">{title}</span>
-                  <span className="mt-1 block text-[13px] text-ink-soft">{text}</span>
+                  <span className="mt-0.5 block text-[13px] text-ink-soft">{text}</span>
                 </span>
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="flex items-center justify-center px-4 py-12 sm:px-16">
-          <div className="w-full max-w-[432px]">
-            <h1 className="m-0 text-[32px] font-semibold text-brand-navy">Acesse a BFP - PJ</h1>
-            <p className="m-0 mt-2 text-sm text-ink-soft">
+        <section className="flex min-h-0 items-center justify-center overflow-y-auto px-4 py-6 sm:px-12 [@media(max-height:760px)]:py-3">
+          <div className="w-full max-w-[400px]">
+            <h1 className="m-0 text-[28px] font-semibold text-brand-navy [@media(max-height:760px)]:text-[24px]">
+              Acesse a BFP - PJ
+            </h1>
+            <p className="m-0 mt-1 text-sm text-ink-soft">
               Entre com suas credenciais ou sua conta corporativa.
             </p>
-            <form className="mt-8 flex flex-col gap-4" onSubmit={handleSubmit}>
+            <form
+              className="mt-6 flex flex-col gap-3 [@media(max-height:760px)]:mt-4"
+              onSubmit={handleSubmit}
+            >
               <Field htmlFor="email" label="E-mail corporativo">
                 <Input
                   autoComplete="username"
-                  className="h-11"
+                  className="h-10"
                   id="email"
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="nome@empresa.com"
@@ -122,7 +129,7 @@ export function LoginPage() {
               <Field htmlFor="password" label="Senha">
                 <Input
                   autoComplete="current-password"
-                  className="h-11"
+                  className="h-10"
                   id="password"
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Digite sua senha"
@@ -151,7 +158,7 @@ export function LoginPage() {
               ) : null}
               {info ? <Notice tone="info">{info}</Notice> : null}
               <button
-                className="h-12 rounded-[var(--radius-control)] bg-brand-orange text-[15px] font-semibold text-white transition-colors hover:bg-brand-orange-hover disabled:opacity-60"
+                className="h-11 rounded-[var(--radius-control)] bg-brand-orange text-[15px] font-semibold text-white transition-colors hover:bg-brand-orange-hover disabled:opacity-60"
                 disabled={pending}
                 type="submit"
               >
@@ -159,16 +166,14 @@ export function LoginPage() {
               </button>
             </form>
 
-            <div className="my-6 flex items-center gap-4 text-xs text-ink-soft">
+            <div className="my-4 flex items-center gap-4 text-xs text-ink-soft [@media(max-height:760px)]:my-3">
               <span className="h-px flex-1 bg-line" />
-              ou
+              ou use a conta corporativa (Single Sign-On)
               <span className="h-px flex-1 bg-line" />
             </div>
 
-            <p className="m-0 text-base font-semibold text-brand-navy">Single Sign-On</p>
-            <p className="m-0 mt-1 text-sm text-ink-soft">Use sua conta corporativa.</p>
             <button
-              className="mt-4 h-12 w-full rounded-[var(--radius-control)] border border-brand-navy bg-card text-[15px] font-semibold text-brand-navy transition-colors hover:bg-tint"
+              className="h-11 w-full rounded-[var(--radius-control)] border border-brand-navy bg-card text-[15px] font-semibold text-brand-navy transition-colors hover:bg-tint"
               onClick={() =>
                 setInfo(
                   'O SSO corporativo ainda não está habilitado neste ambiente. Entre com e-mail e senha.',
@@ -179,19 +184,16 @@ export function LoginPage() {
               Entrar com SSO
             </button>
 
-            <div className="mt-6 flex gap-3 rounded-[var(--radius-card)] bg-muted px-4 py-4">
-              <CircleHelp aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft" />
-              <div className="text-[13px]">
-                <p className="m-0 font-semibold text-ink">Precisa de acesso?</p>
-                <p className="m-0 mt-1 leading-relaxed text-ink-soft">
-                  Fale com o administrador da sua empresa para solicitar acesso ou obter ajuda com o
-                  SSO.
-                </p>
-              </div>
-            </div>
+            <p className="m-0 mt-4 flex items-start gap-2 text-[13px] leading-snug text-ink-soft [@media(max-height:760px)]:mt-3">
+              <CircleHelp aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <span className="font-semibold text-ink">Precisa de acesso?</span> Fale com o
+                administrador da sua empresa.
+              </span>
+            </p>
 
             {import.meta.env.DEV ? (
-              <details className="mt-4 text-[13px]">
+              <details className="mt-3 text-[13px]">
                 <summary className="cursor-pointer text-ink-soft">
                   Perfis de demonstração (ambiente local)
                 </summary>
@@ -215,7 +217,7 @@ export function LoginPage() {
         </section>
       </main>
 
-      <footer className="flex items-center justify-between gap-4 border-t border-line px-4 py-6 text-xs sm:px-16">
+      <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-line px-4 py-3 text-xs sm:px-12">
         <span className="text-ink-soft">BFP - PJ · Business Friendly Platform</span>
         <span className="font-semibold text-brand-navy">Itaú Empresas</span>
       </footer>
