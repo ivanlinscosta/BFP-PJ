@@ -116,6 +116,27 @@ valores); taxas e médias recebem o motivo da incompatibilidade.
 | Cascata                 | `WATERFALL`          | Especializados           | Use 1 métrica que soma com 1 dimensão.                                        |
 | Ranking                 | `RANKING`            | Especializados           | Use 1 métrica com 1 dimensão.                                                 |
 
+## Ajuste automático da análise (Explorar)
+
+Um gráfico incompatível não fica travado no Explorar: `apps/web/src/features/viz/fixes.ts`
+(`buildVisualizationFix`) monta a análise mais próxima que o gráfico consegue desenhar e o menu
+mostra, antes do clique, o que muda ("Clique para ajustar a análise: …"). Exemplos:
+
+| Gráfico                                | Ajuste                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Funil                                  | Troca as métricas pelas etapas da jornada (Leads → Contas abertas → Onboardings → Ativações D30) e remove dimensões |
+| Mapa                                   | Adiciona Estado (ou Região)                                                                                         |
+| Linha / Área                           | Adiciona o mês da métrica                                                                                           |
+| Rosca / Treemap / Cascata / empilhados | Usa a métrica somável (numerador da taxa) e uma dimensão categórica                                                 |
+| Dispersão / Quadrantes / Bolhas        | Adiciona métricas de outra unidade (ex.: CAC × conversão)                                                           |
+| Sankey                                 | Origem × destino (Canal × Produto)                                                                                  |
+| Cohort / Curva de retenção             | Ativações D30 por mês de abertura × mês de ativação                                                                 |
+| Radar                                  | Os seis scores do DNA                                                                                               |
+
+O ajuste só é oferecido quando a análise resultante passa em `checkVisualizationCompatibility`;
+se a métrica escolhida não serve (ex.: um score numa rosca), usa Contas abertas e diz isso.
+O resultado é aplicado com `adjustSpec` (aviso no topo do Explorar) e fica em modo MANUAL.
+
 ## Mapa
 
 Mapa do Brasil em formato de grade (cartograma): cada UF é um quadrado na sua posição geográfica,

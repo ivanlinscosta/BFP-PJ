@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { describeAnalysisSpec } from '@bfp/shared';
+import { chartName, describeAnalysisSpec, type ChartType } from '@bfp/shared';
 import { Badge, CertificationBadge } from '@/components/ui/badge';
 import { Notice } from '@/components/ui/notice';
 import { PageHeader } from '@/components/shell/page-header';
@@ -40,6 +40,7 @@ import {
 import { useAnalysisStore } from '@/features/explorer/store';
 import { useFeatureFlags } from '@/features/admin/hooks';
 import { downloadCsv } from '@/features/viz/csv';
+import { buildVisualizationFix } from '@/features/viz/fixes';
 import { useVisualizationModel } from '@/features/viz/visualization-renderer';
 import { useMeshDatasets } from '@/features/mesh/api';
 import { DatasetPicker } from '@/features/mesh/dataset-picker';
@@ -55,6 +56,10 @@ export function ExplorerPage() {
   const dimensionsQuery = useDimensionCatalog();
   const metrics = useMemo(() => metricsQuery.data ?? [], [metricsQuery.data]);
   const dimensions = useMemo(() => dimensionsQuery.data ?? [], [dimensionsQuery.data]);
+  const fixFor = useCallback(
+    (chart: ChartType) => buildVisualizationFix(chart, spec, { metrics, dimensions }),
+    [spec, metrics, dimensions],
+  );
   const labels = useSpecLabels();
   const flags = useFeatureFlags();
   const mesh = useMeshDatasets();
@@ -293,6 +298,13 @@ export function ExplorerPage() {
                   onSave={() => setDialog('save')}
                   onShare={() => setDialog('share')}
                   model={visualizationModel}
+                  fixFor={fixFor}
+                  onApplyFix={(chart, fix) =>
+                    store.adjustSpec(
+                      fix.spec,
+                      `Análise ajustada para ${chartName(chart).toLowerCase()}: ${fix.label}`,
+                    )
+                  }
                   onSelectVisualization={(value) => store.setVisualization(value)}
                   result={result.data}
                   saveStatus={saveStatus}

@@ -119,8 +119,35 @@ test('Seletor mostra requisitos dos gráficos incompatíveis', async ({ page }) 
   });
   await trigger(page).click();
   await page.getByLabel('Buscar visualização').fill('sankey');
-  await expect(option(page, /Sankey/)).toHaveAttribute('aria-disabled', 'true');
   await expect(option(page, /Sankey/)).toContainText('Adicione uma dimensão de origem');
+  await expect(option(page, /Sankey/)).toContainText('Clique para ajustar a análise');
   await page.getByLabel('Buscar visualização').fill('mapa');
   await expect(option(page, /^Mapa\b(?! de calor)/)).toContainText('Adicione Estado ou Região');
+});
+
+test('Gráfico incompatível ajusta a análise: canal vira funil da jornada', async ({ page }) => {
+  const errors = trackConsoleErrors(page);
+  await login(page);
+  await open(page, {
+    datasets: ['customer_360'],
+    metrics: [{ id: 'accounts_opened' }],
+    dimensions: [{ id: 'acquisition_channel' }],
+  });
+  await trigger(page).click();
+  const funnel = option(page, /^Funil/).last();
+  await expect(funnel).toHaveAttribute('aria-disabled', 'false');
+  await expect(funnel).toContainText('Clique para ajustar a análise');
+  await funnel.click();
+  await expect(trigger(page)).toHaveText('Funil');
+  await expect(page.getByText(/Análise ajustada para funil/)).toBeVisible();
+  await expect(page.getByText('Topo do funil')).toBeVisible();
+
+  // And the map adds Estado.
+  await trigger(page).click();
+  await option(page, /^Mapa\b(?! de calor)/)
+    .last()
+    .click();
+  await expect(trigger(page)).toHaveText('Mapa');
+  await expect(page.getByRole('figure', { name: /Mapa do Brasil/ })).toBeVisible();
+  expect(errors).toEqual([]);
 });

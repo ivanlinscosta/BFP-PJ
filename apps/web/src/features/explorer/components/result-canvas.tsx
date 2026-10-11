@@ -26,6 +26,7 @@ import { VisualizationSelector } from '@/features/viz/visualization-selector';
 import { capitalize, formatMinutes, formatShare } from '@/lib/format';
 import { pluralizeLabel } from '@/lib/text';
 import { cn } from '@/lib/utils';
+import type { VisualizationFix } from '@/features/viz/fixes';
 import type { AnalyticsResponse } from '../api';
 import type { NextExploration } from '../explorations';
 
@@ -35,6 +36,8 @@ interface ResultCanvasProps {
   /** Visualization model (recommendations, compatibility and the chart drawn). */
   model: ReturnType<typeof useVisualizationModel>;
   onSelectVisualization(type: ChartType | 'AUTO'): void;
+  fixFor?(type: ChartType): VisualizationFix | null;
+  onApplyFix?(type: ChartType, fix: VisualizationFix): void;
   result: AnalyticsResponse | undefined;
   totalsResult?: AnalyticsResponse;
   loading: boolean;
@@ -124,7 +127,12 @@ export function ResultCanvas(props: ResultCanvasProps) {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line px-1 pb-3">
-          <VisualizationSelector model={props.model} onSelect={props.onSelectVisualization} />
+          <VisualizationSelector
+            fixFor={props.fixFor}
+            model={props.model}
+            onApplyFix={props.onApplyFix}
+            onSelect={props.onSelectVisualization}
+          />
         </div>
         <div className="relative mt-4 min-h-[220px] px-1">
           {props.fetching && !props.loading ? (

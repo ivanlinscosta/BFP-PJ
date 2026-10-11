@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search, Sparkles, Star } from 'lucide-react';
+import { Check, ChevronDown, Search, Sparkles, Star, Wand2 } from 'lucide-react';
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import {
   VISUALIZATION_CATEGORIES,
@@ -11,6 +11,7 @@ import { Popover } from '@/components/ui/popover';
 import { trackEvent } from '@/lib/telemetry';
 import { normalizeText } from '@/lib/text';
 import { cn } from '@/lib/utils';
+import type { VisualizationFix } from './fixes';
 import { VISUALIZATION_REGISTRY, resolveDefinition } from './registry';
 import type { useVisualizationModel } from './visualization-renderer';
 
@@ -22,6 +23,7 @@ function Option({
   reason,
   selected,
   starred,
+  fix,
   onPick,
 }: {
   type: ChartType;
@@ -29,11 +31,14 @@ function Option({
   reason?: string;
   selected: boolean;
   starred?: boolean;
+  /** How the analysis changes when an incompatible chart is picked. */
+  fix?: VisualizationFix | null;
   onPick(): void;
 }) {
   const definition = resolveDefinition(type);
   const Icon = definition.icon;
-  const disabled = !evaluation.compatible;
+  const disabled = !evaluation.compatible && !fix;
+  const adjusts = !evaluation.compatible && !!fix;
   return (
     <button
       aria-disabled={disabled}
@@ -45,13 +50,13 @@ function Option({
       )}
       onClick={onPick}
       role="option"
-      title={disabled ? evaluation.reason : undefined}
+      title={disabled ? evaluation.reason : adjusts ? fix!.label : undefined}
       type="button"
     >
       <span
         className={cn(
           'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-control)]',
-          disabled ? 'bg-muted text-ink-faint' : 'bg-cream text-brand-orange',
+          disabled || adjusts ? 'bg-muted text-ink-faint' : 'bg-cream text-brand-orange',
         )}
       >
         <Icon aria-hidden className="h-4 w-4" />
@@ -69,8 +74,14 @@ function Option({
           ) : null}
         </span>
         <span className="block text-xs leading-snug text-ink-soft">
-          {disabled ? evaluation.reason : (reason ?? definition.description)}
+          {!evaluation.compatible ? evaluation.reason : (reason ?? definition.description)}
         </span>
+        {adjusts ? (
+          <span className="mt-0.5 flex items-start gap-1 text-xs leading-snug font-medium text-brand-navy">
+            <Wand2 aria-hidden className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>Clique para ajustar a análise: {fix!.label}</span>
+          </span>
+        ) : null}
       </span>
       {selected ? <Check aria-hidden className="mt-1 h-4 w-4 shrink-0 text-brand-navy" /> : null}
     </button>
@@ -87,9 +98,14 @@ export function VisualizationSelector({
   onSelect,
   surface = 'explorer',
   compact = false,
+  fixFor,
+  onApplyFix,
 }: {
   model: Model;
   onSelect(type: ChartType | 'AUTO'): void;
+  /** Adjustment that makes an incompatible chart usable (Explorer only). */
+  fixFor?(type: ChartType): VisualizationFix | null;
+  onApplyFix?(type: ChartType, fix: VisualizationFix): void;
   surface?: 'explorer' | 'dashboard' | 'chat';
   /** Smaller trigger without the caption (chat cards). */
   compact?: boolean;
@@ -111,8 +127,32 @@ export function VisualizationSelector({
     return normalizeText(`${definition.name} ${definition.description} ${type}`).includes(search);
   };
   const shapeInfo = describeShape(shape);
+  const fixes = useMemo(() => {
+    const map = new Map<ChartType, VisualizationFix>();
+    if (!open || !fixFor || !onApplyFix) return map;
+    for (const evaluation of evaluations) {
+      if (evaluation.compatible) continue;
+      const fix = fixFor(evaluation.type);
+      if (fix) map.set(evaluation.type, fix);
+    }
+    return map;
+  }, [open, fixFor, onApplyFix, evaluations]);
 
   function pick(type: ChartType | 'AUTO') {
+    const fix = type === 'AUTO' ? undefined : fixes.get(type);
+    if (type !== 'AUTO' && !byType.get(type)?.compatible && fix && onApplyFix) {
+      trackEvent('VISUALIZATION_SELECTED', {
+        previousType: auto ? 'AUTO' : current,
+        type,
+        mode: 'MANUAL',
+        surface,
+        shape: shapeInfo,
+      });
+      onApplyFix(type, fix);
+      setOpen(false);
+      setQuery('');
+      return;
+    }
     if (type !== 'AUTO' && !byType.get(type)?.compatible) {
       trackEvent('VISUALIZATION_INCOMPATIBLE_ATTEMPT', { type, surface, shape: shapeInfo });
       return;
@@ -273,6 +313,7 @@ export function VisualizationSelector({
                   {types.map((type) => (
                     <Option
                       evaluation={byType.get(type)!}
+                      fix={fixes.get(type)}
                       key={type}
                       onPick={() => pick(type)}
                       reason={byType.get(type)?.compatible ? byType.get(type)?.why : undefined}

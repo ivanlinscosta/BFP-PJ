@@ -46,6 +46,8 @@ interface AnalysisState {
   clearAnalysis(): void;
   loadAnalysis(spec: AnalysisSpec, saved?: SavedAnalysisRef | null): void;
   applyOperations(operations: AnalysisOperation[], message?: string): void;
+  /** Replaces the analysis and tells the user why (e.g. adjusted to fit a chart). */
+  adjustSpec(spec: AnalysisSpec, message: string): void;
   markSaved(saved: SavedAnalysisRef): void;
   dismissNotice(): void;
 }
@@ -129,6 +131,13 @@ export const useAnalysisStore = create<AnalysisState>()(
           spec: applyAnalysisOperations(state.spec, operations),
           dirty: true,
           notice: message ? { id: ++noticeSequence, message } : state.notice,
+        })),
+      adjustSpec: (spec, message) =>
+        set((state) => ({
+          spec,
+          dirty: true,
+          notice: { id: ++noticeSequence, message },
+          saved: state.saved,
         })),
       markSaved: (saved) => set({ saved, dirty: false }),
       dismissNotice: () => set({ notice: null }),
