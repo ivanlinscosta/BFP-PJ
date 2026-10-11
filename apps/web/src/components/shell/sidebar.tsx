@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { NavLink } from 'react-router';
 import { PRIMARY_NAVIGATION, type NavigationItem } from '@/app/navigation';
 import { cn } from '@/lib/utils';
@@ -76,28 +76,20 @@ export function Sidebar() {
           ))}
         </ul>
       </nav>
-      <div className={cn('mt-auto pb-4', collapsed ? 'mx-2' : 'mx-4')}>
-        <button
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
-          className={cn(
-            'flex h-10 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-ink-soft hover:bg-muted hover:text-brand-navy',
-            collapsed && 'justify-center px-0',
-          )}
-          onClick={toggle}
-          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
-          type="button"
-        >
-          {collapsed ? (
-            <PanelLeftOpen aria-hidden className="h-5 w-5" strokeWidth={1.75} />
-          ) : (
-            <>
-              <PanelLeftClose aria-hidden className="h-5 w-5" strokeWidth={1.75} />
-              <span className="leading-none">Recolher menu</span>
-            </>
-          )}
-        </button>
-      </div>
+      <button
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+        className="absolute top-[34px] -right-3 flex h-6 w-6 items-center justify-center rounded-full border border-line bg-card text-ink-faint shadow-sm transition-colors hover:border-line-strong hover:text-brand-navy"
+        onClick={toggle}
+        title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+        type="button"
+      >
+        {collapsed ? (
+          <ChevronRight aria-hidden className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronLeft aria-hidden className="h-3.5 w-3.5" />
+        )}
+      </button>
     </aside>
   );
 }
