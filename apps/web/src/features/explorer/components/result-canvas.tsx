@@ -1,4 +1,13 @@
-import { ArrowRight, Download, LayoutGrid, LoaderCircle, Save, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronDown,
+  Download,
+  LayoutGrid,
+  LoaderCircle,
+  Save,
+  Sparkles,
+} from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import type { AnalysisSpec } from '@bfp/domain';
 import type { ChartType } from '@bfp/shared';
@@ -6,6 +15,7 @@ import { describeAnalysisSpec, type SpecLabelResolver } from '@bfp/shared';
 import { Badge, CertificationBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, Eyebrow } from '@/components/ui/card';
+import { Popover } from '@/components/ui/popover';
 import { ActionChip } from '@/components/ui/chip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/states/states';
@@ -16,11 +26,83 @@ import {
 } from '@/features/viz/visualization-renderer';
 import { VisualizationSelector } from '@/features/viz/visualization-selector';
 import { capitalize, formatMinutes, formatShare } from '@/lib/format';
+import { PDF_IGNORE_ATTRIBUTE } from '@/lib/pdf';
 import { pluralizeLabel } from '@/lib/text';
 import { cn } from '@/lib/utils';
 import type { VisualizationFix } from '@/features/viz/fixes';
 import type { AnalyticsResponse } from '../api';
 import type { NextExploration } from '../explorations';
+
+export type ExportFormat = 'csv' | 'pdf' | 'png';
+/** Element rasterized by the PDF/PNG exports (the chart card). */
+export const EXPORT_ELEMENT_ID = 'explorer-result';
+
+const EXPORT_OPTIONS: Array<{ format: ExportFormat; label: string; description: string }> = [
+  { format: 'csv', label: 'CSV', description: 'Dados agregados para planilhas' },
+  { format: 'pdf', label: 'PDF', description: 'Gráfico com título e período' },
+  { format: 'png', label: 'Imagem PNG', description: 'Gráfico para apresentações' },
+];
+
+/** "Exportar" opens a menu to choose the format of the export. */
+function ExportMenu({
+  formats,
+  exporting,
+  onExport,
+}: {
+  formats: ExportFormat[];
+  exporting: ExportFormat | null;
+  onExport(format: ExportFormat): void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover
+      anchor={
+        <Button
+          aria-expanded={open}
+          aria-haspopup="menu"
+          disabled={formats.length === 0 || exporting !== null}
+          onClick={() => setOpen(!open)}
+        >
+          {exporting ? (
+            <LoaderCircle aria-hidden className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download aria-hidden className="h-4 w-4" />
+          )}
+          {exporting ? `Gerando ${exporting.toUpperCase()}…` : 'Exportar'}
+          <ChevronDown aria-hidden className="h-3.5 w-3.5" />
+        </Button>
+      }
+      className="w-[240px] p-1"
+      onClose={() => setOpen(false)}
+      open={open}
+    >
+      <div aria-label="Formato do export" className="flex flex-col" role="menu">
+        {EXPORT_OPTIONS.map((option) => {
+          const available = formats.includes(option.format);
+          return (
+            <button
+              className="flex flex-col items-start rounded-[var(--radius-control)] px-2.5 py-2 text-left hover:bg-muted focus-visible:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              data-autofocus={option.format === formats[0] ? '' : undefined}
+              disabled={!available}
+              key={option.format}
+              onClick={() => {
+                setOpen(false);
+                onExport(option.format);
+              }}
+              role="menuitem"
+              type="button"
+            >
+              <span className="text-[13px] font-semibold text-ink">{option.label}</span>
+              <span className="text-xs text-ink-soft">
+                {available ? option.description : 'Exportação de dados desativada'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Popover>
+  );
+}
 
 interface ResultCanvasProps {
   spec: AnalysisSpec;
@@ -42,8 +124,11 @@ interface ResultCanvasProps {
   saveStatus: string;
   onSave(): void;
   onAddToDashboard(): void;
-  onExport(): void;
-  canExport: boolean;
+  onExport(format: ExportFormat): void;
+  /** Formats available now (CSV depends on the export permission). */
+  exportFormats: ExportFormat[];
+  /** Format being generated (PDF/PNG take a moment). */
+  exporting: ExportFormat | null;
 }
 
 function chartTitle(spec: AnalysisSpec, labels: SpecLabelResolver) {
@@ -106,7 +191,7 @@ export function ResultCanvas(props: ResultCanvasProps) {
   const insights = result?.insights ?? [];
   return (
     <div className="flex min-w-0 flex-col gap-3.5">
-      <Card aria-busy={props.fetching} className="relative px-3 pt-3 pb-2.5">
+      <Card aria-busy={props.fetching} className="relative px-3 pt-3 pb-2.5" id={EXPORT_ELEMENT_ID}>
         <div className="flex flex-wrap items-start justify-between gap-4 px-1">
           <div className="min-w-0 flex-1">
             <h2 className="m-0 flex items-center gap-2 text-lg leading-tight font-semibold text-brand-navy">
@@ -116,7 +201,10 @@ export function ResultCanvas(props: ResultCanvasProps) {
             <p className="mt-1.5 text-sm text-ink-soft">{capitalize(subtitle)}</p>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-end gap-2 border-b border-line px-1 pb-3">
+        <div
+          className="mt-3 flex flex-wrap items-end gap-2 border-b border-line px-1 pb-3"
+          {...{ [PDF_IGNORE_ATTRIBUTE]: '' }}
+        >
           <VisualizationSelector
             fixFor={props.fixFor}
             model={props.model}
@@ -232,7 +320,7 @@ export function ResultCanvas(props: ResultCanvasProps) {
           <div className="mt-3 border-t border-line pt-3">
             <Link
               className="inline-flex items-center gap-2 text-[13px] font-semibold text-brand-navy hover:underline"
-              to="/inteligencia"
+              to="/inteligencia?origem=explorar"
             >
               <Sparkles aria-hidden className="h-4 w-4" />
               Aprofundar na Inteligência PJ
@@ -251,10 +339,11 @@ export function ResultCanvas(props: ResultCanvasProps) {
           <LayoutGrid aria-hidden className="h-4 w-4" />
           Adicionar ao dashboard
         </Button>
-        <Button disabled={!props.canExport} onClick={props.onExport}>
-          <Download aria-hidden className="h-4 w-4" />
-          Exportar
-        </Button>
+        <ExportMenu
+          exporting={props.exporting}
+          formats={props.exportFormats}
+          onExport={props.onExport}
+        />
       </div>
       <p className="text-[11px] text-ink-soft">{statusParts.join(' · ')}</p>
       {planLabel ? (

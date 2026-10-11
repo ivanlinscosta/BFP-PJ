@@ -19,7 +19,11 @@ import {
 import { DataLibrary } from '@/features/explorer/components/data-library';
 import { EmptyCanvas } from '@/features/explorer/components/empty-canvas';
 import { QueryBuilder } from '@/features/explorer/components/query-builder';
-import { ResultCanvas } from '@/features/explorer/components/result-canvas';
+import {
+  EXPORT_ELEMENT_ID,
+  ResultCanvas,
+  type ExportFormat,
+} from '@/features/explorer/components/result-canvas';
 import type { DraggedItem } from '@/features/explorer/dnd';
 import { buildNextExplorations } from '@/features/explorer/explorations';
 import { useAnalysisResult } from '@/features/explorer/hooks';
@@ -39,6 +43,7 @@ import { useVisualizationModel } from '@/features/viz/visualization-renderer';
 import { useMeshDatasets } from '@/features/mesh/api';
 import { DatasetPicker } from '@/features/mesh/dataset-picker';
 import { capitalize } from '@/lib/format';
+import { exportElementToPdf, exportElementToPng } from '@/lib/pdf';
 
 type DialogName = 'save' | 'dashboard' | null;
 
@@ -60,6 +65,8 @@ export function ExplorerPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogName>(null);
   const [loadError, setLoadError] = useState<unknown>(null);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Deep links: ?spec=<AnalysisSpec JSON> (catalog, customer 360, AI) or ?analysis=<saved id>.
   const handledLink = useRef<string | null>(null);
@@ -121,6 +128,29 @@ export function ExplorerPage() {
       ? 'Alterações não salvas'
       : 'Análise salva'
     : 'Sem alterações salvas';
+
+  async function exportResult(format: ExportFormat) {
+    const title = store.saved?.name ?? description.title;
+    if (format === 'csv') {
+      if (result.data) downloadCsv(result.data, title);
+      return;
+    }
+    const element = document.getElementById(EXPORT_ELEMENT_ID);
+    if (!element) return;
+    setExporting(format);
+    setExportError(null);
+    try {
+      if (format === 'pdf') {
+        await exportElementToPdf(element, { title, subtitle: capitalize(description.period) });
+      } else {
+        await exportElementToPng(element, { title });
+      }
+    } catch {
+      setExportError(`Não foi possível gerar o ${format.toUpperCase()}. Tente novamente.`);
+    } finally {
+      setExporting(null);
+    }
+  }
 
   function handleToggle(item: DraggedItem) {
     if (item.kind === 'metric') {
@@ -263,8 +293,16 @@ export function ExplorerPage() {
           ) : (
             <>
               <p className="-mt-1 text-sm text-ink-soft">{capitalize(description.sentence)}</p>
+              {exportError ? <Notice tone="error">{exportError}</Notice> : null}
               <ResultCanvas
-                canExport={flags.csvExport && Boolean(result.data && result.data.rows.length > 0)}
+                exportFormats={
+                  result.data && result.data.rows.length > 0
+                    ? flags.csvExport
+                      ? ['csv', 'pdf', 'png']
+                      : ['pdf', 'png']
+                    : []
+                }
+                exporting={exporting}
                 error={result.error}
                 explorations={explorations}
                 fetching={result.isFetching}
@@ -275,9 +313,7 @@ export function ExplorerPage() {
                 onExplore={(exploration) =>
                   store.applyOperations(exploration.operations, exploration.message)
                 }
-                onExport={() =>
-                  result.data && downloadCsv(result.data, store.saved?.name ?? description.title)
-                }
+                onExport={(format) => void exportResult(format)}
                 onRetry={() => void result.refetch()}
                 onSave={() => setDialog('save')}
                 model={visualizationModel}

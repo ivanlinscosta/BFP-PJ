@@ -49,6 +49,8 @@ interface ChatEntry {
   retry?: string;
   /** Bases the question was answered with. */
   datasets?: string[];
+  /** The analysis was brought from the Explorer ("Aprofundar na Inteligência PJ"). */
+  fromExplorer?: boolean;
 }
 
 interface ChatState {
@@ -101,6 +103,42 @@ function answeredSpec(reply: IntelligenceReply | undefined) {
     : undefined;
 }
 
+/** Suggestions to go deeper into an analysis brought from the Explorer. */
+const HANDOFF_SUGGESTIONS = [
+  'Quais são os principais destaques desta análise?',
+  'Compare com o período anterior',
+  'O que explica a diferença entre o maior e o menor valor?',
+  'Crie um estudo aprofundado a partir desta análise',
+];
+
+/** Starts a conversation whose first message is the Explorer analysis (chart + context). */
+function explorerHandoff(spec: AnalysisSpec, title: string): ChatState {
+  return {
+    datasets: spec.datasets,
+    entries: [
+      {
+        id: 1,
+        role: 'assistant',
+        fromExplorer: true,
+        datasets: spec.datasets,
+        text: `Trouxe a sua análise do Explorar: ${title}. Ela é o contexto desta conversa — pergunte o que quiser aprofundar.`,
+        reply: {
+          conversationId: '',
+          provider: 'local',
+          model: '',
+          action: 'NONE',
+          operations: [],
+          message: '',
+          answer: '',
+          analysisSpec: spec,
+          suggestions: HANDOFF_SUGGESTIONS,
+          explainability: { tools: [], note: '' },
+        },
+      },
+    ],
+  };
+}
+
 /**
  * Inteligência PJ: a conversation where people ask for analyses of the data they can access.
  * Each answer brings the governed analysis behind it (chart/table, findings, source) and the
@@ -121,7 +159,12 @@ export function IntelligencePage() {
   const [chat, setChat] = useState<ChatState>(() => {
     const customerId = searchParams.get('cliente');
     // Coming from a customer page starts a conversation about that customer.
-    return customerId ? { customer: { customerId }, entries: [] } : loadChat();
+    if (customerId) return { customer: { customerId }, entries: [] };
+    // "Aprofundar na Inteligência PJ": a new conversation about the Explorer analysis.
+    if (searchParams.get('origem') === 'explorar' && spec.metrics.length > 0) {
+      return explorerHandoff(spec, describeAnalysisSpec(spec, labels).title);
+    }
+    return loadChat();
   });
   const [prompt, setPrompt] = useState('');
   const [picking, setPicking] = useState(false);
@@ -227,6 +270,12 @@ export function IntelligencePage() {
     setPrompt('');
     mutation.mutate(trimmed);
   }
+
+  // The Explorer handoff is consumed once (a reload keeps the conversation, not a new one).
+  useEffect(() => {
+    if (searchParams.get('origem') === 'explorar') setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // A question asked from the customer page is sent once, then removed from the URL.
   const initialQuestion = useRef(searchParams.get('pergunta'));
@@ -383,7 +432,9 @@ export function IntelligencePage() {
                   <div className="min-w-0 flex-1">
                     <p className="m-0 flex items-center gap-2 text-xs font-semibold text-brand-navy">
                       Inteligência PJ
-                      {reply ? (
+                      {entry.fromExplorer ? (
+                        <span className="font-normal text-ink-faint">Análise do Explorar</span>
+                      ) : reply ? (
                         <span className="font-normal text-ink-faint">
                           {reply.provider === 'bedrock'
                             ? 'Claude'

@@ -169,3 +169,20 @@ export async function exportElementToPdf(
 
   pdf.save(`${slugify(options.title)}.pdf`);
 }
+
+/** Exports a rendered element (e.g. the Explorer chart card) as a PNG image download. */
+export async function exportElementToPng(element: HTMLElement, options: { title: string }) {
+  const { toPng } = await import('html-to-image');
+  await document.fonts.ready;
+  const fontCss = await getFontEmbedCss();
+  const image = await toPng(element, {
+    backgroundColor: '#ffffff',
+    pixelRatio: 2,
+    ...(fontCss ? { fontEmbedCSS: fontCss } : { skipFonts: true }),
+    filter: (node) => !(node instanceof HTMLElement && node.hasAttribute(PDF_IGNORE_ATTRIBUTE)),
+  });
+  const anchor = document.createElement('a');
+  anchor.href = image;
+  anchor.download = `${slugify(options.title)}.png`;
+  anchor.click();
+}
