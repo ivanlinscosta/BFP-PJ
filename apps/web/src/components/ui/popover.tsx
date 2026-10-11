@@ -18,6 +18,7 @@ export function Popover({
   align?: 'start' | 'end';
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -29,7 +30,12 @@ export function Popover({
     };
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('keydown', handleKey);
-    containerRef.current?.querySelector<HTMLElement>('[data-autofocus], button, input')?.focus();
+    // Focus goes inside the panel (a [data-autofocus] field first), never back to the anchor.
+    const panel = panelRef.current;
+    (
+      panel?.querySelector<HTMLElement>('[data-autofocus]') ??
+      panel?.querySelector<HTMLElement>('input, button')
+    )?.focus();
     return () => {
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKey);
@@ -41,6 +47,7 @@ export function Popover({
       {anchor}
       {open ? (
         <div
+          ref={panelRef}
           className={cn(
             'absolute top-full z-30 mt-1 min-w-[240px] rounded-[var(--radius-card)] border border-line bg-card p-2 shadow-[0_8px_24px_rgba(0,26,71,0.12)]',
             align === 'end' ? 'right-0' : 'left-0',

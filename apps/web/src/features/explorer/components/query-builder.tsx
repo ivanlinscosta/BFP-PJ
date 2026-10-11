@@ -1,4 +1,4 @@
-import { Database, Plus } from 'lucide-react';
+import { Database, Plus, Search } from 'lucide-react';
 import { DragEvent, ReactNode, useState } from 'react';
 import type { AnalysisSpec, FilterCondition } from '@bfp/domain';
 import { describeFilter, type SpecLabelResolver } from '@bfp/shared';
@@ -7,6 +7,7 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Popover } from '@/components/ui/popover';
 import type { CatalogDimension, CatalogMetric } from '@/features/catalog/api';
+import { normalizeText } from '@/lib/text';
 import { cn } from '@/lib/utils';
 import { hasDraggedItem, readDraggedItem, type DraggedItem } from '../dnd';
 import { isDimensionCompatible, MONTH_DIMENSION_ID } from '../spec';
@@ -120,6 +121,7 @@ function ItemPicker({
   children: (toggle: () => void, open: boolean) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const activeMetrics = metrics.filter((metric) =>
     spec.metrics.some((selected) => selected.id === metric.id),
   );
@@ -152,20 +154,52 @@ function ItemPicker({
             featured: true,
           },
         ];
-  const sorted = [...options].sort(
-    (left, right) => Number(Boolean(right.featured)) - Number(Boolean(left.featured)),
-  );
+  const search = normalizeText(query.trim());
+  const sorted = [...options]
+    .filter((option) => !search || normalizeText(option.label).includes(search))
+    .sort((left, right) => Number(Boolean(right.featured)) - Number(Boolean(left.featured)));
+  const noun = kind === 'metric' ? 'métrica' : 'dimensão';
+  const close = () => {
+    setOpen(false);
+    setQuery('');
+  };
 
   return (
     <Popover
-      anchor={children(() => setOpen((current) => !current), open)}
-      className="max-h-72 w-72 overflow-y-auto"
-      onClose={() => setOpen(false)}
+      anchor={children(() => (open ? close() : setOpen(true)), open)}
+      className="w-72 p-0"
+      onClose={close}
       open={open}
     >
+      <label className="flex items-center gap-2 border-b border-line px-3 py-2">
+        <Search aria-hidden className="h-4 w-4 shrink-0 text-ink-faint" />
+        <input
+          aria-label={`Buscar ${noun}`}
+          className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+          data-autofocus
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter picks the first available result.
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            const first = sorted.find((option) => !option.disabled);
+            if (first) {
+              onPick({ kind, id: first.id });
+              close();
+            }
+          }}
+          placeholder={`Buscar ${noun}…`}
+          value={query}
+        />
+      </label>
+      {sorted.length === 0 ? (
+        <p className="m-0 px-3 py-3 text-sm text-ink-soft">
+          Nenhuma {noun} encontrada para “{query.trim()}”.
+        </p>
+      ) : null}
       <ul
         aria-label={kind === 'metric' ? 'Métricas disponíveis' : 'Dimensões disponíveis'}
-        className="m-0 list-none p-0"
+        className="m-0 max-h-64 list-none overflow-y-auto p-2"
         role="listbox"
       >
         {sorted.map((option) => (
@@ -179,7 +213,7 @@ function ItemPicker({
               disabled={option.disabled}
               onClick={() => {
                 onPick({ kind, id: option.id });
-                setOpen(false);
+                close();
               }}
               role="option"
               aria-selected={false}

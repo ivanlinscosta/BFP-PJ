@@ -20,7 +20,7 @@ test('Golden path 1: Explorar → canal → SP → 90 dias → barras → porte 
 
   await page.getByRole('button', { name: 'Adicionar filtro' }).click();
   const dialog = page.getByRole('dialog', { name: 'Adicionar filtro' });
-  await dialog.getByLabel('Dimensão').selectOption('state');
+  await dialog.getByLabel('Dimensão', { exact: true }).selectOption('state');
   await dialog.getByLabel('SP', { exact: true }).check();
   await dialog.getByRole('button', { name: 'Aplicar filtro' }).click();
 

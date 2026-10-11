@@ -3,10 +3,11 @@ import { useState } from 'react';
 import type { FilterCondition } from '@bfp/domain';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Field } from '@/components/ui/input';
+import { Field, SearchInput } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchDimensionValues, type CatalogDimension } from '@/features/catalog/api';
+import { normalizeText } from '@/lib/text';
 
 type Mode = 'EQ' | 'NEQ' | 'IN' | 'NOT_IN';
 
@@ -46,6 +47,17 @@ export function FilterDialog({
       : [],
   );
 
+  const [dimensionQuery, setDimensionQuery] = useState('');
+  const [valueQuery, setValueQuery] = useState('');
+  const dimensionSearch = normalizeText(dimensionQuery.trim());
+  // The current dimension stays in the list so the select never loses its value.
+  const visibleDimensions = filterable.filter(
+    (dimension) =>
+      dimension.id === field ||
+      !dimensionSearch ||
+      normalizeText(dimension.label).includes(dimensionSearch),
+  );
+
   const values = useQuery({
     queryKey: ['catalog', 'dimension-values', field],
     queryFn: () => fetchDimensionValues(field),
@@ -53,6 +65,13 @@ export function FilterDialog({
     staleTime: 5 * 60 * 1000,
   });
   const multiple = mode === 'IN' || mode === 'NOT_IN';
+  const valueSearch = normalizeText(valueQuery.trim());
+  const filteredValues = (values.data ?? []).filter(
+    (option) =>
+      selected.includes(option.value) ||
+      !valueSearch ||
+      normalizeText(option.label).includes(valueSearch),
+  );
 
   function submit() {
     if (selected.length === 0) return;
@@ -81,15 +100,35 @@ export function FilterDialog({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field htmlFor="filter-field" label="Dimensão">
+          <SearchInput
+            aria-label="Buscar dimensão"
+            onChange={(event) => {
+              const next = event.target.value;
+              setDimensionQuery(next);
+              // Typing picks the first match, so search + Enter is enough.
+              const search = normalizeText(next.trim());
+              const first = filterable.find(
+                (dimension) => search && normalizeText(dimension.label).includes(search),
+              );
+              if (first && first.id !== field) {
+                setField(first.id);
+                setSelected([]);
+                setValueQuery('');
+              }
+            }}
+            placeholder="Buscar dimensão…"
+            value={dimensionQuery}
+          />
           <Select
             id="filter-field"
             onChange={(event) => {
               setField(event.target.value);
               setSelected([]);
+              setValueQuery('');
             }}
             value={field}
           >
-            {filterable.map((dimension) => (
+            {visibleDimensions.map((dimension) => (
               <option key={dimension.id} value={dimension.id}>
                 {dimension.label}
               </option>
@@ -116,6 +155,13 @@ export function FilterDialog({
       </div>
       <fieldset className="mt-4 border-0 p-0">
         <legend className="text-[13px] font-semibold text-ink">Valores</legend>
+        <SearchInput
+          aria-label="Buscar valor"
+          containerClassName="mt-2"
+          onChange={(event) => setValueQuery(event.target.value)}
+          placeholder="Buscar valor…"
+          value={valueQuery}
+        />
         {values.isLoading ? (
           <div className="mt-2 grid grid-cols-2 gap-2">
             {Array.from({ length: 6 }, (_, index) => (
@@ -123,8 +169,8 @@ export function FilterDialog({
             ))}
           </div>
         ) : (
-          <div className="mt-2 grid max-h-56 grid-cols-2 gap-1 overflow-y-auto pr-1 sm:grid-cols-3">
-            {(values.data ?? []).map((option) => {
+          <div className="mt-2 grid max-h-56 grid-cols-1 gap-1 overflow-y-auto pr-1 sm:grid-cols-2">
+            {filteredValues.map((option) => {
               const checked = selected.includes(option.value);
               return (
                 <label
@@ -146,13 +192,19 @@ export function FilterDialog({
                     }
                     type={multiple ? 'checkbox' : 'radio'}
                   />
-                  <span className="truncate">{option.label}</span>
+                  <span className="truncate" title={option.label}>
+                    {option.label}
+                  </span>
                 </label>
               );
             })}
             {values.data?.length === 0 ? (
               <p className="col-span-full text-sm text-ink-soft">
                 Nenhum valor disponível para esta dimensão.
+              </p>
+            ) : filteredValues.length === 0 ? (
+              <p className="col-span-full text-sm text-ink-soft">
+                Nenhum valor encontrado para “{valueQuery.trim()}”.
               </p>
             ) : null}
           </div>
